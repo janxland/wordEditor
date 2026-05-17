@@ -9,18 +9,16 @@ import {
   Space,
   Typography,
   Collapse,
-  Tag,
   Empty,
-  Tooltip,
 } from 'antd';
 import {
   PlusOutlined,
   DeleteOutlined,
-  CopyOutlined,
 } from '@ant-design/icons';
-import type { CustomStyle, DslDocument, HeadingRule, StyleOverride } from '@/core/types';
-import { MATCH_KIND_OPTIONS, halfPtLabel } from '@/core/dsl-schema';
+import type { DslDocument, HeadingRule, StyleOverride } from '@/core/types';
+import { MATCH_KIND_OPTIONS } from '@/core/dsl-schema';
 import { ParagraphFieldsForm, RunFieldsForm } from './StyleFieldsForm';
+import { CustomStylesEditor } from './CustomStylesEditor';
 import { useEditorStore } from '@/store/editorStore';
 
 const { Text, Title } = Typography;
@@ -235,142 +233,10 @@ export const DslVisualEditor: React.FC = () => {
         )}
 
         {activeSection === 'custom' && (
-          <Space direction="vertical" style={{ width: '100%' }} size="middle">
-            <Button
-              type="dashed"
-              icon={<PlusOutlined />}
-              onClick={() =>
-                patch((d) => ({
-                  ...d,
-                  custom_styles: [
-                    ...d.custom_styles,
-                    {
-                      id: `Style${d.custom_styles.length + 1}`,
-                      name: '新样式',
-                      based_on: 'a',
-                      paragraph: { align: 'left' },
-                    },
-                  ],
-                }))
-              }
-            >
-              添加自定义样式
-            </Button>
-            {dslDoc.custom_styles.map((st, idx) => (
-              <Card
-                key={st.id}
-                size="small"
-                title={
-                  <Space>
-                    <Tag color="blue">{st.name}</Tag>
-                    <Text type="secondary">{st.id}</Text>
-                    {st.run?.size_half_pt != null && (
-                      <Tag>{halfPtLabel(st.run.size_half_pt)}</Tag>
-                    )}
-                  </Space>
-                }
-                extra={
-                  <Space>
-                    <Tooltip title="复制">
-                      <Button
-                        type="text"
-                        icon={<CopyOutlined />}
-                        onClick={() =>
-                          patch((d) => {
-                            const copy = structuredClone(st) as CustomStyle;
-                            copy.id = `${st.id}_copy`;
-                            copy.name = `${st.name} (副本)`;
-                            const custom_styles = [...d.custom_styles];
-                            custom_styles.splice(idx + 1, 0, copy);
-                            return { ...d, custom_styles };
-                          })
-                        }
-                      />
-                    </Tooltip>
-                    <Button
-                      danger
-                      type="text"
-                      icon={<DeleteOutlined />}
-                      onClick={() =>
-                        patch((d) => ({
-                          ...d,
-                          custom_styles: d.custom_styles.filter((_, i) => i !== idx),
-                        }))
-                      }
-                    />
-                  </Space>
-                }
-              >
-                <Row gutter={12} style={{ marginBottom: 12 }}>
-                  <Col span={8}>
-                    <Text type="secondary">styleId</Text>
-                    <Input
-                      value={st.id}
-                      onChange={(e) =>
-                        patch((d) => {
-                          const custom_styles = [...d.custom_styles];
-                          custom_styles[idx] = { ...st, id: e.target.value };
-                          return { ...d, custom_styles };
-                        })
-                      }
-                    />
-                  </Col>
-                  <Col span={8}>
-                    <Text type="secondary">显示名 (Pandoc custom-style)</Text>
-                    <Input
-                      value={st.name}
-                      onChange={(e) =>
-                        patch((d) => {
-                          const custom_styles = [...d.custom_styles];
-                          custom_styles[idx] = { ...st, name: e.target.value };
-                          return { ...d, custom_styles };
-                        })
-                      }
-                    />
-                  </Col>
-                  <Col span={8}>
-                    <Text type="secondary">based_on</Text>
-                    <Input
-                      value={st.based_on ?? 'a'}
-                      onChange={(e) =>
-                        patch((d) => {
-                          const custom_styles = [...d.custom_styles];
-                          custom_styles[idx] = { ...st, based_on: e.target.value };
-                          return { ...d, custom_styles };
-                        })
-                      }
-                    />
-                  </Col>
-                </Row>
-                <Row gutter={16}>
-                  <Col span={12}>
-                    <ParagraphFieldsForm
-                      value={st.paragraph}
-                      onChange={(p) =>
-                        patch((d) => {
-                          const custom_styles = [...d.custom_styles];
-                          custom_styles[idx] = { ...st, paragraph: p };
-                          return { ...d, custom_styles };
-                        })
-                      }
-                    />
-                  </Col>
-                  <Col span={12}>
-                    <RunFieldsForm
-                      value={st.run}
-                      onChange={(r) =>
-                        patch((d) => {
-                          const custom_styles = [...d.custom_styles];
-                          custom_styles[idx] = { ...st, run: r };
-                          return { ...d, custom_styles };
-                        })
-                      }
-                    />
-                  </Col>
-                </Row>
-              </Card>
-            ))}
-          </Space>
+          <CustomStylesEditor
+            styles={dslDoc.custom_styles}
+            onPatch={patch}
+          />
         )}
 
         {activeSection === 'headings' && (

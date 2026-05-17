@@ -5,18 +5,29 @@
     - 包含 Link[id^="Ref"] 的段落（参考文献条目）            → custom-style "参考文献"
     - 仅含单个 Image 的段落                                  → custom-style "图"
     - Figure 中的 Caption                                    → custom-style "图注"
+    - 标题为 Abstract 之后、至下一标题或中文段之前的英文段   → custom-style "Abstract"
+    - 其它纯英文段                                           → custom-style "英文段落"
     - 其它裸正文段落                                         → custom-style "文章的正文"
     - 跳过 Header / CodeBlock / List / BlockQuote / Table 内部段落
     - 不动 Div 已经显式标了 custom-style 的段落
 ]]
 
 local in_special = 0
+local in_abstract = false
 
 local function wrap(style, blocks)
   return pandoc.Div(blocks, pandoc.Attr('', {}, { { 'custom-style', style } }))
 end
 
-function Header(_) return nil end
+local function _header_plain(el)
+  return pandoc.utils.stringify(el.content):gsub('%s+', ' '):match('^%s*(.-)%s*$') or ''
+end
+
+function Header(el)
+  local t = _header_plain(el):lower()
+  in_abstract = (t == 'abstract')
+  return nil
+end
 
 function BlockQuote(el)
   in_special = in_special + 1
@@ -54,8 +65,7 @@ local function is_bib_para(p)
   return false
 end
 
--- 整段英文（不含任何 CJK 字符且非空）：
---   Abstract / Keywords / 纯英文段落 → custom-style "英文段落"
+-- 整段英文（不含任何 CJK 字符且非空）→ 英文段落 / Abstract 等
 local function is_english_para(p)
   local s = pandoc.utils.stringify(p)
   if not s:find('%S') then return false end
@@ -77,6 +87,12 @@ function Para(el)
   end
   if is_bib_para(el) then
     return wrap('参考文献', { el })
+  end
+  if in_abstract then
+    if is_english_para(el) then
+      return wrap('Abstract', { el })
+    end
+    in_abstract = false
   end
   if is_english_para(el) then
     return wrap('英文段落', { el })

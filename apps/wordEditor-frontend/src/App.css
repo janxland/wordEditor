@@ -214,6 +214,98 @@ body,
   max-height: 240px;
 }
 
+/* 自定义样式折叠列表 */
+.dsl-custom-styles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dsl-custom-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.dsl-custom-search {
+  width: min(280px, 100%);
+}
+
+.dsl-custom-hint {
+  font-size: 12px;
+  display: block;
+}
+
+.dsl-custom-collapse .ant-collapse-item {
+  margin-bottom: 8px;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+  background: #fff;
+}
+
+.dsl-custom-collapse .ant-collapse-header {
+  align-items: center !important;
+  padding: 10px 14px !important;
+}
+
+.dsl-custom-collapse .ant-collapse-content-box {
+  padding: 12px 14px 14px !important;
+  background: #fafbfc;
+}
+
+.dsl-custom-collapse-label {
+  flex: 1;
+  min-width: 0;
+  padding-right: 8px;
+}
+
+.dsl-custom-style-name {
+  font-size: 14px;
+}
+
+.dsl-custom-style-id {
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+}
+
+.dsl-custom-style-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dsl-custom-section {
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.dsl-custom-section-title {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.dsl-field-label {
+  display: block;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.dsl-custom-props-row {
+  margin-top: 0;
+}
+
 /* VBA */
 .vba-page {
   max-width: 100%;
