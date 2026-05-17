@@ -1,0 +1,4 @@
+pywin32>=306; platform_system == "Windows"
+pyyaml>=6
+Pillow>=10
+

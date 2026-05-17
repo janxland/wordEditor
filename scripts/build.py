@@ -68,22 +68,43 @@ def run_pandoc(
     output_docx: Path,
     reference_doc: Path,
     lua_filter: Path,
+    extra_lua_filters: list[Path],
     use_html_pipe: bool,
 ) -> None:
     output_docx.parent.mkdir(parents=True, exist_ok=True)
-    lua_arg = ["--lua-filter", str(lua_filter)] if lua_filter.is_file() else []
+    lua_arg: list[str] = []
+    if lua_filter.is_file():
+        lua_arg += ["--lua-filter", str(lua_filter)]
+    for f in extra_lua_filters:
+        if f.is_file():
+            lua_arg += ["--lua-filter", str(f)]
 
     if use_html_pipe:
         # 与上游 md2docx.sh 一致：经 HTML 中转以更好支持部分 HTML 标签
-        cmd1 = [pandoc, str(input_md), "-t", "html"]
+        # 加 tex_math_dollars + tex_math_single_backslash，让 HTML reader 重新识别
+        # \(...\) / $...$ 为数学，DOCX writer 转为 Word 原生 OMML 公式
+        md_dir = str(input_md.parent)
+        cmd1 = [
+            pandoc,
+            str(input_md),
+            "-f",
+            "markdown+tex_math_single_backslash",
+            "-t",
+            "html",
+            "--mathjax",
+            "--embed-resources",
+            "--standalone",
+            f"--resource-path={md_dir}",
+        ]
         cmd2 = [
             pandoc,
             "-f",
-            "html",
+            "html+tex_math_dollars+tex_math_single_backslash",
             "-o",
             str(output_docx),
             "--reference-doc",
             str(reference_doc),
+            f"--resource-path={md_dir}",
             *lua_arg,
         ]
         html = subprocess.check_output(cmd1, text=True, encoding="utf-8", errors="replace")
@@ -108,6 +129,14 @@ def main() -> int:
     parser.add_argument("-t", "--template", help="模板 id，见 config/templates.json")
     parser.add_argument("--list-templates", action="store_true", help="列出模板")
     parser.add_argument("--no-html-pipe", action="store_true", help="不使用 html 管道（更快，HTML 支持较弱）")
+    parser.add_argument("--no-postprocess", action="store_true",
+                        help="不运行后处理（VBA 宏 + OOXML 样式注入）")
+    parser.add_argument("--render-math", action="store_true",
+                        help="预渲染行内 LaTeX 为 Unicode（默认关，交由 Pandoc 生成 Word 原生公式 OMML）")
+    parser.add_argument("--with-formula-macro", action="store_true",
+                        help="后处理时仍跑 VBA 公式宏（默认跳过——公式已 OMML 化）")
+    parser.add_argument("--interactive-macro", action="store_true",
+                        help="后处理时 Word 可见 + 保留 MsgBox（调试）")
     args = parser.parse_args()
 
     cfg = load_config()
@@ -148,17 +177,35 @@ def main() -> int:
         out = ROOT / out
 
     lua = ROOT / cfg.get("lua_filter", "")
+    extra_luas = [ROOT / p for p in template.get("extra_lua_filters", [])]
     print(f"模板: {template['name']} ({template['id']})")
     print(f"输入: {input_md}")
     print(f"输出: {out}")
+    if extra_luas:
+        print(f"额外 Lua: {[str(p.relative_to(ROOT)) for p in extra_luas]}")
+
+    pandoc_input = input_md
+    rendered_md: Path | None = None
+    if args.render_math:
+        rendered_md = DEFAULT_OUTPUT_DIR / f"{input_md.stem}.rendered.md"
+        rendered_md.parent.mkdir(parents=True, exist_ok=True)
+        rc = subprocess.call([
+            sys.executable, str(ROOT / "scripts" / "render_math.py"),
+            str(input_md), "-o", str(rendered_md),
+        ])
+        if rc != 0:
+            print("LaTeX 预渲染失败。", file=sys.stderr)
+            return rc
+        pandoc_input = rendered_md
 
     try:
         run_pandoc(
             pandoc,
-            input_md,
+            pandoc_input,
             out,
             ref,
             lua,
+            extra_luas,
             use_html_pipe=not args.no_html_pipe,
         )
     except subprocess.CalledProcessError as e:
@@ -166,6 +213,34 @@ def main() -> int:
         return e.returncode or 1
 
     print("完成。")
+
+    if not args.no_postprocess:
+        print("\n[后处理] 运行 VBA 宏 …")
+        pp_args = [sys.executable, str(ROOT / "scripts" / "postprocess_word.py"), str(out)]
+        if not args.with_formula_macro:
+            pp_args.append("--skip-formula")
+        if args.interactive_macro:
+            pp_args.append("--interactive")
+        import os as _os
+        env = _os.environ.copy()
+        env.setdefault("PYTHONIOENCODING", "utf-8")
+        rc = subprocess.call(pp_args, env=env)
+        if rc != 0:
+            print("VBA 后处理失败。", file=sys.stderr)
+            return rc
+        print("\n[后处理] 注入 OOXML 样式 …")
+        styles_cmd = [sys.executable, str(ROOT / "scripts" / "postprocess_styles.py"), str(out)]
+        styles_yaml_rel = template.get("styles_yaml")
+        if styles_yaml_rel:
+            styles_yaml = ROOT / styles_yaml_rel
+            if styles_yaml.is_file():
+                styles_cmd += ["--styles", str(styles_yaml)]
+            else:
+                print(f"警告: styles_yaml 不存在 {styles_yaml}，退回内置 DSL", file=sys.stderr)
+        rc = subprocess.call(styles_cmd, env=env)
+        if rc != 0:
+            print("OOXML 样式后处理失败。", file=sys.stderr)
+            return rc
     return 0
 
 

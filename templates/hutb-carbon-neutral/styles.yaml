@@ -1,0 +1,122 @@
+# ============================================================
+# 模板样式 DSL —— 湖南工商大学 · 碳中和模板
+# 详见 docs/styles-dsl.md
+#
+# 通用约定（与 OOXML 单位对齐）：
+#   - size_half_pt:  字号，半磅。1pt = 2，21=小四(10.5pt)，24=小三(12pt)
+#   - spacing_dxa:   段前/段后/缩进，单位 dxa (1/20 pt)。240=12pt 一行
+#   - line_spacing:  single | 1.5 | double | <数字 半磅>
+#   - align:         left | center | right | both | distribute
+#   - indent_chars:  以"中文字符"为单位的缩进（Word: w:firstLineChars 等）
+#   - latin_font / cjk_font:  'inherit' 表示用 fonts 节里的全局值
+# ============================================================
+
+template:
+  id: hutb-carbon-neutral
+  name: 湖南工商大学 · 碳中和
+
+# ---------- 全局字体 ----------
+fonts:
+  latin: Times New Roman    # 西文 ASCII/hAnsi/cs
+  cjk: null                 # 中文 eastAsia: null = 不动模板默认
+
+# ---------- 已有样式覆盖 ----------
+# match 支持: { id: <styleId> } | { name: <name> } | { name_regex: <regex> } | { kind: heading|body }
+overrides:
+  # 正文：只允许西文断行，不强制西文字体（论文中英文混排时不干扰中文主题字体）
+  - match: { kind: body }              # Normal + 文章的正文
+    word_wrap_break_latin: true
+
+  # 标题：中文标题里的英文单词统一 TNR，同时清掉模板残留缩进
+  - match: { kind: heading }           # heading 1..5
+    word_wrap_break_latin: true
+    clear_indent: true
+    latin_font: inherit
+
+# ---------- 新增/重写自定义样式 ----------
+# Pandoc 会按 name 自动创建空壳；本配置覆盖其 pPr/rPr
+custom_styles:
+  - id: Cankaowenxian
+    name: 参考文献
+    based_on: a                         # 基于 Normal
+    paragraph:
+      align: both
+      line_spacing: single
+      spacing_before_dxa: 60
+      spacing_after_dxa: 60
+      hanging_indent_chars: 2           # 悬挂缩进 2 字符（"[N] " 对齐）
+      word_wrap_break_latin: true
+    run:
+      latin_font: inherit
+      size_half_pt: 21                  # 小四
+
+  - id: TuStyle
+    name: 图
+    based_on: a
+    paragraph:
+      align: center
+      line_spacing: single
+      spacing_before_dxa: 120
+      spacing_after_dxa: 0
+      indent_clear: true                # 不首行缩进
+      word_wrap_break_latin: true
+
+  - id: TuZhu
+    name: 图注
+    based_on: a
+    paragraph:
+      align: center
+      line_spacing: single
+      spacing_before_dxa: 0
+      spacing_after_dxa: 120
+      indent_clear: true
+      word_wrap_break_latin: true
+    run:
+      latin_font: inherit
+      size_half_pt: 20                  # 五号
+
+  # 整段英文（Abstract / Keywords / 纯英文段落）——由 Lua filter 检测后贴 custom-style
+  - id: Yingwenduanluo
+    name: 英文段落
+    based_on: a
+    paragraph:
+      align: both
+      line_spacing: single
+      word_wrap_break_latin: true
+    run:
+      latin_font: inherit
+      size_half_pt: 21                  # 小四
+
+# ---------- 语义映射（zhengwen-style.lua 行为对照） ----------
+# 仅作文档/校验用途；当前 Lua 仍直接硬编码，可按本节核对一致性
+semantics:
+  bib_paragraph:
+    detect:
+      inline_type: [Link, Span]         # HTML reader: 无 href 的 <a id> 是 Span
+      identifier_regex: '^Ref\d+$'
+      scan_first_n_inlines: 5
+    apply_style: 参考文献
+  english_paragraph:
+    detect:
+      rule: 段落 plain text 非空且不含 CJK 字符（Unified / Ext A / Compatibility）
+    apply_style: 英文段落
+  image_only_paragraph:
+    apply_style: 图
+  figure_caption:
+    apply_style: 图注
+    auto_prefix: "图 {n}　"             # n 从 1 起算（zhengwen-style.lua 的 fig_counter）
+
+# ---------- VBA 标题宏行为（ApplyHeadingsAndRemoveNumbering） ----------
+# 仅作文档；当前宏直接硬编码相同规则
+headings:
+  # 从最长前缀到最短前缀依次匹配；命中后保留原文（不剥离编号）
+  - pattern: '^[一二三四五六七八九十百千]、'   # 中文一级
+    level: 1
+  - pattern: '^\d+\.\d+\.\d+\.\d+( |$)'
+    level: 4
+  - pattern: '^\d+\.\d+\.\d+( |$)'
+    level: 3
+  - pattern: '^\d+\.\d+( |$)'
+    level: 2
+  - pattern: '^\d+( |$)'
+    level: 1
