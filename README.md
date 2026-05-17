@@ -42,7 +42,7 @@ python scripts/build.py --list-templates
 ## 添加自定义模板（如学校官方版式）
 
 1. 在 `templates/<你的模板id>/` 下放入 `reference.docx`（从官方 Word 另存，保留页眉页脚与样式表）。
-2. 在 `config/templates.json` 的 `templates` 数组中增加一项（可复制 `hutb-carbon-neutral` 条目修改 `id`、`name`、`reference_doc`）。
+2. 在 `config/templates.json` 的 `templates` 数组中增加一项（学校完整版式可复制 `hutb-carbon-neutral` 并设 `standalone: true`）。
 3. 执行 `python scripts/build.py -t <你的模板id> -i 你的.md`。
 
 湖南工商大学碳中和模板说明见 [templates/hutb-carbon-neutral/README.md](templates/hutb-carbon-neutral/README.md)。
@@ -60,7 +60,7 @@ wordEditor/
 │   ├── build.ps1 / build.bat
 ├── templates/
 │   ├── builtin/               # 内置英文文件名模板（setup 生成）
-│   └── hutb-carbon-neutral/   # 学校自定义模板目录
+│   └── hutb-carbon-neutral/   # 学校独立模板（standalone，含自有 Lua + styles.yaml）
 └── vendor/
     └── pandoc_docx_template/  # 上游克隆（Lua + 原始 docx）
 ```

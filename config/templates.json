@@ -41,11 +41,13 @@
     {
       "id": "hutb-carbon-neutral",
       "name": "湖南工商大学 · 碳中和（自定义）",
+      "standalone": true,
       "reference_doc": "templates/hutb-carbon-neutral/reference.docx",
+      "lua_filter": "templates/hutb-carbon-neutral/markdown-to-docx.lua",
       "extra_lua_filters": ["templates/hutb-carbon-neutral/zhengwen-style.lua"],
       "styles_yaml": "templates/hutb-carbon-neutral/styles.yaml",
       "source": "user",
-      "note": "将学校官方 Word 模板另存为 reference.docx 放入对应目录，详见 templates/hutb-carbon-neutral/README.md"
+      "note": "独立模板（不复用通用 builtin / 全局 Lua）；将学校官方 Word 另存为 reference.docx，详见 templates/hutb-carbon-neutral/README.md"
     }
   ]
 }

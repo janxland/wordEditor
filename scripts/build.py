@@ -44,6 +44,27 @@ def resolve_template(cfg: dict, template_id: str | None) -> dict:
     raise SystemExit(f"未知模板 '{tid}'。可用: {ids}")
 
 
+def resolve_lua_filters(cfg: dict, template: dict) -> list[Path]:
+    """按模板解析 Pandoc --lua-filter 链。standalone 模板不加载 config 全局过滤器。"""
+    paths: list[Path] = []
+    standalone = bool(template.get("standalone"))
+    if not standalone:
+        global_lua = cfg.get("lua_filter")
+        if global_lua:
+            paths.append(ROOT / global_lua)
+    tpl_lua = template.get("lua_filter")
+    if tpl_lua:
+        paths.append(ROOT / tpl_lua)
+    elif standalone:
+        raise SystemExit(
+            f"独立模板「{template['name']}」须在 templates.json 中配置 lua_filter，"
+            "且过滤器文件位于本模板目录内。"
+        )
+    for rel in template.get("extra_lua_filters", []):
+        paths.append(ROOT / rel)
+    return paths
+
+
 def list_templates(cfg: dict) -> None:
     print("可用模板 (--template / -t):\n")
     for t in cfg["templates"]:
@@ -59,17 +80,16 @@ def run_pandoc(
     input_md: Path,
     output_docx: Path,
     reference_doc: Path,
-    lua_filter: Path,
-    extra_lua_filters: list[Path],
+    lua_filters: list[Path],
     use_html_pipe: bool,
 ) -> None:
     output_docx.parent.mkdir(parents=True, exist_ok=True)
     lua_arg: list[str] = []
-    if lua_filter.is_file():
-        lua_arg += ["--lua-filter", str(lua_filter)]
-    for f in extra_lua_filters:
+    for f in lua_filters:
         if f.is_file():
             lua_arg += ["--lua-filter", str(f)]
+        else:
+            print(f"警告: Lua 过滤器不存在，已跳过: {f}", file=sys.stderr)
 
     if use_html_pipe:
         # 与上游 md2docx.sh 一致：经 HTML 中转以更好支持部分 HTML 标签
@@ -169,13 +189,14 @@ def main() -> int:
     elif not out.is_absolute():
         out = ROOT / out
 
-    lua = ROOT / cfg.get("lua_filter", "")
-    extra_luas = [ROOT / p for p in template.get("extra_lua_filters", [])]
+    lua_filters = resolve_lua_filters(cfg, template)
     print(f"模板: {template['name']} ({template['id']})")
+    if template.get("standalone"):
+        print("模式: 独立模板（不复用通用 builtin / 全局 Lua）")
     print(f"输入: {input_md}")
     print(f"输出: {out}")
-    if extra_luas:
-        print(f"额外 Lua: {[str(p.relative_to(ROOT)) for p in extra_luas]}")
+    if lua_filters:
+        print(f"Lua: {[str(p.relative_to(ROOT)) for p in lua_filters]}")
 
     pandoc_input = input_md
     rendered_md: Path | None = None
@@ -197,8 +218,7 @@ def main() -> int:
             pandoc_input,
             out,
             ref,
-            lua,
-            extra_luas,
+            lua_filters,
             use_html_pipe=not args.no_html_pipe,
         )
     except subprocess.CalledProcessError as e:
@@ -221,19 +241,24 @@ def main() -> int:
         if rc != 0:
             print("VBA 后处理失败。", file=sys.stderr)
             return rc
-        print("\n[后处理] 注入 OOXML 样式 …")
-        styles_cmd = [sys.executable, str(ROOT / "scripts" / "postprocess_styles.py"), str(out)]
         styles_yaml_rel = template.get("styles_yaml")
         if styles_yaml_rel:
+            print("\n[后处理] 注入 OOXML 样式 …")
             styles_yaml = ROOT / styles_yaml_rel
-            if styles_yaml.is_file():
-                styles_cmd += ["--styles", str(styles_yaml)]
-            else:
-                print(f"警告: styles_yaml 不存在 {styles_yaml}，退回内置 DSL", file=sys.stderr)
-        rc = subprocess.call(styles_cmd, env=env)
-        if rc != 0:
-            print("OOXML 样式后处理失败。", file=sys.stderr)
-            return rc
+            if not styles_yaml.is_file():
+                print(f"错误: styles_yaml 不存在 {styles_yaml}", file=sys.stderr)
+                return 1
+            styles_cmd = [
+                sys.executable,
+                str(ROOT / "scripts" / "postprocess_styles.py"),
+                str(out),
+                "--styles",
+                str(styles_yaml),
+            ]
+            rc = subprocess.call(styles_cmd, env=env)
+            if rc != 0:
+                print("OOXML 样式后处理失败。", file=sys.stderr)
+                return rc
     return 0
 
 

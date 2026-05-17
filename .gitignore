@@ -1,13 +1,13 @@
-# 依赖（任意层级）
+# 依赖
 node_modules/
-**/node_modules/
 .pnpm-store/
 
 # 前端构建 / 缓存
 dist/
 .cache/
-# 构建产物
-output/*.docx
+
+# 构建产物（仅保留占位）
+output/**
 !output/.gitkeep
 
 # Python

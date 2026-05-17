@@ -71,7 +71,9 @@ headings:   [ ... ]         # 仅作文档，与 VBA 宏对照
 |---|---|---|
 | `latin_font` | str / `inherit` | 设 `rFonts ascii hAnsi cs` |
 | `cjk_font`   | str / `inherit` | 设 `rFonts eastAsia` |
-| `size_half_pt` | int | 字号 `sz / szCs` |
+| `size_half_pt` | int | 西文字号 `w:sz` |
+| `size_cs_half_pt` | int | 复杂文种字号 `w:szCs`（未设时与 `size_half_pt` 相同） |
+| `first_line_dxa` | int | 可选，覆盖 `first_line_chars` 推算的 `w:firstLine`（twips） |
 
 ## 5. `custom_styles` 行为细节
 
@@ -94,4 +96,4 @@ headings:   [ ... ]         # 仅作文档，与 VBA 宏对照
 py scripts/postprocess_styles.py output.docx --styles templates/<id>/styles.yaml
 ```
 
-由 `build.py` 自动调用：当 `config/templates.json` 的模板项含 `styles_yaml` 字段时即生效；未提供则回退内置默认 DSL（与 hutb-carbon-neutral 等价）。
+由 `build.py` 自动调用：仅当模板项含 `styles_yaml` 时注入（如 `hutb-carbon-neutral` 使用本目录 `styles.yaml`）。通用 builtin 模板无 `styles_yaml`，不跑 OOXML 样式后处理。

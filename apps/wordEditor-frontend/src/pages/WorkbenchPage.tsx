@@ -21,6 +21,7 @@ import { DslVisualEditor } from '@/components/dsl/DslVisualEditor';
 import { LazyCodeEditor } from '@/components/code/LazyCodeEditor';
 import { validateDslYaml } from '@/core/yaml';
 import type { EditorTab } from '@/core/types';
+import { getTemplateLuaFilters } from '@/core/types';
 
 const { Text, Paragraph } = Typography;
 
@@ -44,7 +45,10 @@ export const WorkbenchPage: React.FC = () => {
   const [luaText, setLuaText] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const luaFilters = entry?.extra_lua_filters ?? [];
+  const luaFilters = useMemo(
+    () => (entry ? getTemplateLuaFilters(entry, config) : []),
+    [entry, config],
+  );
 
   useEffect(() => {
     const first = luaFilters[0] ?? null;
@@ -128,7 +132,10 @@ export const WorkbenchPage: React.FC = () => {
                     {t.extra_lua_filters?.length ? (
                       <Tag color="purple">Lua</Tag>
                     ) : null}
-                    {t.source === 'user' && <Tag color="gold">自定义</Tag>}
+                    {t.standalone && <Tag color="blue">独立</Tag>}
+                    {t.source === 'user' && !t.standalone && (
+                      <Tag color="gold">自定义</Tag>
+                    )}
                   </Space>
                 }
               />
@@ -207,9 +214,14 @@ export const WorkbenchPage: React.FC = () => {
                   </Descriptions.Item>
                   <Descriptions.Item label="styles.yaml">
                     {entry.styles_yaml ?? (
-                      <Text type="secondary">未配置 — 使用内置默认 DSL</Text>
+                      <Text type="secondary">未配置</Text>
                     )}
                   </Descriptions.Item>
+                  {entry.standalone && (
+                    <Descriptions.Item label="模式">
+                      独立单例模板（不复用通用 builtin / 全局 Lua）
+                    </Descriptions.Item>
+                  )}
                   <Descriptions.Item label="Lua filters">
                     {luaFilters.length ? (
                       <Space direction="vertical">

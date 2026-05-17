@@ -8,8 +8,7 @@ OOXML 样式后处理（DSL 驱动）。
   3. 注入西文字体（rFonts ascii/hAnsi/cs），保留 eastAsia 等原有属性
 
 用法:
-  py scripts/postprocess_styles.py <docx>                     # 旧式：硬编码 hutb 行为
-  py scripts/postprocess_styles.py <docx> --styles <yaml>     # DSL 驱动
+  py scripts/postprocess_styles.py <docx> --styles <yaml>     # DSL 驱动（须显式指定）
 
 DSL 字段见 docs/styles-dsl.md。
 """
@@ -40,7 +39,7 @@ def _q(t: str) -> str:
 
 HEADING_IDS = {f"Heading{i}" for i in range(1, 6)} | {f"\u6807\u9898 {i}" for i in range(1, 6)}
 HEADING_NAMES = {f"heading {i}" for i in range(1, 6)} | {f"\u6807\u9898 {i}" for i in range(1, 6)}
-BODY_IDS = {"Normal", "a", "\u6587\u7ae0\u7684\u6b63\u6587"}
+BODY_IDS = {"Normal", "a", "ae"}  # ae = 文章的正文（reference.docx styleId）
 BODY_NAMES = {"normal", "\u6587\u7ae0\u7684\u6b63\u6587"}
 
 
@@ -162,9 +161,13 @@ def _apply_paragraph(style: ET.Element, p: dict[str, Any]) -> None:
         })
     if "first_line_chars" in p:
         chars = int(p["first_line_chars"])
+        first_line = p.get("first_line_dxa")
+        if first_line is None:
+            # 与学校 reference.docx 常见 ae 样式一致：2 字符 → firstLineChars/firstLine 均为 200
+            first_line = chars * 100
         ind_attrs.update({
             "firstLineChars": str(chars * 100),
-            "firstLine": str(chars * 210),
+            "firstLine": str(int(first_line)),
         })
     if ind_attrs:
         old = ppr.find("w:ind", NS)
@@ -188,13 +191,20 @@ def _apply_run(style: ET.Element, r: dict[str, Any], fonts: dict[str, Any]) -> N
             font = fonts.get("cjk")
         if font:
             _set_cjk_font(style, font)
-    if "size_half_pt" in r:
+    if "size_half_pt" in r or "size_cs_half_pt" in r:
         rpr = _ensure_rpr(style)
-        for tag in ("sz", "szCs"):
-            old = rpr.find(f"w:{tag}", NS)
+        sz = r.get("size_half_pt")
+        sz_cs = r.get("size_cs_half_pt", sz)
+        if sz is not None:
+            old = rpr.find("w:sz", NS)
             if old is not None:
                 rpr.remove(old)
-            ET.SubElement(rpr, _q(tag), {_q("val"): str(r["size_half_pt"])})
+            ET.SubElement(rpr, _q("sz"), {_q("val"): str(sz)})
+        if sz_cs is not None:
+            old = rpr.find("w:szCs", NS)
+            if old is not None:
+                rpr.remove(old)
+            ET.SubElement(rpr, _q("szCs"), {_q("val"): str(sz_cs)})
 
 
 # ============================================================
@@ -231,8 +241,11 @@ def _find_style_by_name(root: ET.Element, name_val: str) -> ET.Element | None:
     return None
 
 
-def _has_style_id(root: ET.Element, style_id: str) -> bool:
-    return any(_style_id(s) == style_id for s in root.findall("w:style", NS))
+def _find_style_by_id(root: ET.Element, style_id: str) -> ET.Element | None:
+    for s in root.findall("w:style", NS):
+        if _style_id(s) == style_id:
+            return s
+    return None
 
 
 # ============================================================
@@ -275,7 +288,7 @@ def apply_dsl(xml_bytes: bytes, dsl: dict[str, Any]) -> bytes:
         sid = c["id"]
         name = c["name"]
         based_on = c.get("based_on", "a")
-        existing = _find_style_by_name(root, name)
+        existing = _find_style_by_id(root, sid) or _find_style_by_name(root, name)
         if existing is not None:
             for tag in ("w:pPr", "w:rPr"):
                 el = existing.find(tag, NS)
@@ -285,8 +298,6 @@ def apply_dsl(xml_bytes: bytes, dsl: dict[str, Any]) -> bytes:
                 ET.SubElement(existing, _q("qFormat"))
             target = existing
             print(f"  ~ 覆盖样式: name={name!r} (styleId={_style_id(existing)!r})")
-        elif _has_style_id(root, sid):
-            continue
         else:
             target = ET.SubElement(
                 root, _q("style"),
@@ -302,42 +313,6 @@ def apply_dsl(xml_bytes: bytes, dsl: dict[str, Any]) -> bytes:
             _apply_run(target, c["run"], fonts)
 
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
-
-
-# ============================================================
-# 兼容内置默认 DSL（无 --styles 时；与 hutb-carbon-neutral/styles.yaml 等价）
-# ============================================================
-def _builtin_hutb_dsl() -> dict[str, Any]:
-    return {
-        "fonts": {"latin": "Times New Roman"},
-        "overrides": [
-            # 正文不强制西文字体，只处理空格釮顺
-            {"match": {"kind": "body"}, "word_wrap_break_latin": True},
-            {"match": {"kind": "heading"}, "word_wrap_break_latin": True,
-             "clear_indent": True, "latin_font": "inherit"},
-        ],
-        "custom_styles": [
-            {"id": "Cankaowenxian", "name": "\u53c2\u8003\u6587\u732e", "based_on": "a",
-             "paragraph": {"align": "both", "line_spacing": "single",
-                           "spacing_before_dxa": 60, "spacing_after_dxa": 60,
-                           "hanging_indent_chars": 2, "word_wrap_break_latin": True},
-             "run": {"latin_font": "inherit", "size_half_pt": 21}},
-            {"id": "TuStyle", "name": "\u56fe", "based_on": "a",
-             "paragraph": {"align": "center", "line_spacing": "single",
-                           "spacing_before_dxa": 120, "spacing_after_dxa": 0,
-                           "indent_clear": True, "word_wrap_break_latin": True}},
-            {"id": "TuZhu", "name": "\u56fe\u6ce8", "based_on": "a",
-             "paragraph": {"align": "center", "line_spacing": "single",
-                           "spacing_before_dxa": 0, "spacing_after_dxa": 120,
-                           "indent_clear": True, "word_wrap_break_latin": True},
-             "run": {"latin_font": "inherit", "size_half_pt": 20}},
-            # 整段英文（Lua filter 检测无 CJK 的段落后贴上）
-            {"id": "Yingwenduanluo", "name": "\u82f1\u6587\u6bb5\u843d", "based_on": "a",
-             "paragraph": {"align": "both", "line_spacing": "single",
-                           "word_wrap_break_latin": True},
-             "run": {"latin_font": "inherit", "size_half_pt": 21}},
-        ],
-    }
 
 
 def patch_docx(path: Path, dsl: dict[str, Any]) -> None:
@@ -356,23 +331,19 @@ def patch_docx(path: Path, dsl: dict[str, Any]) -> None:
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="OOXML 样式后处理（DSL 驱动）")
     ap.add_argument("docx", type=Path)
-    ap.add_argument("--styles", type=Path, help="模板 styles.yaml；省略则用内置 hutb 默认 DSL")
+    ap.add_argument("--styles", type=Path, required=True, help="模板 styles.yaml（各模板自有 DSL）")
     args = ap.parse_args(argv[1:])
 
     if not args.docx.is_file():
         print(f"\u627e\u4e0d\u5230\u6587\u4ef6: {args.docx}", file=sys.stderr)
         return 1
 
-    if args.styles:
-        if yaml is None:
-            print("\u9700\u8981 pyyaml: py -m pip install pyyaml", file=sys.stderr)
-            return 1
-        with args.styles.open(encoding="utf-8") as f:
-            dsl = yaml.safe_load(f)
-        print(f"[postprocess_styles] {args.docx}  <- DSL: {args.styles}")
-    else:
-        dsl = _builtin_hutb_dsl()
-        print(f"[postprocess_styles] {args.docx}  <- 内置默认 DSL (hutb)")
+    if yaml is None:
+        print("\u9700\u8981 pyyaml: py -m pip install pyyaml", file=sys.stderr)
+        return 1
+    with args.styles.open(encoding="utf-8") as f:
+        dsl = yaml.safe_load(f)
+    print(f"[postprocess_styles] {args.docx}  <- DSL: {args.styles}")
 
     patch_docx(args.docx, dsl)
     print("[postprocess_styles] \u5b8c\u6210")
