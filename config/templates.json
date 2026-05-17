@@ -1,0 +1,49 @@
+{
+  "default_template": "heading-number-list-flush",
+  "lua_filter": "vendor/pandoc_docx_template/markdown-to-docx.lua",
+  "templates": [
+    {
+      "id": "heading-number-list-flush",
+      "name": "通用 · 标题编号 · 列表顶格",
+      "reference_doc": "templates/builtin/heading-number-list-flush.docx",
+      "source": "Achuan-2/pandoc_docx_template"
+    },
+    {
+      "id": "heading-number-list-indent",
+      "name": "通用 · 标题编号 · 列表缩进",
+      "reference_doc": "templates/builtin/heading-number-list-indent.docx",
+      "source": "Achuan-2/pandoc_docx_template"
+    },
+    {
+      "id": "no-heading-number-list-flush",
+      "name": "通用 · 标题不编号 · 列表顶格",
+      "reference_doc": "templates/builtin/no-heading-number-list-flush.docx",
+      "source": "Achuan-2/pandoc_docx_template"
+    },
+    {
+      "id": "no-heading-number-list-indent",
+      "name": "通用 · 标题不编号 · 列表缩进",
+      "reference_doc": "templates/builtin/no-heading-number-list-indent.docx",
+      "source": "Achuan-2/pandoc_docx_template"
+    },
+    {
+      "id": "sci-heading-number",
+      "name": "SCI 论文 · 标题编号",
+      "reference_doc": "templates/builtin/sci-heading-number.docx",
+      "source": "Achuan-2/pandoc_docx_template"
+    },
+    {
+      "id": "sci-no-heading-number",
+      "name": "SCI 论文 · 标题不编号",
+      "reference_doc": "templates/builtin/sci-no-heading-number.docx",
+      "source": "Achuan-2/pandoc_docx_template"
+    },
+    {
+      "id": "hutb-carbon-neutral",
+      "name": "湖南工商大学 · 碳中和（自定义）",
+      "reference_doc": "templates/hutb-carbon-neutral/reference.docx",
+      "source": "user",
+      "note": "将学校官方 Word 模板另存为 reference.docx 放入对应目录，详见 templates/hutb-carbon-neutral/README.md"
+    }
+  ]
+}

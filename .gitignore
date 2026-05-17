@@ -1,0 +1,21 @@
+# 构建产物
+output/*.docx
+!output/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 用户自定义模板（含学校官方 docx，勿提交敏感内容时可取消忽略）
+# templates/hutb-carbon-neutral/reference.docx
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# vendor 内 docx 已由 templates/builtin 提供副本，避免重复提交
+vendor/pandoc_docx_template/template_*.docx
