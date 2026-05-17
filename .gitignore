@@ -1,3 +1,11 @@
+# 依赖（任意层级）
+node_modules/
+**/node_modules/
+.pnpm-store/
+
+# 前端构建 / 缓存
+dist/
+.cache/
 # 构建产物
 output/*.docx
 !output/.gitkeep
@@ -13,7 +21,8 @@ venv/
 
 # IDE / OS
 .idea/
-.vscode/
+.vscode/*
+!.vscode/settings.json
 .DS_Store
 Thumbs.db
 

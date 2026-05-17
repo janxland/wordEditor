@@ -19,6 +19,12 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from tool_paths import find_pandoc  # noqa: E402
+
 CONFIG_PATH = ROOT / "config" / "templates.json"
 DEFAULT_INPUT = ROOT / "input" / "example.md"
 DEFAULT_OUTPUT_DIR = ROOT / "output"
@@ -27,20 +33,6 @@ DEFAULT_OUTPUT_DIR = ROOT / "output"
 def load_config() -> dict:
     with CONFIG_PATH.open(encoding="utf-8") as f:
         return json.load(f)
-
-
-def find_pandoc() -> str:
-    exe = shutil.which("pandoc")
-    if exe:
-        return exe
-    # winget 常见安装路径
-    for candidate in (
-        Path(r"C:\Program Files\Pandoc\pandoc.exe"),
-        Path(r"C:\Users") / Path.home().name / "AppData/Local/Pandoc/pandoc.exe",
-    ):
-        if candidate.is_file():
-            return str(candidate)
-    return "pandoc"
 
 
 def resolve_template(cfg: dict, template_id: str | None) -> dict:
@@ -161,11 +153,12 @@ def main() -> int:
         return 1
 
     pandoc = find_pandoc()
-    if pandoc == "pandoc" and not shutil.which("pandoc"):
+    if not pandoc:
         print(
             "未检测到 Pandoc。请安装后重试，例如:\n"
             "  winget install --id JohnMacFarlane.Pandoc\n"
-            "  或 https://pandoc.org/installing.html",
+            "  或 https://pandoc.org/installing.html\n"
+            "已安装但仍报错时，可设置环境变量 PANDOC 指向 pandoc.exe 完整路径。",
             file=sys.stderr,
         )
         return 1

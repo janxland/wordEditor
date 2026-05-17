@@ -1,0 +1,13 @@
+{
+  "explorer.excludeGitIgnore": true,
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/.pnpm-store": true
+  },
+  "search.exclude": {
+    "**/node_modules": true
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true
+  }
+}
