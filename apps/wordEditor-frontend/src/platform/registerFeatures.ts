@@ -24,20 +24,11 @@ export function registerAppFeatures(): void {
   });
 
   registerFeature({
-    id: 'vba',
-    path: '/vba',
-    label: 'VBA 宏',
-    icon: 'vba',
-    order: 30,
-    lazy: lazy(() => import('@/pages/VbaPage').then((m) => ({ default: m.VbaPage }))),
-  });
-
-  registerFeature({
     id: 'docs',
     path: '/docs',
     label: '规范文档',
     icon: 'docs',
-    order: 40,
+    order: 30,
     lazy: lazy(() => import('@/pages/DocsPage').then((m) => ({ default: m.DocsPage }))),
   });
 }

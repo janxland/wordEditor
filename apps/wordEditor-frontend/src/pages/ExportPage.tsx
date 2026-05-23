@@ -1,27 +1,19 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
+import { Button, Select, Space, Checkbox, Input, Tooltip } from 'antd';
 import {
-  Button,
-  Select,
-  Space,
-  Typography,
-  Alert,
-  Checkbox,
-  Input,
-  Steps,
-  Card,
-  Tooltip,
-} from 'antd';
-import {
-  DownloadOutlined,
-  FileWordOutlined,
   ThunderboltOutlined,
+  CloudDownloadOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons';
-import { LazyCodeEditor } from '@/components/code/LazyCodeEditor';
-import { DEFAULT_PIPELINE_STEPS, fetchToolsStatus, type ToolsStatus } from '@/kernel/pipeline';
+import { LazyMarkdownEditor } from '@/components/code/LazyMarkdownEditor';
+import {
+  BuildProgressModal,
+  ExportResultModal,
+  ExportErrorModal,
+} from '@/components/feedback';
+import { fetchToolsStatus, type ToolsStatus } from '@/kernel/pipeline';
 import { useAppStore } from '@/store/appStore';
 import { useExportStore } from '@/store/exportStore';
-
-const { Text, Title } = Typography;
 
 export const ExportPage: React.FC = () => {
   const config = useAppStore((s) => s.config);
@@ -36,12 +28,27 @@ export const ExportPage: React.FC = () => {
   const setFileName = useExportStore((s) => s.setFileName);
   const options = useExportStore((s) => s.options);
   const setOptions = useExportStore((s) => s.setOptions);
+  const autoDownload = useExportStore((s) => s.autoDownload);
+  const setAutoDownload = useExportStore((s) => s.setAutoDownload);
   const building = useExportStore((s) => s.building);
   const lastError = useExportStore((s) => s.lastError);
   const downloadUrl = useExportStore((s) => s.downloadUrl);
   const exportDocx = useExportStore((s) => s.exportDocx);
   const loadSample = useExportStore((s) => s.loadSample);
-  const resetResult = useExportStore((s) => s.resetResult);
+  const errorModalOpen = useExportStore((s) => s.errorModalOpen);
+  const closeErrorModal = useExportStore((s) => s.closeErrorModal);
+  const cancelBuild = useExportStore((s) => s.cancelBuild);
+  const downloadDocx = useExportStore((s) => s.downloadDocx);
+  const downloading = useExportStore((s) => s.downloading);
+
+  const progressOpen = useExportStore((s) => s.progressOpen);
+  const resultOpen = useExportStore((s) => s.resultOpen);
+  const buildSteps = useExportStore((s) => s.buildSteps);
+  const buildLogs = useExportStore((s) => s.buildLogs);
+  const buildStartedAt = useExportStore((s) => s.buildStartedAt);
+  const buildFinishedAt = useExportStore((s) => s.buildFinishedAt);
+  const statusMessage = useExportStore((s) => s.statusMessage);
+  const closeResult = useExportStore((s) => s.closeResult);
 
   const [tools, setTools] = React.useState<ToolsStatus | null>(null);
 
@@ -56,126 +63,111 @@ export const ExportPage: React.FC = () => {
       .catch(() => setTools(null));
   }, [apiReady]);
 
-  const currentStep = building ? 1 : downloadUrl ? 2 : 0;
   const disabled = apiReady === false;
   const pandocOk = tools?.pandoc.ok ?? true;
+  const canExport = !disabled && pandocOk && !!markdown.trim();
+
+  const templateName = useMemo(
+    () => config?.templates.find((t) => t.id === templateId)?.name,
+    [config, templateId],
+  );
+
+  const elapsedMs =
+    buildStartedAt && buildFinishedAt ? buildFinishedAt - buildStartedAt : undefined;
+
+  const handleExport = () => {
+    closeErrorModal();
+    void exportDocx();
+  };
+
+  const banner = disabled
+    ? '构建 API 未连接 · 请 pnpm dev 启动'
+    : tools && !tools.pandoc.ok
+      ? '未检测到 Pandoc'
+      : null;
 
   return (
     <div className="export-page">
-      <div className="export-header">
-        <div>
-          <Title level={4} style={{ margin: 0 }}>
-            <FileWordOutlined /> Markdown → Word
-          </Title>
-          <Text type="secondary">
-            输入正文 MD，选择模板，一键走 Pandoc + VBA + OOXML 管线
-          </Text>
-        </div>
-        <Space>
-          <Button onClick={loadSample} disabled={disabled}>
-            加载示例
-          </Button>
-          <Button
-            type="primary"
-            size="large"
-            icon={<ThunderboltOutlined />}
-            loading={building}
-            disabled={disabled || !pandocOk || !markdown.trim()}
-            onClick={() => void exportDocx()}
-          >
-            导出 Word
-          </Button>
-        </Space>
-      </div>
+      <BuildProgressModal
+        open={progressOpen}
+        steps={buildSteps}
+        logs={buildLogs}
+        startedAt={buildStartedAt}
+        statusMessage={statusMessage}
+        onCancel={cancelBuild}
+      />
 
-      {disabled && (
-        <Alert
-          type="warning"
-          showIcon
-          message="构建 API 不可用"
-          description="请使用 pnpm dev 启动前端，并确保本机已安装 Python、Pandoc 与 Word（VBA 后处理）。"
-          style={{ marginBottom: 12 }}
-        />
-      )}
+      <ExportResultModal
+        open={resultOpen}
+        fileName={fileName}
+        templateName={templateName}
+        elapsedMs={elapsedMs}
+        downloading={downloading}
+        onDownload={() => void downloadDocx()}
+        onExportAgain={() => {
+          closeResult();
+          handleExport();
+        }}
+        onClose={closeResult}
+      />
 
-      {!disabled && tools && !tools.pandoc.ok && (
-        <Alert
-          type="error"
-          showIcon
-          message="未检测到 Pandoc"
-          description={
-            <>
-              <div>请安装后重启终端与 dev 服务：</div>
-              <code>winget install --id JohnMacFarlane.Pandoc</code>
-              <div style={{ marginTop: 8 }}>
-                已安装但仍报错时，将 WinGet 目录加入 PATH，或设置环境变量{' '}
-                <code>PANDOC</code> 为 pandoc.exe 完整路径。
-              </div>
-            </>
-          }
-          style={{ marginBottom: 12 }}
-        />
-      )}
+      <ExportErrorModal
+        open={errorModalOpen && !!lastError}
+        error={lastError ?? ''}
+        logs={buildLogs}
+        onRetry={handleExport}
+        onClose={closeErrorModal}
+      />
 
-      {!disabled && tools?.pandoc.ok && tools.pandoc.path && (
-        <Alert
-          type="info"
-          showIcon
-          message="Pandoc 已就绪"
-          description={<code style={{ fontSize: 12 }}>{tools.pandoc.path}</code>}
-          style={{ marginBottom: 12 }}
-          closable
-        />
-      )}
+      <div className="export-layout">
+        <main className="export-main">
+          <header className="export-main-head">
+            <div className="export-main-head-left">
+              <FileTextOutlined className="export-main-icon" />
+              <span>文稿</span>
+              {banner && <span className="export-banner">{banner}</span>}
+            </div>
+            <Space size={8} wrap className="export-main-actions">
+              <Button type="text" size="small" onClick={loadSample} disabled={disabled}>
+                示例
+              </Button>
+              {downloadUrl && !building && (
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CloudDownloadOutlined />}
+                  onClick={() => void downloadDocx()}
+                >
+                  下载
+                </Button>
+              )}
+              <Button
+                type="primary"
+                icon={<ThunderboltOutlined />}
+                loading={building}
+                disabled={!canExport}
+                onClick={handleExport}
+              >
+                导出 Word
+              </Button>
+            </Space>
+          </header>
 
-      {lastError && (
-        <Alert
-          type="error"
-          showIcon
-          closable
-          message="导出失败"
-          description={<pre className="export-error">{lastError}</pre>}
-          style={{ marginBottom: 12 }}
-          onClose={resetResult}
-        />
-      )}
-
-      {downloadUrl && (
-        <Alert
-          type="success"
-          showIcon
-          message="导出成功"
-          description={
-            <Button
-              type="link"
-              icon={<DownloadOutlined />}
-              href={downloadUrl}
-              download={fileName}
-            >
-              下载 {fileName}
-            </Button>
-          }
-          style={{ marginBottom: 12 }}
-        />
-      )}
-
-      <div className="export-body">
-        <section className="export-editor">
-          <LazyCodeEditor
-            language="markdown"
-            path="export-input.md"
+          <LazyMarkdownEditor
             value={markdown}
             onChange={setMarkdown}
-            height="calc(100vh - 280px)"
+            path={fileName.replace(/\.docx$/i, '.md') || 'document.md'}
           />
-        </section>
+        </main>
 
-        <aside className="export-sidebar">
-          <Card size="small" title="模板" className="export-card">
+        <aside className="export-rail">
+          <section className="export-rail-block">
+            <label className="export-rail-label">模板</label>
             <Select
+              size="middle"
               style={{ width: '100%' }}
               value={templateId || undefined}
-              placeholder="选择模板"
+              placeholder="选择"
               options={(config?.templates ?? []).map((t) => ({
                 value: t.id,
                 label: t.name,
@@ -183,61 +175,36 @@ export const ExportPage: React.FC = () => {
               onChange={setTemplateId}
             />
             <Input
-              style={{ marginTop: 10 }}
-              addonBefore="文件名"
+              size="middle"
+              style={{ marginTop: 8 }}
+              placeholder="输出文件名.docx"
               value={fileName}
               onChange={(e) => setFileName(e.target.value)}
             />
-          </Card>
+          </section>
 
-          <Card size="small" title="管线选项" className="export-card">
-            <Space direction="vertical">
-              <Checkbox
-                checked={!options.noHtmlPipe}
-                onChange={(e) => setOptions({ noHtmlPipe: !e.target.checked })}
-              >
-                HTML 管道（推荐，支持公式/书签）
-              </Checkbox>
+          <section className="export-rail-block">
+            <label className="export-rail-label">管线</label>
+            <div className="export-rail-checks">
+              <Tooltip title="TeX 公式（$...$、$$...$$、\\(...\\)）由 Pandoc 转为 Word OMML">
+                <Checkbox
+                  checked={!options.noHtmlPipe}
+                  onChange={(e) => setOptions({ noHtmlPipe: !e.target.checked })}
+                >
+                  HTML 管道
+                </Checkbox>
+              </Tooltip>
               <Checkbox
                 checked={!options.noPostprocess}
                 onChange={(e) => setOptions({ noPostprocess: !e.target.checked })}
               >
-                VBA + OOXML 后处理
+                结构 + 样式
               </Checkbox>
-              <Tooltip title="公式已由 Pandoc 转 OMML 时通常无需再跑">
-                <Checkbox
-                  checked={!!options.withFormulaMacro}
-                  disabled={!!options.noPostprocess}
-                  onChange={(e) => setOptions({ withFormulaMacro: e.target.checked })}
-                >
-                  VBA 公式宏
-                </Checkbox>
-              </Tooltip>
-              <Checkbox
-                checked={!!options.renderMath}
-                onChange={(e) => setOptions({ renderMath: e.target.checked })}
-              >
-                预渲染 LaTeX 为 Unicode
+              <Checkbox checked={autoDownload} onChange={(e) => setAutoDownload(e.target.checked)}>
+                自动下载
               </Checkbox>
-            </Space>
-          </Card>
-
-          <Card size="small" title="管线步骤" className="export-card">
-            <Steps
-              direction="vertical"
-              size="small"
-              current={currentStep}
-              items={DEFAULT_PIPELINE_STEPS.map((s) => ({
-                title: s.label,
-                description: s.description,
-              }))}
-            />
-          </Card>
-
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            图片路径相对于仓库根目录（如 input/images/…）。自定义模板需已放置
-            reference.docx。
-          </Text>
+            </div>
+          </section>
         </aside>
       </div>
     </div>

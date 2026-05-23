@@ -127,6 +127,12 @@ def _line_spacing_attrs(value: Any) -> dict[str, str]:
         return {"line": "360", "lineRule": "auto"}
     if value in (2, "double", "2"):
         return {"line": "480", "lineRule": "auto"}
+    # 固定磅值，例如 "22pt" → line=440(twips), lineRule=exact
+    if isinstance(value, str):
+        m = re.match(r"^\s*([0-9]+(?:\.[0-9]+)?)\s*(pt|磅)\s*$", value, re.IGNORECASE)
+        if m:
+            twips = int(round(float(m.group(1)) * 20))
+            return {"line": str(twips), "lineRule": "exact"}
     if isinstance(value, (int, float)):
         return {"line": str(int(value)), "lineRule": "auto"}
     raise ValueError(f"unknown line_spacing: {value!r}")
@@ -205,6 +211,15 @@ def _apply_run(style: ET.Element, r: dict[str, Any], fonts: dict[str, Any]) -> N
             if old is not None:
                 rpr.remove(old)
             ET.SubElement(rpr, _q("szCs"), {_q("val"): str(sz_cs)})
+    if "bold" in r:
+        rpr = _ensure_rpr(style)
+        for tag in ("w:b", "w:bCs"):
+            old = rpr.find(tag, NS)
+            if old is not None:
+                rpr.remove(old)
+        if r["bold"]:
+            ET.SubElement(rpr, _q("b"))
+            ET.SubElement(rpr, _q("bCs"))
 
 
 # ============================================================
@@ -316,16 +331,132 @@ def apply_dsl(xml_bytes: bytes, dsl: dict[str, Any]) -> bytes:
 
 
 def patch_docx(path: Path, dsl: dict[str, Any]) -> None:
+    multilevel = dsl.get("multilevel_list") or {}
+    has_ml = bool(multilevel.get("levels"))
+    if has_ml:
+        from ooxml_multilevel import apply_multilevel  # 延迟引入
+
+    library = dsl.get("list_style_library") or []
+    use_list = dsl.get("use_list_styles") or []
+    has_list_styles = bool(use_list)
+    if has_list_styles:
+        from ooxml_list_styles import apply_list_styles  # 延迟引入
+
     tmp = path.with_suffix(path.suffix + ".tmp")
+    with zipfile.ZipFile(path, "r") as zin:
+        names = set(zin.namelist())
+        original_styles = zin.read("word/styles.xml")
+        original_numbering = zin.read("word/numbering.xml") if "word/numbering.xml" in names else b""
+        original_doc = zin.read("word/document.xml") if "word/document.xml" in names else b""
+
+    # 第 1 步：DSL 样式覆盖（仅作用于 styles.xml）
+    new_styles = apply_dsl(original_styles, dsl)
+
+    # 第 2 步：DSL 多级列表（同时改 numbering / styles / document）
+    if has_ml:
+        new_numbering, new_styles, new_doc, patched = apply_multilevel(
+            original_numbering, new_styles, original_doc, multilevel
+        )
+        print(f"[postprocess_multilevel] numId={multilevel.get('num_id', 2)} 段落补齐 {patched} 处")
+    else:
+        new_numbering, new_doc = original_numbering, original_doc
+
+    # 第 3 步：列表样式库（DecimalList / BulletList 等）
+    if has_list_styles:
+        new_numbering, new_styles, used_ids = apply_list_styles(
+            new_numbering,
+            new_styles,
+            library,
+            use_list,
+            fonts=dsl.get("fonts") or {},
+        )
+        if used_ids:
+            pairs = ", ".join(f"{k}=numId:{v}" for k, v in used_ids.items())
+            print(f"[postprocess_list_styles] 启用 {len(used_ids)} 个列表样式 → {pairs}")
+
+        # 第 3.5 步：把 Pandoc 自动生成的散装 numId（每个 -/1. 列表一个新 id）
+        # 全部重定向到模板默认列表样式 → 让 use_list_styles 真正落到文档段落上。
+        # 默认 = `default_list_style` 显式指定，否则取 use_list_styles 的第一项。
+        default_sid = dsl.get("default_list_style")
+        if not default_sid and use_list:
+            first = use_list[0]
+            default_sid = first.get("id") if isinstance(first, dict) else str(first)
+        if default_sid and default_sid in used_ids:
+            from ooxml_list_styles import redirect_list_num_ids  # type: ignore
+            preserved = set(used_ids.values())
+            if has_ml:
+                try:
+                    preserved.add(int(multilevel.get("num_id", 2)))
+                except (TypeError, ValueError):
+                    pass
+            new_doc, redirected = redirect_list_num_ids(
+                new_doc, used_ids[default_sid], preserved
+            )
+            if redirected:
+                print(
+                    f"[postprocess_list_styles] 重定向 {redirected} 处 Pandoc 列表 → "
+                    f"{default_sid}(numId:{used_ids[default_sid]})"
+                )
+        elif default_sid:
+            print(f"  ! default_list_style={default_sid!r} 未在 use_list_styles 中启用，跳过重定向")
+
+    has_numbering_output = has_ml or has_list_styles
+    overrides_map = {"word/styles.xml": new_styles}
+    if (has_ml or has_list_styles) and "word/document.xml" in names:
+        overrides_map["word/document.xml"] = new_doc
+    if has_numbering_output:
+        if "word/numbering.xml" in names:
+            overrides_map["word/numbering.xml"] = new_numbering
+
+    written = set()
     with zipfile.ZipFile(path, "r") as zin, zipfile.ZipFile(
         tmp, "w", zipfile.ZIP_DEFLATED
     ) as zout:
         for item in zin.infolist():
-            data = zin.read(item.filename)
-            if item.filename == "word/styles.xml":
-                data = apply_dsl(data, dsl)
-            zout.writestr(item, data)
+            if item.filename in overrides_map:
+                zout.writestr(item, overrides_map[item.filename])
+            else:
+                zout.writestr(item, zin.read(item.filename))
+            written.add(item.filename)
+        # 新增不存在的 part（例如原 docx 无 numbering.xml）
+        if has_numbering_output and "word/numbering.xml" not in written:
+            zout.writestr("word/numbering.xml", new_numbering)
     shutil.move(str(tmp), str(path))
+
+
+_LIST_MERGE_KEYS = {"overrides", "custom_styles", "headings", "list_style_library", "use_list_styles"}
+
+
+def _deep_merge(base: dict[str, Any], over: dict[str, Any]) -> dict[str, Any]:
+    """深合并：base 在前；列表（overrides/custom_styles/headings）做拼接，base 在前，子模板在后（后者覆盖）。其它键 over 胜出。"""
+    out: dict[str, Any] = dict(base) if isinstance(base, dict) else {}
+    for k, v in (over or {}).items():
+        if k in _LIST_MERGE_KEYS and isinstance(v, list) and isinstance(out.get(k), list):
+            out[k] = list(out[k]) + list(v)
+        elif isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = _deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+def load_dsl(path: Path, _seen: set[Path] | None = None) -> dict[str, Any]:
+    """加载 styles.yaml，支持顶层 `extends: 相对路径` 形成链式继承。"""
+    if yaml is None:
+        raise RuntimeError("需要 pyyaml: py -m pip install pyyaml")
+    path = path.resolve()
+    _seen = _seen or set()
+    if path in _seen:
+        raise RuntimeError(f"styles extends 循环: {path}")
+    _seen.add(path)
+    with path.open(encoding="utf-8") as f:
+        dsl = yaml.safe_load(f) or {}
+    parent_rel = dsl.pop("extends", None)
+    if parent_rel:
+        parent_path = (path.parent / parent_rel).resolve()
+        base = load_dsl(parent_path, _seen)
+        dsl = _deep_merge(base, dsl)
+    return dsl
 
 
 def main(argv: list[str]) -> int:
@@ -341,8 +472,7 @@ def main(argv: list[str]) -> int:
     if yaml is None:
         print("\u9700\u8981 pyyaml: py -m pip install pyyaml", file=sys.stderr)
         return 1
-    with args.styles.open(encoding="utf-8") as f:
-        dsl = yaml.safe_load(f)
+    dsl = load_dsl(args.styles)
     print(f"[postprocess_styles] {args.docx}  <- DSL: {args.styles}")
 
     patch_docx(args.docx, dsl)

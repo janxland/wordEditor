@@ -1,6 +1,6 @@
 # 模板样式 DSL 规范
 
-> 适用于本仓库 `scripts/postprocess_styles.py`。每个 Word 模板在自己目录下放一份 `styles.yaml`，由 `build.py` 在 VBA 后处理之后自动加载并改写 `word/styles.xml`。
+> 适用于 `scripts/postprocess_styles.py`。每个模板目录下放一份 `styles.yaml`，由 `build.py` 在 `postprocess_document.py` 之后加载并改写 `word/styles.xml`。
 
 ## 1. 单位与术语
 
@@ -37,7 +37,7 @@ custom_styles:              # 新增 / 重写自定义样式（按 name 匹配�
     run:       { ... }
 
 semantics: { ... }          # 仅作文档，与 Lua filter 对照
-headings:   [ ... ]         # 仅作文档，与 VBA 宏对照
+headings:   [ ... ]         # 仅作文档，与 postprocess_document.py 标题规则对照
 ```
 
 ## 3. `match` 选择器
@@ -84,7 +84,7 @@ headings:   [ ... ]         # 仅作文档，与 VBA 宏对照
 
 ## 6. `semantics` / `headings`（说明性）
 
-这两节当前**仅作文档**用途——真正生效的是 `templates/<id>/zhengwen-style.lua`（语义映射）和 `macros/ApplyHeadingsAndRemoveNumbering.bas`（标题识别）。当未来抽取 Lua / 宏成通用引擎时，可改为驱动来源。
+这两节当前**仅作文档**用途——真正生效的是 `zhengwen-style.lua`（语义映射）和 `postprocess_document.py`（标题识别）。
 
 ## 7. 示例
 
@@ -96,4 +96,4 @@ headings:   [ ... ]         # 仅作文档，与 VBA 宏对照
 py scripts/postprocess_styles.py output.docx --styles templates/<id>/styles.yaml
 ```
 
-由 `build.py` 自动调用：仅当模板项含 `styles_yaml` 时注入（如 `hutb-carbon-neutral` 使用本目录 `styles.yaml`）。通用 builtin 模板无 `styles_yaml`，不跑 OOXML 样式后处理。
+由 `build.py` 自动调用：按 `config/templates.json` 中的 `styles_yaml` 注入 OOXML 样式。

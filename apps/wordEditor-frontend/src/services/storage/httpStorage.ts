@@ -1,4 +1,4 @@
-import type { MacroEntry, TemplatesConfig } from '@/core/types';
+import type { TemplatesConfig } from '@/core/types';
 import type { IStorageAdapter } from './types';
 
 async function apiGet<T>(url: string): Promise<T> {
@@ -41,10 +41,6 @@ export class HttpStorageAdapter implements IStorageAdapter {
   async writeText(relativePath: string, content: string): Promise<void> {
     const q = new URLSearchParams({ path: relativePath });
     await apiPut(`${this.base}/file?${q}`, { content });
-  }
-
-  listMacros(): Promise<MacroEntry[]> {
-    return apiGet(`${this.base}/macros`);
   }
 
   async readDoc(name: string): Promise<string> {

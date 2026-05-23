@@ -1,0 +1,277 @@
+# 湖南工商大学系列模板共享基底（不直接被 build.py 引用，仅通过 extends）
+# 子模板通过顶层 `extends: ../_shared/hutb-base.yaml` 继承。
+# 合并策略：list 拼接（base 在前，子在后→后者覆盖），dict 深合并，其它 over 胜出。
+
+# 链式继承列表样式库：本文件 extends → list-style-library.yaml
+extends: "./list-style-library.yaml"
+
+# 默认启用的列表样式（模板若想再覆盖缩进，只需在自己的 styles.yaml 重新声明同 id）
+use_list_styles:
+  - id: "DecimalList"           # 1. 2. 3.
+  - id: "BulletList"            # ●
+  - id: "ParenDecimalList"      # (1)(2)
+  - id: "CircledList"           # ①②③
+  - id: "ChineseList"           # 一、二、三
+
+fonts:
+  latin: "Times New Roman"
+  cjk: "宋体"
+
+overrides:
+  - match: { kind: "body" }
+    word_wrap_break_latin: true
+  - match: { kind: "heading" }
+    word_wrap_break_latin: true
+    clear_indent: true
+    latin_font: "inherit"
+
+custom_styles:
+  # 默认正文
+  - id: "ae"
+    name: "文章的正文"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: 1.5
+      first_line_chars: 2
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "宋体"
+      size_half_pt: 24
+      size_cs_half_pt: 28
+
+  # 参考文献条目
+  - id: "Cankaowenxian"
+    name: "参考文献"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: "single"
+      spacing_before_dxa: 60
+      spacing_after_dxa: 60
+      hanging_indent_chars: 2
+      word_wrap_break_latin: true
+    run:
+      latin_font: "inherit"
+      size_half_pt: 21
+
+  # 图（单图段）
+  - id: "TuStyle"
+    name: "图"
+    based_on: "a"
+    paragraph:
+      align: "center"
+      line_spacing: "single"
+      spacing_before_dxa: 120
+      spacing_after_dxa: 0
+      indent_clear: true
+      word_wrap_break_latin: true
+
+  # 图注
+  - id: "TuZhu"
+    name: "图注"
+    based_on: "a"
+    paragraph:
+      align: "center"
+      line_spacing: "single"
+      spacing_before_dxa: 0
+      spacing_after_dxa: 120
+      indent_clear: true
+      word_wrap_break_latin: true
+    run:
+      latin_font: "inherit"
+      size_half_pt: 20
+
+  # 英文摘要正文（首行缩进 2 字符）
+  - id: "AbstractPara"
+    name: "Abstract"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: 1.5
+      first_line_chars: 2
+      word_wrap_break_latin: true
+    run:
+      latin_font: "Times New Roman"
+      cjk_font: "Times New Roman"
+      size_half_pt: 24       # 小四 = 12pt
+      size_cs_half_pt: 24
+
+  # 英文摘要标题 "Abstract"（居中二号 TNR 加粗）
+  - id: "AbstractTitle"
+    name: "Abstract 标题"
+    based_on: "a"
+    paragraph:
+      align: "center"
+      line_spacing: "single"
+      spacing_before_dxa: 240
+      spacing_after_dxa: 120
+      indent_clear: true
+      word_wrap_break_latin: true
+    run:
+      latin_font: "Times New Roman"
+      cjk_font: "Times New Roman"
+      size_half_pt: 44       # 二号 = 22pt
+      size_cs_half_pt: 44
+      bold: true
+
+  # 中文摘要正文（与 Abstract 字号一致，宋体）
+  - id: "ZhaiYao"
+    name: "摘要"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: 1.5
+      first_line_chars: 2
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+
+  # 中文摘要标题 "摘要"（居中二号宋体加粗）
+  - id: "ZhaiYaoTitle"
+    name: "摘要标题"
+    based_on: "a"
+    paragraph:
+      align: "center"
+      line_spacing: "single"
+      spacing_before_dxa: 240
+      spacing_after_dxa: 120
+      indent_clear: true
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 44
+      size_cs_half_pt: 44
+      bold: true
+
+  # 关键词（中文）
+  - id: "KeyWordsZh"
+    name: "关键词"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: 1.5
+      first_line_chars: 2
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+      bold: true
+
+  # Keywords（英文）
+  - id: "KeyWordsEn"
+    name: "Keywords"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: 1.5
+      first_line_chars: 2
+      word_wrap_break_latin: true
+    run:
+      latin_font: "Times New Roman"
+      cjk_font: "Times New Roman"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+      bold: true
+
+  # 表注（表上方居中，带 "表 N　" 前缀）
+  - id: "BiaoZhu"
+    name: "表注"
+    based_on: "a"
+    paragraph:
+      align: "center"
+      line_spacing: "single"
+      spacing_before_dxa: 120
+      spacing_after_dxa: 60
+      indent_clear: true
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 21
+      size_cs_half_pt: 21
+      bold: true
+
+  # 纯英文段
+  - id: "Yingwenduanluo"
+    name: "英文段落"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: "single"
+      word_wrap_break_latin: true
+    run:
+      latin_font: "inherit"
+      size_half_pt: 21
+
+semantics:
+  body_paragraph:
+    note: "默认正文（非参考文献/图/英文段）"
+    apply_style: "文章的正文"
+  bib_paragraph:
+    detect:
+      inline_type: ["Link", "Span"]
+      identifier_regex: "^Ref\\d+$"
+      scan_first_n_inlines: 5
+    apply_style: "参考文献"
+  abstract_paragraph:
+    detect:
+      after_heading: "Abstract"
+      until: "下一标题或出现 CJK 的段落"
+    apply_style: "Abstract"
+  english_paragraph:
+    detect:
+      rule: "段落 plain text 非空且不含 CJK 字符"
+    apply_style: "英文段落"
+  image_only_paragraph:
+    apply_style: "图"
+  figure_caption:
+    apply_style: "图注"
+    auto_prefix: "图 {n}　"
+  table_caption:
+    apply_style: "表注"
+    auto_prefix: "表 {n}　"
+  zhaiyao_title:
+    detect: "段落 plain text 等于 '摘要'"
+    apply_style: "摘要标题"
+  zhaiyao_body:
+    detect: "'摘要' 后至关键词/章节标题之间的段落"
+    apply_style: "摘要"
+  abstract_title:
+    detect: "段落 plain text 等于 'Abstract'（忽略大小写）"
+    apply_style: "Abstract 标题"
+  keywords_zh:
+    detect: "段落以 '关键词' / '关键词：' 开头"
+    apply_style: "关键词"
+  keywords_en:
+    detect: "段落以 'Keywords' / 'Key words' 开头"
+    apply_style: "Keywords"
+
+# 由 postprocess_document.py 识别后去掉前缀并挂多级编号
+headings:
+  - note: "标题识别（见 docs/markdown-conventions.md）"
+  - pattern: "^[一二三四五六七八九十百千]、"
+    level: 1
+  - pattern: "^\\d+\\.\\d+\\.\\d+\\.\\d+\\s+"
+    level: 4
+  - pattern: "^\\d+\\.\\d+\\.\\d+\\s+"
+    level: 3
+  - pattern: "^\\d+\\.\\d+\\s+"
+    level: 2
+  - pattern: "^\\d+[.\\s]\\s*"
+    level: 1
+
+# ────────────────────────────────────────────────────────────────
+# 多级列表 DSL（低代码）：本基底不再提供默认 multilevel_list。
+# 每个子模板必须在自己的 styles.yaml 中显式声明 multilevel_list，
+# 因为工科 / 管科 / 数学建模 / 形策 / 碳中和 的标题编号方案各不相同。
+# 参见各 templates/<id>/styles.yaml 的 multilevel_list 节。
+# 可用 `py scripts/inspect_heading_numbering.py <docx>` 反查官方 docx 的方案。
+# ────────────────────────────────────────────────────────────────

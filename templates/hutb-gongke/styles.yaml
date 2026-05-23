@@ -1,0 +1,40 @@
+# 湖南工商大学 · 工科：H1=1 H2=1.1 H3=1.1.1 H4=1.1.1.1 全程 isLgl 阿拉伯编号
+extends: "../_shared/hutb-base.yaml"
+template:
+  id: "hutb-gongke"
+  name: "湖南工商大学 · 工科"
+
+overrides: []
+custom_styles: []
+fonts: {}
+
+multilevel_list:
+  num_id: 2
+  levels:
+    - ilvl: 0
+      heading_style: "1"
+      num_fmt: "decimal"
+      lvl_text: "%1"
+      suff: "space"
+      start: 1
+    - ilvl: 1
+      heading_style: "2"
+      num_fmt: "decimal"
+      lvl_text: "%1.%2"
+      suff: "space"
+      start: 1
+      is_lgl: true
+    - ilvl: 2
+      heading_style: "3"
+      num_fmt: "decimal"
+      lvl_text: "%1.%2.%3"
+      suff: "space"
+      start: 1
+      is_lgl: true
+    - ilvl: 3
+      heading_style: "4"
+      num_fmt: "decimal"
+      lvl_text: "%1.%2.%3.%4"
+      suff: "space"
+      start: 1
+      is_lgl: true

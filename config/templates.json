@@ -1,53 +1,54 @@
 {
-  "default_template": "heading-number-list-flush",
-  "lua_filter": "vendor/pandoc_docx_template/markdown-to-docx.lua",
+  "default_template": "hutb-guanke",
   "templates": [
     {
-      "id": "heading-number-list-flush",
-      "name": "通用 · 标题编号 · 列表顶格",
-      "reference_doc": "templates/builtin/heading-number-list-flush.docx",
-      "source": "Achuan-2/pandoc_docx_template"
-    },
-    {
-      "id": "heading-number-list-indent",
-      "name": "通用 · 标题编号 · 列表缩进",
-      "reference_doc": "templates/builtin/heading-number-list-indent.docx",
-      "source": "Achuan-2/pandoc_docx_template"
-    },
-    {
-      "id": "no-heading-number-list-flush",
-      "name": "通用 · 标题不编号 · 列表顶格",
-      "reference_doc": "templates/builtin/no-heading-number-list-flush.docx",
-      "source": "Achuan-2/pandoc_docx_template"
-    },
-    {
-      "id": "no-heading-number-list-indent",
-      "name": "通用 · 标题不编号 · 列表缩进",
-      "reference_doc": "templates/builtin/no-heading-number-list-indent.docx",
-      "source": "Achuan-2/pandoc_docx_template"
-    },
-    {
-      "id": "sci-heading-number",
-      "name": "SCI 论文 · 标题编号",
-      "reference_doc": "templates/builtin/sci-heading-number.docx",
-      "source": "Achuan-2/pandoc_docx_template"
-    },
-    {
-      "id": "sci-no-heading-number",
-      "name": "SCI 论文 · 标题不编号",
-      "reference_doc": "templates/builtin/sci-no-heading-number.docx",
-      "source": "Achuan-2/pandoc_docx_template"
-    },
-    {
-      "id": "hutb-carbon-neutral",
-      "name": "湖南工商大学 · 碳中和（自定义）",
+      "id": "hutb-gongke",
+      "name": "湖南工商大学 · 工科",
       "standalone": true,
+      "heading_numbering": "gongke",
       "reference_doc": "templates/hutb-carbon-neutral/reference.docx",
       "lua_filter": "templates/hutb-carbon-neutral/markdown-to-docx.lua",
       "extra_lua_filters": ["templates/hutb-carbon-neutral/zhengwen-style.lua"],
-      "styles_yaml": "templates/hutb-carbon-neutral/styles.yaml",
+      "styles_yaml": "templates/hutb-gongke/styles.yaml",
       "source": "user",
-      "note": "独立模板（不复用通用 builtin / 全局 Lua）；将学校官方 Word 另存为 reference.docx，详见 templates/hutb-carbon-neutral/README.md"
+      "note": "标题编号：1 → 1.1 → 1.1.1 → 1.1.1.1（阿拉伯数字章）"
+    },
+    {
+      "id": "hutb-guanke",
+      "name": "湖南工商大学 · 管科",
+      "standalone": true,
+      "heading_numbering": "guanke",
+      "reference_doc": "templates/hutb-carbon-neutral/reference.docx",
+      "lua_filter": "templates/hutb-carbon-neutral/markdown-to-docx.lua",
+      "extra_lua_filters": ["templates/hutb-carbon-neutral/zhengwen-style.lua"],
+      "styles_yaml": "templates/hutb-guanke/styles.yaml",
+      "source": "user",
+      "note": "标题编号：一、→ 1.1 → 1.1.1 → 1.1.1.1（第一章中文数字）"
+    },
+    {
+      "id": "hutb-xingce",
+      "name": "湖南工商大学 · 形策论文 1500 字模板",
+      "standalone": true,
+      "heading_numbering": "guanke",
+      "reference_doc": "templates/hutb-carbon-neutral/reference.docx",
+      "lua_filter": "templates/hutb-carbon-neutral/markdown-to-docx.lua",
+      "extra_lua_filters": ["templates/hutb-carbon-neutral/zhengwen-style.lua"],
+      "styles_yaml": "templates/hutb-xingce/styles.yaml",
+      "source": "user",
+      "note": "形势与政策 1500 字论文：题目宋体二号加粗居中，正文宋体小三 1.5 倍行距首行缩进 2 字符，无摘要/关键词/参考文献"
+    },
+    {
+      "id": "hutb-math-modeling",
+      "name": "湖南工商大学 · 数学建模",
+      "standalone": true,
+      "heading_numbering": "guanke",
+      "reference_doc": "templates/hutb-carbon-neutral/reference.docx",
+      "lua_filter": "templates/hutb-carbon-neutral/markdown-to-docx.lua",
+      "extra_lua_filters": ["templates/hutb-carbon-neutral/zhengwen-style.lua"],
+      "styles_yaml": "templates/hutb-math-modeling/styles.yaml",
+      "three_line_tables": true,
+      "source": "user",
+      "note": "数学建模：题目黑体小二居中加粗；标题 一、→ 1.1 → 1.1.1；自动三线表；含摘要/关键词/图/图注/参考文献"
     }
   ]
 }

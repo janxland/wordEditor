@@ -14,7 +14,10 @@ import {
   SaveOutlined,
   SyncOutlined,
   CheckCircleOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
+import { fetchStylePreviewBlob } from '@/services/previewStyles';
+import { DocxPreviewDrawer } from '@/components/preview';
 import { useEditorStore, getSelectedTemplate } from '@/store/editorStore';
 import { useAppStore } from '@/store/appStore';
 import { DslVisualEditor } from '@/components/dsl/DslVisualEditor';
@@ -44,6 +47,11 @@ export const WorkbenchPage: React.FC = () => {
   const [luaPath, setLuaPath] = useState<string | null>(null);
   const [luaText, setLuaText] = useState('');
   const [saving, setSaving] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+  const [previewFileName, setPreviewFileName] = useState('style-preview.docx');
+  const [previewDownloadUrl, setPreviewDownloadUrl] = useState<string | null>(null);
 
   const luaFilters = useMemo(
     () => (entry ? getTemplateLuaFilters(entry, config) : []),
@@ -88,6 +96,33 @@ export const WorkbenchPage: React.FC = () => {
     }
   }, [stylesPath, yamlValid, saveFile]);
 
+  const runStylePreview = useCallback(async () => {
+    if (!entry?.id) return;
+    if (!yamlValid.ok) {
+      message.error(yamlValid.error);
+      return;
+    }
+    setPreviewing(true);
+    setPreviewOpen(true);
+    setPreviewBlob(null);
+    try {
+      const { blob, fileName, downloadUrl } = await fetchStylePreviewBlob({
+        templateId: entry.id,
+        stylesYaml: yamlText,
+      });
+      setPreviewBlob(blob);
+      setPreviewFileName(fileName);
+      setPreviewDownloadUrl(downloadUrl);
+    } catch (e) {
+      setPreviewOpen(false);
+      message.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPreviewing(false);
+    }
+  }, [entry?.id, yamlValid, yamlText]);
+
+  const handlePreviewStyles = () => void runStylePreview();
+
   const handleSaveLua = useCallback(async () => {
     if (!luaPath) return;
     updateFile(luaPath, luaText);
@@ -111,6 +146,15 @@ export const WorkbenchPage: React.FC = () => {
 
   return (
     <div className="workbench">
+      <DocxPreviewDrawer
+        open={previewOpen}
+        loading={previewing}
+        blob={previewBlob}
+        fileName={previewFileName}
+        downloadUrl={previewDownloadUrl}
+        onClose={() => setPreviewOpen(false)}
+        onRefresh={() => void runStylePreview()}
+      />
       <aside className="workbench-sidebar">
         <Text type="secondary" className="sidebar-label">
           模板 ({config?.templates.length ?? 0})
@@ -132,10 +176,7 @@ export const WorkbenchPage: React.FC = () => {
                     {t.extra_lua_filters?.length ? (
                       <Tag color="purple">Lua</Tag>
                     ) : null}
-                    {t.standalone && <Tag color="blue">独立</Tag>}
-                    {t.source === 'user' && !t.standalone && (
-                      <Tag color="gold">自定义</Tag>
-                    )}
+                    {t.source === 'user' && <Tag color="blue">学校模板</Tag>}
                   </Space>
                 }
               />
@@ -175,15 +216,27 @@ export const WorkbenchPage: React.FC = () => {
                   </Tooltip>
                 )}
                 {(activeTab === 'yaml' || activeTab === 'visual') && stylesPath && (
-                  <Button
-                    type="primary"
-                    icon={<SaveOutlined />}
-                    loading={saving}
-                    onClick={() => void handleSaveStyles()}
-                    disabled={!yamlValid.ok}
-                  >
-                    保存 DSL
-                  </Button>
+                  <>
+                    <Tooltip title="侧栏在线预览（OOXML 标题一/二/三识别 + 样式注入，无需 Word，约数秒）">
+                      <Button
+                        icon={<EyeOutlined />}
+                        loading={previewing}
+                        disabled={!yamlValid.ok}
+                        onClick={handlePreviewStyles}
+                      >
+                        在线预览
+                      </Button>
+                    </Tooltip>
+                    <Button
+                      type="primary"
+                      icon={<SaveOutlined />}
+                      loading={saving}
+                      onClick={() => void handleSaveStyles()}
+                      disabled={!yamlValid.ok}
+                    >
+                      保存 DSL
+                    </Button>
+                  </>
                 )}
                 {activeTab === 'lua' && luaPath && (
                   <Button
@@ -217,11 +270,6 @@ export const WorkbenchPage: React.FC = () => {
                       <Text type="secondary">未配置</Text>
                     )}
                   </Descriptions.Item>
-                  {entry.standalone && (
-                    <Descriptions.Item label="模式">
-                      独立单例模板（不复用通用 builtin / 全局 Lua）
-                    </Descriptions.Item>
-                  )}
                   <Descriptions.Item label="Lua filters">
                     {luaFilters.length ? (
                       <Space direction="vertical">
@@ -237,7 +285,7 @@ export const WorkbenchPage: React.FC = () => {
                     <Descriptions.Item label="说明">{entry.note}</Descriptions.Item>
                   )}
                   <Descriptions.Item label="管线顺序">
-                    Pandoc → VBA 后处理 → OOXML 样式注入（见规范文档）
+                    Pandoc → OOXML 标题/引用 → styles.yaml 注入（见规范文档）
                   </Descriptions.Item>
                 </Descriptions>
               )}

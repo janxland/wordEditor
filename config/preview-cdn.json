@@ -1,0 +1,8 @@
+{
+  "cdn_base": "https://cdn.jsdelivr.net/gh/janxland/wordEditor@main",
+  "images": {
+    "fig-emission": "input/images/fig-emission.png",
+    "fig-marginal": "input/images/fig-marginal.png"
+  },
+  "note": "可通过环境变量 WORDEDITOR_PREVIEW_CDN 覆盖 cdn_base（内网 CDN 地址）"
+}

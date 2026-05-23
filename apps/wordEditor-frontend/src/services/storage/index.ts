@@ -10,8 +10,4 @@ export function getStorage(): IStorageAdapter {
   return instance;
 }
 
-export function setStorage(adapter: IStorageAdapter): void {
-  instance = adapter;
-}
-
 export type { IStorageAdapter } from './types';

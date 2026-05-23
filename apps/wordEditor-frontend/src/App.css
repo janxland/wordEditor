@@ -5,6 +5,8 @@
   --accent: #1677ff;
   --sider: #0f172a;
   --text-muted: #64748b;
+  --ok: #16a34a;
+  --danger: #dc2626;
 }
 
 html,
@@ -51,7 +53,7 @@ body,
 
 .app-content {
   margin: 0 !important;
-  padding: 16px 20px !important;
+  padding: 12px 16px !important;
   background: var(--bg);
   min-height: calc(100vh - 56px);
 }
@@ -306,33 +308,6 @@ body,
   margin-top: 0;
 }
 
-/* VBA */
-.vba-page {
-  max-width: 100%;
-}
-
-.vba-layout {
-  display: grid;
-  grid-template-columns: 300px 1fr;
-  gap: 16px;
-  background: var(--panel);
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  padding: 12px;
-  min-height: calc(100vh - 180px);
-}
-
-.vba-list {
-  border-right: 1px solid var(--border);
-  padding-right: 12px;
-}
-
-.vba-editor {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
 .docs-page {
   background: var(--panel);
   border-radius: 10px;
@@ -340,57 +315,371 @@ body,
   padding: 16px;
 }
 
-/* Export */
+/* Export — 主区写作 + 右侧精简配置 */
 .export-page {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  min-height: calc(100vh - 100px);
+  height: calc(100vh - 56px - 24px);
+  min-height: 0;
 }
 
-.export-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  flex-wrap: wrap;
+.export-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 248px;
   gap: 12px;
+}
+
+.export-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px 18px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
-.export-body {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 16px;
+.export-main-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.export-main-head-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.export-main-icon {
+  color: #6366f1;
+  font-size: 15px;
+}
+
+.export-banner {
+  font-size: 12px;
+  font-weight: 500;
+  color: #b45309;
+  background: #fffbeb;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.export-main .md-editor {
   flex: 1;
   min-height: 0;
 }
 
-.export-editor {
-  background: var(--panel);
+.export-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 6px 2px;
+}
+
+.export-rail-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.export-rail-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.export-rail-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.export-rail-checks .ant-checkbox-wrapper {
+  margin-inline-start: 0 !important;
+  font-size: 13px;
+  color: #475569;
+}
+
+/* Markdown 编辑器 */
+.md-editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: #fafbfc;
+}
+
+.md-editor-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  flex-shrink: 0;
+}
+
+.md-editor-bar-title {
+  font-size: 12px;
+  color: #94a3b8;
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+}
+
+.md-editor-bar-stats {
+  font-size: 11px;
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
+}
+
+.md-editor-surface {
+  flex: 1;
+  min-height: 0;
+}
+
+.md-editor--loading {
+  min-height: 320px;
+  border-radius: 12px;
   border: 1px solid var(--border);
-  border-radius: 10px;
   overflow: hidden;
 }
 
-.export-sidebar {
+.md-editor-skeleton {
+  height: 100%;
+  min-height: 280px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #fafbfc 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: md-shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes md-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Monaco 外壳 */
+.code-editor-shell {
+  height: 100%;
+  min-height: 0;
+}
+
+.code-editor-shell--markdown {
+  background: #fafbfc;
+}
+
+.code-editor-shell--markdown .monaco-editor .margin,
+.code-editor-shell--markdown .monaco-editor-background {
+  background-color: #fafbfc !important;
+}
+
+.code-editor-shell--code {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.code-editor-shell--code .monaco-editor .margin,
+.code-editor-shell--code .monaco-editor-background {
+  background-color: #1e1e2e !important;
+}
+
+/* Build progress modal */
+.build-progress-modal .ant-modal-content {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
+}
+
+.build-progress-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.build-progress-title {
+  font-size: 18px !important;
+  font-weight: 600;
+}
+
+.build-progress-ring {
+  --p: 0%;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: conic-gradient(#6366f1 var(--p), #e0e7ff 0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  animation: ring-pulse 2s ease-in-out infinite;
+}
+
+.build-progress-ring::before {
+  content: '';
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.build-progress-ring {
+  position: relative;
+}
+
+.build-progress-ring-value {
+  position: relative;
+  z-index: 1;
+  font-weight: 700;
+  font-size: 15px;
+  color: #4338ca;
+}
+
+@keyframes ring-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+.build-progress-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
-.export-card {
-  border-radius: 10px;
-}
-
-.export-error {
-  margin: 0;
-  white-space: pre-wrap;
+.build-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 12px;
-  max-height: 160px;
+}
+
+.build-progress-pulse {
+  animation: text-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes text-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.build-progress-steps {
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.build-progress-log-pre,
+.export-error-pre {
+  margin: 0;
+  padding: 10px 12px;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.45;
+  max-height: 180px;
   overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.build-progress-actions {
+  text-align: center;
+  padding-top: 4px;
+}
+
+/* Export result modal */
+.export-result-modal .ant-modal-content {
+  border-radius: 16px;
+  padding-top: 8px;
+}
+
+.export-result-card {
+  padding: 8px 4px 4px;
+}
+
+.export-result-icon-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.export-result-icon {
+  font-size: 52px;
+  color: var(--ok);
+  animation: result-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes result-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.export-result-file {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+  border: 1px solid #e0e7ff;
+  border-radius: 12px;
+}
+
+.export-result-file-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Export error modal */
+.export-error-modal .ant-modal-content {
+  border-radius: 14px;
+}
+
+.export-error-hero {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.export-error-icon {
+  font-size: 36px;
+  color: var(--danger);
+  flex-shrink: 0;
+}
+
+.export-error-log {
+  max-height: 220px;
 }
 
 .page-fallback,
@@ -401,10 +690,100 @@ body,
   min-height: 200px;
 }
 
+.editor-loading--minimal {
+  min-height: 120px;
+  padding: 0;
+  background: #fafbfc;
+}
+
+.editor-loading-bar {
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  background: linear-gradient(90deg, #f1f5f9 25%, #fafbfc 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: md-shimmer 1.2s ease-in-out infinite;
+}
+
+/* Docx 在线预览（docx-preview） */
+.docx-preview-drawer .ant-drawer-body {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px 16px;
+  background: #e8ecf1;
+}
+
+.docx-preview-hint {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.docx-preview-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: #525659;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.docx-preview-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(248, 250, 252, 0.85);
+  border-radius: 8px;
+}
+
+.docx-preview-style-host {
+  display: none;
+}
+
+.docx-preview-body {
+  margin: 0 auto;
+  max-width: 816px;
+}
+
+.docx-preview-body .docx-preview-page-wrapper {
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.15);
+  margin-bottom: 16px;
+}
+
+.docx-preview-body section.docx-preview-page {
+  padding: 48px 56px !important;
+  box-sizing: border-box;
+}
+
 @media (max-width: 992px) {
+  .export-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+
+  .export-page {
+    height: auto;
+    min-height: calc(100vh - 80px);
+  }
+
+  .export-rail {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .export-rail-block {
+    flex: 1;
+    min-width: 180px;
+  }
+
   .workbench,
-  .dsl-visual,
-  .vba-layout {
+  .dsl-visual {
     grid-template-columns: 1fr;
   }
 

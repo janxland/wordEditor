@@ -19,6 +19,8 @@ import type { DslDocument, HeadingRule, StyleOverride } from '@/core/types';
 import { MATCH_KIND_OPTIONS } from '@/core/dsl-schema';
 import { ParagraphFieldsForm, RunFieldsForm } from './StyleFieldsForm';
 import { CustomStylesEditor } from './CustomStylesEditor';
+import { MultilevelListEditor } from './MultilevelListEditor';
+import { ListStyleLibraryEditor } from './ListStyleLibraryEditor';
 import { useEditorStore } from '@/store/editorStore';
 
 const { Text, Title } = Typography;
@@ -73,6 +75,18 @@ export const DslVisualEditor: React.FC = () => {
     { key: 'overrides', label: `覆盖 (${dslDoc.overrides.length})` },
     { key: 'custom', label: `自定义样式 (${dslDoc.custom_styles.length})` },
     { key: 'headings', label: `标题规则 (${dslDoc.headings?.length ?? 0})` },
+    {
+      key: 'multilevel',
+      label: `多级列表${dslDoc.multilevel_list ? ` (${dslDoc.multilevel_list.levels.length})` : ''}`,
+    },
+    {
+      key: 'list-styles',
+      label: `列表样式库${
+        dslDoc.list_style_library?.length
+          ? ` (${dslDoc.use_list_styles?.length ?? 0}/${dslDoc.list_style_library.length})`
+          : ''
+      }`,
+    },
     { key: 'semantics', label: '语义映射' },
   ];
 
@@ -242,7 +256,7 @@ export const DslVisualEditor: React.FC = () => {
         {activeSection === 'headings' && (
           <Space direction="vertical" style={{ width: '100%' }}>
             <Text type="secondary">
-              文档化字段，对照 macros/ApplyHeadingsAndRemoveNumbering.bas；未来可驱动 VBA 生成。
+              文档化字段，与 postprocess_document.py 标题识别规则对照。
             </Text>
             <Button
               type="dashed"
@@ -309,6 +323,14 @@ export const DslVisualEditor: React.FC = () => {
               </Card>
             ))}
           </Space>
+        )}
+
+        {activeSection === 'multilevel' && (
+          <MultilevelListEditor doc={dslDoc} onPatch={patch} />
+        )}
+
+        {activeSection === 'list-styles' && (
+          <ListStyleLibraryEditor doc={dslDoc} onPatch={patch} />
         )}
 
         {activeSection === 'semantics' && (

@@ -1,0 +1,231 @@
+# 列表样式库（list_style_library）
+#
+# 设计原则：
+#   • 元样式（ListBase）= 0 缩进 + 无制表符 + 无项目符号 —— 任何派生样式都从这里出发
+#   • 派生样式 = ListBase + numbering 编号 + 可选段落微调
+#   • 模板通过顶层 `use_list_styles:` 选用其中若干款；可在 overrides 里单独覆盖缩进/制表符
+#
+# 用法（在任意 styles.yaml）：
+#
+#   extends: "../_shared/list-style-library.yaml"
+#   use_list_styles:
+#     - id: DecimalList                 # 直接使用默认参数
+#     - id: BulletList
+#       overrides:                      # 单独覆盖缩进
+#         paragraph:
+#           first_line_chars: 0
+#           hanging_indent_chars: 2
+#
+# 后端注入（scripts/ooxml_list_styles.py）：
+#   1) 解析 list_style_library + 模板 use_list_styles，合并 overrides
+#   2) 为每个 use 创建独立 numId（从 base_num_id=100 起递增），写入 abstractNum
+#   3) 创建/覆盖段落样式（pStyle=id），并把 numPr 绑定到样式
+#   4) custom_styles 路径由 apply_dsl 写入段落/字体属性 —— 零重复实现
+
+list_style_library:
+  # ─────────────────────────────────────────
+  # 元样式：所有列表样式的零基底
+  # ─────────────────────────────────────────
+  - id: "ListBase"
+    name: "列表基样式"
+    based_on: "a"
+    description: "元样式：0 缩进 + 无制表符 + 单倍行距。其它列表样式以此为基。"
+    paragraph:
+      align: "both"
+      line_spacing: "single"
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+      indent_clear: true            # 清空 ind（左/右/首行/悬挂）
+      first_line_chars: 0
+      hanging_indent_chars: 0
+    run:
+      latin_font: "inherit"
+      size_half_pt: 24              # 小四
+    # list 字段：none 表示"基样式不带编号"
+    list:
+      num_fmt: "none"
+      lvl_text: ""
+      suff: "nothing"
+
+  # ─────────────────────────────────────────
+  # 数字编号：1. 2. 3.
+  # ─────────────────────────────────────────
+  - id: "DecimalList"
+    name: "数字列表（无首行缩进）"
+    based_on: "ListBase"
+    description: "1. 2. 3. 编号；首行无缩进，编号后空格分隔。"
+    list:
+      num_fmt: "decimal"
+      lvl_text: "%1."
+      suff: "space"
+      start: 1
+
+  # ─────────────────────────────────────────
+  # 项目符号：●
+  # ─────────────────────────────────────────
+  - id: "BulletList"
+    name: "项目符号列表（无首行缩进）"
+    based_on: "ListBase"
+    description: "● 圆点；首行无缩进。"
+    list:
+      num_fmt: "bullet"
+      lvl_text: "●"
+      suff: "space"
+
+  # ─────────────────────────────────────────
+  # (1)(2) 带括号数字
+  # ─────────────────────────────────────────
+  - id: "ParenDecimalList"
+    name: "(1)(2) 数字列表"
+    based_on: "ListBase"
+    description: "(1)(2) 编号；常用于二级要点。"
+    list:
+      num_fmt: "decimal"
+      lvl_text: "(%1)"
+      suff: "space"
+      start: 1
+
+  # ─────────────────────────────────────────
+  # 圈号：①②③
+  # ─────────────────────────────────────────
+  - id: "CircledList"
+    name: "①②③ 圈号列表"
+    based_on: "ListBase"
+    description: "圈号编号；常用于三级要点。"
+    list:
+      num_fmt: "decimalEnclosedCircle"
+      lvl_text: "%1"
+      suff: "space"
+      start: 1
+
+  # ─────────────────────────────────────────
+  # 中文一、二、三
+  # ─────────────────────────────────────────
+  - id: "ChineseList"
+    name: "中文一、二、三 列表"
+    based_on: "ListBase"
+    description: "中文计数 + 顿号；常用于章节内要点。"
+    list:
+      num_fmt: "chineseCounting"
+      lvl_text: "%1、"
+      suff: "nothing"
+      start: 1
+
+  # ─────────────────────────────────────────
+  # A B C 大写字母
+  # ─────────────────────────────────────────
+  - id: "UpperLetterList"
+    name: "A B C 字母列表"
+    based_on: "ListBase"
+    list:
+      num_fmt: "upperLetter"
+      lvl_text: "%1."
+      suff: "space"
+      start: 1
+
+  # ─────────────────────────────────────────
+  # a b c 小写字母
+  # ─────────────────────────────────────────
+  - id: "LowerLetterList"
+    name: "a b c 字母列表"
+    based_on: "ListBase"
+    list:
+      num_fmt: "lowerLetter"
+      lvl_text: "%1."
+      suff: "space"
+      start: 1
+
+  # ─────────────────────────────────────────
+  # 自定义 bullet 符号列表（从用户 list-style.docx 提取/参考）
+  # 所有符号通过 lvl_text 直接写 Unicode；num_fmt=bullet
+  # 如需再添加，可运行：py scripts/extract_list_styles.py -i <your.docx>
+  # ─────────────────────────────────────────
+  - id: "StarSolidList"
+    name: "★ 实心五角星列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "★", suff: "space" }
+
+  - id: "StarOutlineList"
+    name: "☆ 空心五角星列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "☆", suff: "space" }
+
+  - id: "TriangleRightList"
+    name: "▶ 三角列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "▶", suff: "space" }
+
+  - id: "DiamondSolidList"
+    name: "◆ 实心菱形列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "◆", suff: "space" }
+
+  - id: "DiamondOutlineList"
+    name: "◇ 空心菱形列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "◇", suff: "space" }
+
+  - id: "ChevronRightList"
+    name: "› 尖括号列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "›", suff: "space" }
+
+  - id: "CircleOutlineList"
+    name: "○ 空心圆列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "○", suff: "space" }
+
+  - id: "SquareOutlineList"
+    name: "□ 空心方块列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "□", suff: "space" }
+
+  - id: "HeartOutlineList"
+    name: "♡ 空心爱心列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "♡", suff: "space" }
+
+  - id: "HeartSolidList"
+    name: "♥ 实心爱心列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "♥", suff: "space" }
+
+  - id: "HashList"
+    name: "# 井号列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "#", suff: "space" }
+
+  - id: "CrownList"
+    name: "♛ 皇冠列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "♛", suff: "space" }
+
+  - id: "PinList"
+    name: "📍 定位列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "📍", suff: "space" }
+
+  - id: "FlowerList"
+    name: "✿ 花朵列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "✿", suff: "space" }
+
+  - id: "AsteriskList"
+    name: "✱ 星号列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "✱", suff: "space" }
+
+  - id: "DashList"
+    name: "— 长破折号列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "—", suff: "space" }
+
+  - id: "CheckList"
+    name: "✓ 对勾列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "✓", suff: "space" }
+
+  - id: "ArrowRightList"
+    name: "→ 箭头列表"
+    based_on: "ListBase"
+    list: { num_fmt: "bullet", lvl_text: "→", suff: "space" }

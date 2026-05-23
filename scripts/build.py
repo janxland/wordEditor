@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 """
-Markdown → Word 一键构建（多模板）。
+Markdown → Word（湖南工商大学 · 碳中和模板）。
 
 用法:
-  python scripts/build.py                          # 默认模板，input/example.md
-  python scripts/build.py -i report.md -t hutb-carbon-neutral
+  python scripts/build.py
+  python scripts/build.py -i report.md
   python scripts/build.py --list-templates
-  python scripts/setup_templates.py                # 首次：从 vendor 提取内置模板
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import shutil
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -23,11 +22,13 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
+from postprocess_pipeline import run_document_postprocess, run_styles_postprocess  # noqa: E402
 from tool_paths import find_pandoc  # noqa: E402
 
 CONFIG_PATH = ROOT / "config" / "templates.json"
-DEFAULT_INPUT = ROOT / "input" / "example.md"
+DEFAULT_INPUT = ROOT / "input" / "carbon-neutral-renewable.md"
 DEFAULT_OUTPUT_DIR = ROOT / "output"
+DEFAULT_TEMPLATE_ID = "hutb-guanke"
 
 
 def load_config() -> dict:
@@ -35,8 +36,12 @@ def load_config() -> dict:
         return json.load(f)
 
 
+TEMPLATE_ALIASES = {"hutb-carbon-neutral": "hutb-guanke"}
+
+
 def resolve_template(cfg: dict, template_id: str | None) -> dict:
-    tid = template_id or cfg["default_template"]
+    tid = template_id or cfg.get("default_template") or DEFAULT_TEMPLATE_ID
+    tid = TEMPLATE_ALIASES.get(tid, tid)
     for t in cfg["templates"]:
         if t["id"] == tid:
             return t
@@ -44,21 +49,15 @@ def resolve_template(cfg: dict, template_id: str | None) -> dict:
     raise SystemExit(f"未知模板 '{tid}'。可用: {ids}")
 
 
-def resolve_lua_filters(cfg: dict, template: dict) -> list[Path]:
-    """按模板解析 Pandoc --lua-filter 链。standalone 模板不加载 config 全局过滤器。"""
+def resolve_lua_filters(template: dict) -> list[Path]:
+    """模板内 Lua 过滤器链（markdown-to-docx → zhengwen-style）。"""
     paths: list[Path] = []
-    standalone = bool(template.get("standalone"))
-    if not standalone:
-        global_lua = cfg.get("lua_filter")
-        if global_lua:
-            paths.append(ROOT / global_lua)
     tpl_lua = template.get("lua_filter")
     if tpl_lua:
         paths.append(ROOT / tpl_lua)
-    elif standalone:
+    else:
         raise SystemExit(
-            f"独立模板「{template['name']}」须在 templates.json 中配置 lua_filter，"
-            "且过滤器文件位于本模板目录内。"
+            f"模板「{template['name']}」须在 templates.json 中配置 lua_filter。"
         )
     for rel in template.get("extra_lua_filters", []):
         paths.append(ROOT / rel)
@@ -69,7 +68,7 @@ def list_templates(cfg: dict) -> None:
     print("可用模板 (--template / -t):\n")
     for t in cfg["templates"]:
         ref = ROOT / t["reference_doc"]
-        ok = "✓" if ref.is_file() else "✗ 缺少 reference.docx"
+        ok = "OK" if ref.is_file() else "缺少 reference.docx"
         note = f"  — {t['note']}" if t.get("note") else ""
         print(f"  {t['id']:<28} {t['name']}{note}")
         print(f"    {'':28} [{ok}] {t['reference_doc']}\n")
@@ -92,9 +91,6 @@ def run_pandoc(
             print(f"警告: Lua 过滤器不存在，已跳过: {f}", file=sys.stderr)
 
     if use_html_pipe:
-        # 与上游 md2docx.sh 一致：经 HTML 中转以更好支持部分 HTML 标签
-        # 加 tex_math_dollars + tex_math_single_backslash，让 HTML reader 重新识别
-        # \(...\) / $...$ 为数学，DOCX writer 转为 Word 原生 OMML 公式
         md_dir = str(input_md.parent)
         cmd1 = [
             pandoc,
@@ -120,6 +116,15 @@ def run_pandoc(
             *lua_arg,
         ]
         html = subprocess.check_output(cmd1, text=True, encoding="utf-8", errors="replace")
+        # 移除 standalone HTML 在 body 中的标题块，避免与 <head><title> 同时被
+        # HTML→DOCX 阶段读入而产生两次 Title 段（原「形策模板标题重复」根因）。
+        html = re.sub(
+            r"<header[^>]*id=[\"']title-block-header[\"'][^>]*>.*?</header>",
+            "",
+            html,
+            count=1,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
         subprocess.run(cmd2, input=html, text=True, check=True, encoding="utf-8")
     else:
         cmd = [
@@ -135,20 +140,17 @@ def run_pandoc(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Markdown 转 Word（多模板）")
+    parser = argparse.ArgumentParser(description="Markdown 转 Word（碳中和模板）")
     parser.add_argument("-i", "--input", type=Path, default=DEFAULT_INPUT, help="输入 .md")
     parser.add_argument("-o", "--output", type=Path, help="输出 .docx（默认 output/<名>-<模板>.docx）")
-    parser.add_argument("-t", "--template", help="模板 id，见 config/templates.json")
+    parser.add_argument("-t", "--template", help="模板 id（默认 hutb-guanke；hutb-carbon-neutral 等同管科）")
     parser.add_argument("--list-templates", action="store_true", help="列出模板")
     parser.add_argument("--no-html-pipe", action="store_true", help="不使用 html 管道（更快，HTML 支持较弱）")
-    parser.add_argument("--no-postprocess", action="store_true",
-                        help="不运行后处理（VBA 宏 + OOXML 样式注入）")
-    parser.add_argument("--render-math", action="store_true",
-                        help="预渲染行内 LaTeX 为 Unicode（默认关，交由 Pandoc 生成 Word 原生公式 OMML）")
-    parser.add_argument("--with-formula-macro", action="store_true",
-                        help="后处理时仍跑 VBA 公式宏（默认跳过——公式已 OMML 化）")
-    parser.add_argument("--interactive-macro", action="store_true",
-                        help="后处理时 Word 可见 + 保留 MsgBox（调试）")
+    parser.add_argument(
+        "--no-postprocess",
+        action="store_true",
+        help="不运行后处理（标题/引用 + OOXML 样式注入）",
+    )
     args = parser.parse_args()
 
     cfg = load_config()
@@ -161,10 +163,7 @@ def main() -> int:
     ref = ROOT / template["reference_doc"]
     if not ref.is_file():
         print(f"模板文件不存在: {ref}", file=sys.stderr)
-        if template["id"] == "hutb-carbon-neutral":
-            print("请阅读 templates/hutb-carbon-neutral/README.md 放置学校官方模板。", file=sys.stderr)
-        else:
-            print("请先运行: python scripts/setup_templates.py", file=sys.stderr)
+        print("请阅读 templates/hutb-carbon-neutral/README.md 放置学校官方 reference.docx。", file=sys.stderr)
         return 1
 
     input_md = args.input if args.input.is_absolute() else ROOT / args.input
@@ -189,33 +188,17 @@ def main() -> int:
     elif not out.is_absolute():
         out = ROOT / out
 
-    lua_filters = resolve_lua_filters(cfg, template)
+    lua_filters = resolve_lua_filters(template)
     print(f"模板: {template['name']} ({template['id']})")
-    if template.get("standalone"):
-        print("模式: 独立模板（不复用通用 builtin / 全局 Lua）")
     print(f"输入: {input_md}")
     print(f"输出: {out}")
     if lua_filters:
         print(f"Lua: {[str(p.relative_to(ROOT)) for p in lua_filters]}")
 
-    pandoc_input = input_md
-    rendered_md: Path | None = None
-    if args.render_math:
-        rendered_md = DEFAULT_OUTPUT_DIR / f"{input_md.stem}.rendered.md"
-        rendered_md.parent.mkdir(parents=True, exist_ok=True)
-        rc = subprocess.call([
-            sys.executable, str(ROOT / "scripts" / "render_math.py"),
-            str(input_md), "-o", str(rendered_md),
-        ])
-        if rc != 0:
-            print("LaTeX 预渲染失败。", file=sys.stderr)
-            return rc
-        pandoc_input = rendered_md
-
     try:
         run_pandoc(
             pandoc,
-            pandoc_input,
+            input_md,
             out,
             ref,
             lua_filters,
@@ -228,36 +211,29 @@ def main() -> int:
     print("完成。")
 
     if not args.no_postprocess:
-        print("\n[后处理] 运行 VBA 宏 …")
-        pp_args = [sys.executable, str(ROOT / "scripts" / "postprocess_word.py"), str(out)]
-        if not args.with_formula_macro:
-            pp_args.append("--skip-formula")
-        if args.interactive_macro:
-            pp_args.append("--interactive")
-        import os as _os
-        env = _os.environ.copy()
-        env.setdefault("PYTHONIOENCODING", "utf-8")
-        rc = subprocess.call(pp_args, env=env)
+        scheme = template.get("heading_numbering", "guanke")
+        rc = run_document_postprocess(out, heading_scheme=scheme)
         if rc != 0:
-            print("VBA 后处理失败。", file=sys.stderr)
+            print("文档结构后处理失败。", file=sys.stderr)
             return rc
         styles_yaml_rel = template.get("styles_yaml")
         if styles_yaml_rel:
-            print("\n[后处理] 注入 OOXML 样式 …")
             styles_yaml = ROOT / styles_yaml_rel
             if not styles_yaml.is_file():
                 print(f"错误: styles_yaml 不存在 {styles_yaml}", file=sys.stderr)
                 return 1
-            styles_cmd = [
-                sys.executable,
-                str(ROOT / "scripts" / "postprocess_styles.py"),
-                str(out),
-                "--styles",
-                str(styles_yaml),
-            ]
-            rc = subprocess.call(styles_cmd, env=env)
+            print("\n[后处理] 注入 OOXML 样式 …")
+            rc = run_styles_postprocess(out, styles_yaml)
             if rc != 0:
                 print("OOXML 样式后处理失败。", file=sys.stderr)
+                return rc
+        if template.get("three_line_tables"):
+            print("\n[后处理] 三线表边框 …")
+            rc = subprocess.call(
+                [sys.executable, str(SCRIPT_DIR / "ooxml_three_line_table.py"), str(out)]
+            )
+            if rc != 0:
+                print("三线表后处理失败。", file=sys.stderr)
                 return rc
     return 0
 

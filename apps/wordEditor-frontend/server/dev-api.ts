@@ -43,8 +43,6 @@ function readBody(req: IncomingMessage, limit = MAX_BODY): Promise<string> {
 export interface BuildApiOptions {
   noHtmlPipe?: boolean;
   noPostprocess?: boolean;
-  withFormulaMacro?: boolean;
-  renderMath?: boolean;
 }
 
 function spawnEnv(): NodeJS.ProcessEnv {
@@ -126,33 +124,86 @@ function runPythonJson(scriptArgs: string[]): Promise<string> {
   });
 }
 
-function runBuild(
+function buildScriptArgs(
   inputMd: string,
   outputDocx: string,
   templateId: string,
   options: BuildApiOptions,
+): string[] {
+  const scriptArgs = [
+    path.join(REPO_ROOT, 'scripts', 'build.py'),
+    '-i',
+    inputMd,
+    '-o',
+    outputDocx,
+    '-t',
+    templateId,
+  ];
+  if (options.noHtmlPipe) scriptArgs.push('--no-html-pipe');
+  if (options.noPostprocess) scriptArgs.push('--no-postprocess');
+  return scriptArgs;
+}
+
+function sanitizeDownloadName(name: string): string {
+  const base = path.basename(name || 'export.docx');
+  const cleaned = base.replace(/[^\w.\-()\u4e00-\u9fff\s]/g, '_').trim();
+  return cleaned.endsWith('.docx') ? cleaned : `${cleaned || 'export'}.docx`;
+}
+
+type BuildLineHandler = (stream: 'stdout' | 'stderr', line: string) => void;
+
+function emitStepFromBuildLine(
+  line: string,
+  options: BuildApiOptions,
+  write: (id: string, status: string, message?: string) => void,
+): void {
+  const t = line.trim();
+  if (!t) return;
+  if (t.includes('模板:') || t.startsWith('输入:')) {
+    write('prepare', 'finish');
+    write('pandoc', 'process', 'Pandoc 转换中…');
+  }
+  if (t === '完成。') {
+    write('pandoc', 'finish', 'DOCX 已生成');
+    if (!options.noPostprocess) write('structure', 'wait');
+  }
+  if (t.includes('[后处理] 标题识别') || t.includes('[postprocess_headings]')) {
+    write('structure', 'process', '标题与交叉引用…');
+  }
+  if (t.includes('[postprocess_document] 完成')) {
+    write('structure', 'finish');
+  }
+  if (t.includes('注入 OOXML') || t.includes('[postprocess_styles]')) {
+    if (!t.includes('完成')) write('ooxml', 'process', '注入 styles.yaml…');
+  }
+  if (t.includes('[postprocess_styles] 完成')) {
+    write('ooxml', 'finish');
+  }
+}
+
+function runStylePreview(
+  templateId: string,
+  outputDocx: string,
+  stylesYaml: string,
 ): Promise<{ code: number; stderr: string }> {
   return new Promise((resolve) => {
-    const scriptArgs = [
-      path.join(REPO_ROOT, 'scripts', 'build.py'),
-      '-i',
-      inputMd,
-      '-o',
-      outputDocx,
-      '-t',
-      templateId,
-    ];
-    if (options.noHtmlPipe) scriptArgs.push('--no-html-pipe');
-    if (options.noPostprocess) scriptArgs.push('--no-postprocess');
-    if (options.withFormulaMacro) scriptArgs.push('--with-formula-macro');
-    if (options.renderMath) scriptArgs.push('--render-math');
-
-    const child = spawnPython(scriptArgs, {
-      cwd: REPO_ROOT,
-      env: spawnEnv(),
-    });
+    const child = spawnPython(
+      [
+        path.join(REPO_ROOT, 'scripts', 'preview_styles.py'),
+        '-t',
+        templateId,
+        '-o',
+        outputDocx,
+        '--styles',
+        stylesYaml,
+      ],
+      { cwd: REPO_ROOT, env: spawnEnv() },
+    );
     let stderr = '';
     child.stderr?.on('data', (d) => {
+      stderr += d.toString();
+    });
+    child.stdout?.on('data', (d) => {
       stderr += d.toString();
     });
     child.on('error', (err) => {
@@ -162,6 +213,56 @@ function runBuild(
     });
     child.on('close', (code) => resolve({ code: code ?? 1, stderr }));
   });
+}
+
+function runBuild(
+  inputMd: string,
+  outputDocx: string,
+  templateId: string,
+  options: BuildApiOptions,
+  onLine?: BuildLineHandler,
+): Promise<{ code: number; stderr: string }> {
+  return new Promise((resolve) => {
+    const child = spawnPython(buildScriptArgs(inputMd, outputDocx, templateId, options), {
+      cwd: REPO_ROOT,
+      env: spawnEnv(),
+    });
+    let stderr = '';
+    let outBuf = '';
+    let errBuf = '';
+
+    const flush = (stream: 'stdout' | 'stderr', chunk: string) => {
+      const bufRef = stream === 'stdout' ? { get: () => outBuf, set: (v: string) => { outBuf = v; } } : { get: () => errBuf, set: (v: string) => { errBuf = v; } };
+      bufRef.set(bufRef.get() + chunk);
+      const parts = bufRef.get().split(/\r?\n/);
+      bufRef.set(parts.pop() ?? '');
+      for (const line of parts) {
+        if (stream === 'stderr') stderr += `${line}\n`;
+        onLine?.(stream, line);
+      }
+    };
+
+    child.stdout?.on('data', (d) => flush('stdout', d.toString()));
+    child.stderr?.on('data', (d) => flush('stderr', d.toString()));
+    child.on('error', (err) => {
+      const py = resolvePython();
+      stderr += `无法启动 Python (${py.command}): ${err.message}\n`;
+      resolve({ code: 1, stderr });
+    });
+    child.on('close', (code) => {
+      if (outBuf.trim()) onLine?.('stdout', outBuf.trim());
+      if (errBuf.trim()) {
+        stderr += `${errBuf}\n`;
+        onLine?.('stderr', errBuf.trim());
+      }
+      resolve({ code: code ?? 1, stderr });
+    });
+  });
+}
+
+function writeSse(res: ServerResponse, event: string, data: unknown): void {
+  res.write(`event: ${event}\n`);
+  res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
 export function createDevApiMiddleware(): Connect.NextHandleFunction {
@@ -199,20 +300,6 @@ export function createDevApiMiddleware(): Connect.NextHandleFunction {
       return;
     }
 
-    if (req.method === 'GET' && pathname === '/macros') {
-      try {
-        const dir = path.join(REPO_ROOT, 'macros');
-        const files = fs
-          .readdirSync(dir)
-          .filter((f) => f.endsWith('.bas'))
-          .map((f) => ({ name: f.replace(/\.bas$/, ''), file: `macros/${f}` }));
-        sendJson(res, 200, files);
-      } catch (e) {
-        sendJson(res, 500, { error: String(e) });
-      }
-      return;
-    }
-
     if (req.method === 'GET' && pathname === '/docs') {
       const name = url.searchParams.get('name');
       if (!name || !/^[\w-]+\.md$/.test(name)) {
@@ -243,6 +330,7 @@ export function createDevApiMiddleware(): Connect.NextHandleFunction {
         sendJson(res, 404, { error: 'file not found or expired' });
         return;
       }
+      const fileName = sanitizeDownloadName(url.searchParams.get('fileName') ?? 'export.docx');
       res.statusCode = 200;
       res.setHeader(
         'Content-Type',
@@ -250,13 +338,65 @@ export function createDevApiMiddleware(): Connect.NextHandleFunction {
       );
       res.setHeader(
         'Content-Disposition',
-        `attachment; filename="wordeditor-${jobId.slice(0, 8)}.docx"`,
+        `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
       );
       fs.createReadStream(docx).pipe(res);
       return;
     }
 
-    if (req.method === 'POST' && pathname === '/build') {
+    if (req.method === 'POST' && pathname === '/preview/styles') {
+      void (async () => {
+        try {
+          const raw = await readBody(req);
+          const body = JSON.parse(raw) as {
+            templateId?: string;
+            stylesYaml?: string;
+          };
+          if (!body.templateId) {
+            sendJson(res, 400, { error: 'templateId is required' });
+            return;
+          }
+          if (!body.stylesYaml?.trim()) {
+            sendJson(res, 400, { error: 'stylesYaml is required' });
+            return;
+          }
+
+          const jobId = randomUUID();
+          const workDir = path.join(CACHE_DIR, jobId);
+          fs.mkdirSync(workDir, { recursive: true });
+          const stylesPath = path.join(workDir, 'styles.yaml');
+          const outputDocx = path.join(workDir, 'output.docx');
+          fs.writeFileSync(stylesPath, body.stylesYaml, 'utf-8');
+
+          const { code, stderr } = await runStylePreview(
+            body.templateId,
+            outputDocx,
+            stylesPath,
+          );
+
+          if (code !== 0 || !fs.existsSync(outputDocx)) {
+            sendJson(res, 500, {
+              error: 'style preview failed',
+              detail: stderr.slice(-4000) || `exit code ${code}`,
+              jobId,
+            });
+            return;
+          }
+
+          const fileName = sanitizeDownloadName(`style-preview-${body.templateId}.docx`);
+          sendJson(res, 200, {
+            jobId,
+            fileName,
+            downloadUrl: `/api/build/download?jobId=${jobId}&fileName=${encodeURIComponent(fileName)}`,
+          });
+        } catch (e) {
+          sendJson(res, 500, { error: String(e) });
+        }
+      })();
+      return;
+    }
+
+    if (req.method === 'POST' && pathname === '/build/stream') {
       void (async () => {
         try {
           const raw = await readBody(req);
@@ -275,36 +415,67 @@ export function createDevApiMiddleware(): Connect.NextHandleFunction {
             return;
           }
 
+          res.writeHead(200, {
+            'Content-Type': 'text/event-stream; charset=utf-8',
+            'Cache-Control': 'no-cache, no-transform',
+            Connection: 'keep-alive',
+          });
+
+          const options = body.options ?? {};
           const jobId = randomUUID();
           const workDir = path.join(CACHE_DIR, jobId);
           fs.mkdirSync(workDir, { recursive: true });
           const inputMd = path.join(workDir, 'input.md');
           const outputDocx = path.join(workDir, 'output.docx');
+          const fileName = sanitizeDownloadName(body.fileName ?? `export-${body.templateId}.docx`);
+
+          const pushStep = (id: string, status: string, message?: string) => {
+            writeSse(res, 'step', { id, status, message });
+          };
+
+          pushStep('prepare', 'process', '写入 Markdown…');
           fs.writeFileSync(inputMd, body.markdown, 'utf-8');
+          pushStep('prepare', 'finish');
+          pushStep('pandoc', 'process', '启动 Pandoc…');
 
           const { code, stderr } = await runBuild(
             inputMd,
             outputDocx,
             body.templateId,
-            body.options ?? {},
+            options,
+            (stream, line) => {
+              writeSse(res, 'log', { line, stream });
+              emitStepFromBuildLine(line, options, pushStep);
+            },
           );
 
           if (code !== 0 || !fs.existsSync(outputDocx)) {
-            sendJson(res, 500, {
+            writeSse(res, 'error', {
               error: 'build failed',
               detail: stderr.slice(-4000) || `exit code ${code}`,
               jobId,
             });
+            res.end();
             return;
           }
 
-          sendJson(res, 200, {
+          if (options.noPostprocess) {
+            pushStep('pandoc', 'finish', '构建完成');
+          }
+
+          writeSse(res, 'done', {
             jobId,
-            fileName: body.fileName ?? `export-${body.templateId}.docx`,
-            downloadUrl: `/api/build/download?jobId=${jobId}`,
+            fileName,
+            downloadUrl: `/api/build/download?jobId=${jobId}&fileName=${encodeURIComponent(fileName)}`,
           });
+          res.end();
         } catch (e) {
-          sendJson(res, 500, { error: String(e) });
+          if (!res.headersSent) {
+            sendJson(res, 500, { error: String(e) });
+          } else {
+            writeSse(res, 'error', { error: String(e) });
+            res.end();
+          }
         }
       })();
       return;

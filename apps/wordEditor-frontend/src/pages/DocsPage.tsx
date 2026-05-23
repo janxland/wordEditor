@@ -7,7 +7,7 @@ const { Text } = Typography;
 
 const DOCS = [
   { name: 'styles-dsl.md', label: '样式 DSL 规范' },
-  { name: 'principle.md', label: '实现原理' },
+  { name: 'markdown-conventions.md', label: 'Markdown 约定' },
 ];
 
 export const DocsPage: React.FC = () => {

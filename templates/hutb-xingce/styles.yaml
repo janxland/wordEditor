@@ -1,0 +1,67 @@
+extends: "../_shared/hutb-base.yaml"
+template:
+  id: "hutb-xingce"
+  name: "湖南工商大学 · 形策论文 1500 字模板"
+custom_styles:
+  - id: "Title"
+    name: "Title"
+    based_on: "a"
+    paragraph:
+      align: "center"
+      line_spacing: "single"
+      spacing_before_dxa: 240
+      spacing_after_dxa: 240
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 44
+      size_cs_half_pt: 44
+      bold: true
+  - id: "ae"
+    name: "文章的正文"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: "22pt"
+      first_line_chars: 2
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 30
+      size_cs_half_pt: 30
+overrides: []
+fonts: {}
+multilevel_list:
+  num_id: 2
+  levels:
+    - ilvl: 0
+      heading_style: "1"
+      num_fmt: "chineseCounting"
+      lvl_text: "%1、"
+      suff: "nothing"
+      start: 1
+    - ilvl: 1
+      heading_style: "2"
+      num_fmt: "decimal"
+      lvl_text: "%1.%2"
+      suff: "space"
+      start: 1
+      is_lgl: true
+    - ilvl: 2
+      heading_style: "3"
+      num_fmt: "decimal"
+      lvl_text: "%1.%2.%3"
+      suff: "space"
+      start: 1
+      is_lgl: true
+    - ilvl: 3
+      heading_style: "4"
+      num_fmt: "decimal"
+      lvl_text: "%1.%2.%3.%4"
+      suff: "space"
+      start: 1
+      is_lgl: true

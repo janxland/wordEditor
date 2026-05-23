@@ -1,5 +1,7 @@
-import React, { useCallback } from 'react';
-import Editor, { type OnMount } from '@monaco-editor/react';
+import React, { useCallback, useRef } from 'react';
+import Editor, { type EditorProps, type OnMount } from '@monaco-editor/react';
+import { ensureCodeTheme, ensureMarkdownTheme } from './monacoTheme';
+import { editorOptions, editorTheme, shellClass, type EditorVariant } from './editorPresets';
 
 export type CodeLanguage = 'yaml' | 'lua' | 'vb' | 'markdown';
 
@@ -17,6 +19,9 @@ export interface CodeEditorProps {
   readOnly?: boolean;
   height?: string | number;
   path?: string;
+  /** markdown：浅色写作模式；code：深色代码模式 */
+  variant?: EditorVariant;
+  autoFocus?: boolean;
 }
 
 export const CodeEditor: React.FC<CodeEditorProps> = ({
@@ -26,31 +31,39 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   readOnly = false,
   height = '100%',
   path,
+  variant = language === 'markdown' ? 'markdown' : 'code',
+  autoFocus = false,
 }) => {
-  const onMount = useCallback<OnMount>((editor) => {
-    editor.focus();
-  }, []);
+  const mounted = useRef(false);
+
+  const onMount = useCallback<OnMount>(
+    (editor, monaco) => {
+      if (variant === 'markdown') {
+        ensureMarkdownTheme(monaco);
+      } else {
+        ensureCodeTheme(monaco);
+      }
+      monaco.editor.setTheme(editorTheme(variant));
+      if (autoFocus && !mounted.current) {
+        editor.focus();
+        mounted.current = true;
+      }
+    },
+    [variant, autoFocus],
+  );
 
   return (
-    <Editor
-      height={height}
-      language={LANG_MAP[language]}
-      path={path}
-      value={value}
-      onChange={(v) => onChange(v ?? '')}
-      onMount={onMount}
-      theme="vs-dark"
-      options={{
-        readOnly,
-        minimap: { enabled: true },
-        fontSize: 13,
-        lineNumbers: 'on',
-        scrollBeyondLastLine: false,
-        wordWrap: 'on',
-        automaticLayout: true,
-        tabSize: 2,
-        formatOnPaste: true,
-      }}
-    />
+    <div className={shellClass(variant, language)}>
+      <Editor
+        height={height}
+        language={LANG_MAP[language]}
+        path={path}
+        value={value}
+        onChange={(v) => onChange(v ?? '')}
+        onMount={onMount}
+        theme={editorTheme(variant)}
+        options={editorOptions(variant, readOnly) as EditorProps['options']}
+      />
+    </div>
   );
 };

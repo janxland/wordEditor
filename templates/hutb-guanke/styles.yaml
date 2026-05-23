@@ -1,0 +1,37 @@
+# 湖南工商大学 · 管科：H1=一、 H2=（一） H3=1. H4=1.1（H1/H2 中文数字，H3+ 阿拉伯）
+extends: "../_shared/hutb-base.yaml"
+template:
+  id: "hutb-guanke"
+  name: "湖南工商大学 · 管科"
+
+overrides: []
+custom_styles: []
+fonts: {}
+
+multilevel_list:
+  num_id: 2
+  levels:
+    - ilvl: 0
+      heading_style: "1"
+      num_fmt: "chineseCounting"
+      lvl_text: "%1、"
+      suff: "nothing"
+      start: 1
+    - ilvl: 1
+      heading_style: "2"
+      num_fmt: "chineseCounting"
+      lvl_text: "（%2）"
+      suff: "nothing"
+      start: 1
+    - ilvl: 2
+      heading_style: "3"
+      num_fmt: "decimal"
+      lvl_text: "%3."
+      suff: "space"
+      start: 1
+    - ilvl: 3
+      heading_style: "4"
+      num_fmt: "decimal"
+      lvl_text: "%3.%4"
+      suff: "space"
+      start: 1

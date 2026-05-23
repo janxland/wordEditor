@@ -9,6 +9,8 @@ export interface TemplateEntry {
   lua_filter?: string;
   extra_lua_filters?: string[];
   styles_yaml?: string;
+  /** 标题多级编号：gongke=1/1.1/1.1.1，guanke=一、/1.1/1.1.1 */
+  heading_numbering?: 'gongke' | 'guanke';
 }
 
 /** 按构建顺序返回模板应加载的 Lua 过滤器路径 */
@@ -33,11 +35,6 @@ export interface TemplatesConfig {
   default_template: string;
   lua_filter?: string;
   templates: TemplateEntry[];
-}
-
-export interface MacroEntry {
-  name: string;
-  file: string;
 }
 
 export type EditorTab = 'visual' | 'yaml' | 'lua' | 'overview';

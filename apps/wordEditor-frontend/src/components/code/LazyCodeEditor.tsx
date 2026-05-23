@@ -1,5 +1,4 @@
 import React, { Suspense } from 'react';
-import { Spin } from 'antd';
 import type { CodeEditorProps } from './CodeEditor';
 
 const CodeEditor = React.lazy(() =>
@@ -9,8 +8,8 @@ const CodeEditor = React.lazy(() =>
 export const LazyCodeEditor: React.FC<CodeEditorProps> = (props) => (
   <Suspense
     fallback={
-      <div className="editor-loading">
-        <Spin tip="加载编辑器…" />
+      <div className="editor-loading editor-loading--minimal">
+        <div className="editor-loading-bar" />
       </div>
     }
   >

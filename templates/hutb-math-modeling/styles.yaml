@@ -1,0 +1,54 @@
+extends: "../_shared/hutb-base.yaml"
+template:
+  id: "hutb-math-modeling"
+  name: "湖南工商大学 · 数学建模"
+custom_styles:
+  - id: "Title"
+    name: "Title"
+    based_on: "a"
+    paragraph:
+      align: "center"
+      line_spacing: "single"
+      spacing_before_dxa: 240
+      spacing_after_dxa: 240
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "黑体"
+      latin_font: "Times New Roman"
+      size_half_pt: 36
+      size_cs_half_pt: 36
+      bold: true
+overrides: []
+fonts: {}
+multilevel_list:
+  num_id: 2
+  levels:
+    - ilvl: 0
+      heading_style: "1"
+      num_fmt: "chineseCounting"
+      lvl_text: "%1、"
+      suff: "nothing"
+      start: 1
+    - ilvl: 1
+      heading_style: "2"
+      num_fmt: "decimal"
+      lvl_text: "%1.%2"
+      suff: "space"
+      start: 1
+      is_lgl: true
+    - ilvl: 2
+      heading_style: "3"
+      num_fmt: "decimal"
+      lvl_text: "%1.%2.%3"
+      suff: "space"
+      start: 1
+      is_lgl: true
+    - ilvl: 3
+      heading_style: "4"
+      num_fmt: "decimal"
+      lvl_text: "%1.%2.%3.%4"
+      suff: "space"
+      start: 1
+      is_lgl: true
+use_list_styles:
+  - id: "DecimalList"

@@ -26,5 +26,8 @@ venv/
 .DS_Store
 Thumbs.db
 
-# vendor 内 docx 已由 templates/builtin 提供副本，避免重复提交
-vendor/pandoc_docx_template/template_*.docx
+# 已弃用：上游克隆目录（模板 Lua 已迁入 templates/hutb-carbon-neutral/）
+vendor/
+
+# 可选：学校源模板备份（体积大时不提交）
+templates/hutb-carbon-neutral/_user-template.docx

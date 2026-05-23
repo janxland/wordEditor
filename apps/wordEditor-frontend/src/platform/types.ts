@@ -12,11 +12,3 @@ export interface FeatureModule {
   nav?: boolean;
   lazy: LazyExoticComponent<ComponentType>;
 }
-
-/** 可插拔能力契约（后续无代码节点可映射到 capability） */
-export interface CapabilityDescriptor {
-  id: string;
-  version: string;
-  inputs: Record<string, 'string' | 'markdown' | 'file' | 'template' | 'boolean'>;
-  outputs: Record<string, 'docx' | 'yaml' | 'json'>;
-}

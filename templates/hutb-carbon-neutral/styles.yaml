@@ -1,125 +1,38 @@
+extends: "../_shared/hutb-base.yaml"
 template:
   id: "hutb-carbon-neutral"
   name: "湖南工商大学 · 碳中和（自定义）"
-fonts:
-  latin: "Times New Roman"
-  cjk: "宋体"
-overrides:
-  - match:
-      kind: "body"
-    word_wrap_break_latin: true
-  - match:
-      kind: "heading"
-    word_wrap_break_latin: true
-    clear_indent: true
-    latin_font: "inherit"
-custom_styles:
-  - id: "ae"
-    name: "文章的正文"
-    based_on: "a"
-    paragraph:
-      align: "both"
-      line_spacing: 1.5
-      first_line_chars: 2
-      word_wrap_break_latin: true
-    run:
-      cjk_font: "宋体"
-      latin_font: "宋体"
-      size_half_pt: 24
-      size_cs_half_pt: 28
-  - id: "Cankaowenxian"
-    name: "参考文献"
-    based_on: "a"
-    paragraph:
-      align: "both"
-      line_spacing: "single"
-      spacing_before_dxa: 60
-      spacing_after_dxa: 60
-      hanging_indent_chars: 2
-      word_wrap_break_latin: true
-    run:
-      latin_font: "inherit"
-      size_half_pt: 21
-  - id: "TuStyle"
-    name: "图"
-    based_on: "a"
-    paragraph:
-      align: "center"
-      line_spacing: "single"
-      spacing_before_dxa: 120
-      spacing_after_dxa: 0
-      indent_clear: true
-      word_wrap_break_latin: true
-  - id: "TuZhu"
-    name: "图注"
-    based_on: "a"
-    paragraph:
-      align: "center"
-      line_spacing: "single"
-      spacing_before_dxa: 0
-      spacing_after_dxa: 120
-      indent_clear: true
-      word_wrap_break_latin: true
-    run:
-      latin_font: "inherit"
-      size_half_pt: 20
-  - id: "AbstractPara"
-    name: "Abstract"
-    based_on: "a"
-    paragraph:
-      align: "both"
-      line_spacing: "single"
-      indent_clear: true
-      word_wrap_break_latin: true
-    run:
-      latin_font: "inherit"
-      size_half_pt: 21
-      size_cs_half_pt: 21
-
-  - id: "Yingwenduanluo"
-    name: "英文段落"
-    based_on: "a"
-    paragraph:
-      align: "both"
-      line_spacing: "single"
-      word_wrap_break_latin: true
-    run:
-      latin_font: "inherit"
-      size_half_pt: 21
-semantics:
-  body_paragraph:
-    note: "默认正文（非参考文献/图/英文段）"
-    apply_style: "文章的正文"
-  bib_paragraph:
-    detect:
-      inline_type:
-        - "Link"
-        - "Span"
-      identifier_regex: "^Ref\\d+$"
-      scan_first_n_inlines: 5
-    apply_style: "参考文献"
-  abstract_paragraph:
-    detect:
-      after_heading: "Abstract"
-      until: "下一标题或出现 CJK 的段落"
-    apply_style: "Abstract"
-  english_paragraph:
-    detect:
-      rule: "段落 plain text 非空且不含 CJK 字符（Unified / Ext A / Compatibility）"
-    apply_style: "英文段落"
-  image_only_paragraph:
-    apply_style: "图"
-  figure_caption:
-    apply_style: "图注"
-    auto_prefix: "图 {n}　"
-headings:
-  - pattern: "^[一二三四五六七八九十百千]、"
-    level: 1
-  - pattern: "^\\d+\\.\\d+\\.\\d+\\.\\d+( |$)"
-    level: 4
-  - pattern: "^\\d+\\.\\d+\\.\\d+( |$)"
-    level: 3
-  - pattern: "^\\d+\\.\\d+( |$)"
-    level: 2
-  - pattern: "^\\d+( |$)"
-    level: 1
+overrides: []
+custom_styles: []
+fonts: {}
+multilevel_list:
+  num_id: 2
+  levels:
+    - ilvl: 0
+      heading_style: "1"
+      num_fmt: "chineseCounting"
+      lvl_text: "%1、"
+      suff: "nothing"
+      start: 1
+      is_lgl: true
+    - ilvl: 1
+      heading_style: "2"
+      num_fmt: "decimal"
+      lvl_text: "（%2）"
+      suff: "space"
+      start: 1
+      is_lgl: true
+    - ilvl: 2
+      heading_style: "3"
+      num_fmt: "decimal"
+      lvl_text: "%3."
+      suff: "space"
+      start: 1
+      is_lgl: true
+    - ilvl: 3
+      heading_style: "4"
+      num_fmt: "upperLetter"
+      lvl_text: "%4"
+      suff: "space"
+      start: 1
+      is_lgl: true

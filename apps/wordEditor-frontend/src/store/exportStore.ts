@@ -1,25 +1,66 @@
 import { create } from 'zustand';
-import { getBuildPipeline, isBuildSuccess, type BuildOptions } from '@/kernel/pipeline';
+import { notification } from 'antd';
+import type { BuildOptions } from '@/kernel/pipeline';
+import { streamBuild } from '@/kernel/pipeline/streamBuild';
+import type { BuildStreamStepEvent } from '@/kernel/pipeline/streamBuild';
+import {
+  createInitialBuildSteps,
+  type BuildStepState,
+} from '@/kernel/pipeline/buildSteps';
+import { downloadFile } from '@/services/download';
 import type { TemplatesConfig } from '@/core/types';
 
-const SAMPLE_MD = `# 示例正文
+const SAMPLE_MD = `<!-- 导出页示例：完整稿见 input/carbon-neutral-renewable.md -->
+
+摘要
+
+双碳背景下风光储协同优化示例摘要，含行内公式 \\(c_{CO_2}\\) 与引用[1]。
+
+**关键词**：双碳目标；新能源消纳；储能优化
+
+Abstract
+
+Sample abstract with \\(c_{CO_2}\\) and citation[2].
+
+**Keywords**: dual-carbon; renewable integration; energy storage
 
 一、绪论
 
-本文演示 Markdown 一键导出 Word。
+1.1 模型说明
 
-## 1.1 研究背景
+$$
+SOC(t+1) = SOC(t) + \\frac{\\eta_c P_{ch}(t) - P_{dis}(t)/\\eta_d}{E_{cap}} \\Delta t
+$$
 
-行内公式 \\(E = mc^2\\) 与引用 [1]。
+![碳排放对比](images/fig-emission.png)
 
-![示意图](/input/images/fig-emission.png)
+参考文献
 
-图注由 Lua 自动加「图 N」前缀。
+<a id="Ref1"></a>[1] 中共中央, 国务院. 碳达峰碳中和工作的意见[Z]. 2021.
 
-# 参考文献
-
-<a id="Ref1"></a>[1] 示例文献. 期刊, 2024.
+<a id="Ref2"></a>[2] 国家能源局. 新型电力系统发展蓝皮书[R]. 2023.
 `;
+
+const MAX_LOG_LINES = 120;
+
+function patchStep(steps: BuildStepState[], event: BuildStreamStepEvent): BuildStepState[] {
+  const i = steps.findIndex((s) => s.id === event.id);
+  if (i < 0) return steps;
+  const next = steps.map((s) => ({ ...s }));
+  next[i] = {
+    ...next[i],
+    status: event.status,
+    message: event.message ?? next[i].message,
+  };
+  return next;
+}
+
+function appendLog(logs: string[], line: string, stream: 'stdout' | 'stderr'): string[] {
+  if (!line.trim()) return logs;
+  const prefix = stream === 'stderr' ? '⚠ ' : '';
+  const next = [...logs, `${prefix}${line}`];
+  return next.length > MAX_LOG_LINES ? next.slice(-MAX_LOG_LINES) : next;
+}
 
 interface ExportState {
   config: TemplatesConfig | null;
@@ -29,17 +70,32 @@ interface ExportState {
   options: BuildOptions;
   building: boolean;
   lastError: string | null;
-  lastJobId: string | null;
   downloadUrl: string | null;
+
+  progressOpen: boolean;
+  resultOpen: boolean;
+  errorModalOpen: boolean;
+  buildSteps: BuildStepState[];
+  buildLogs: string[];
+  buildStartedAt: number | null;
+  buildFinishedAt: number | null;
+  statusMessage: string;
+  downloading: boolean;
+  autoDownload: boolean;
+  abortController: AbortController | null;
 
   init: (config: TemplatesConfig | null) => void;
   setMarkdown: (v: string) => void;
   setTemplateId: (id: string) => void;
   setFileName: (name: string) => void;
   setOptions: (patch: Partial<BuildOptions>) => void;
+  setAutoDownload: (v: boolean) => void;
   loadSample: () => void;
   exportDocx: () => Promise<boolean>;
-  resetResult: () => void;
+  cancelBuild: () => void;
+  downloadDocx: (silent?: boolean) => Promise<void>;
+  closeResult: () => void;
+  closeErrorModal: () => void;
 }
 
 export const useExportStore = create<ExportState>((set, get) => ({
@@ -50,8 +106,19 @@ export const useExportStore = create<ExportState>((set, get) => ({
   options: {},
   building: false,
   lastError: null,
-  lastJobId: null,
   downloadUrl: null,
+
+  progressOpen: false,
+  resultOpen: false,
+  errorModalOpen: false,
+  buildSteps: [],
+  buildLogs: [],
+  buildStartedAt: null,
+  buildFinishedAt: null,
+  statusMessage: '',
+  downloading: false,
+  autoDownload: true,
+  abortController: null,
 
   init: (config) => {
     const defaultId = config?.default_template ?? '';
@@ -67,48 +134,145 @@ export const useExportStore = create<ExportState>((set, get) => ({
     set({ templateId, fileName: `export-${templateId}.docx` }),
   setFileName: (fileName) => set({ fileName }),
   setOptions: (patch) => set((s) => ({ options: { ...s.options, ...patch } })),
+  setAutoDownload: (autoDownload) => set({ autoDownload }),
   loadSample: () => set({ markdown: SAMPLE_MD }),
 
-  resetResult: () => set({ lastError: null, lastJobId: null, downloadUrl: null }),
+  closeErrorModal: () => set({ errorModalOpen: false, lastError: null }),
+  closeResult: () => set({ resultOpen: false }),
+
+  cancelBuild: () => {
+    get().abortController?.abort();
+    set({
+      building: false,
+      progressOpen: false,
+      abortController: null,
+      statusMessage: '已取消',
+    });
+    notification.info({ message: '已取消导出', placement: 'bottomRight', duration: 3 });
+  },
+
+  downloadDocx: async (silent = false) => {
+    const { downloadUrl, fileName } = get();
+    if (!downloadUrl) return;
+    set({ downloading: true });
+    try {
+      await downloadFile(downloadUrl, fileName);
+      if (!silent) {
+        notification.success({
+          message: '下载已开始',
+          description: fileName,
+          placement: 'bottomRight',
+          duration: 3,
+        });
+      }
+    } catch (e) {
+      notification.error({
+        message: '下载失败',
+        description: e instanceof Error ? e.message : String(e),
+        placement: 'bottomRight',
+      });
+    } finally {
+      set({ downloading: false });
+    }
+  },
 
   exportDocx: async () => {
-    const { markdown, templateId, fileName, options } = get();
+    const { markdown, templateId, fileName, options, autoDownload } = get();
     if (!markdown.trim()) {
-      set({ lastError: '请输入 Markdown 正文' });
+      notification.warning({ message: '请输入 Markdown 正文', placement: 'bottomRight' });
       return false;
     }
     if (!templateId) {
-      set({ lastError: '请选择模板' });
+      notification.warning({ message: '请选择模板', placement: 'bottomRight' });
       return false;
     }
 
-    set({ building: true, lastError: null, downloadUrl: null });
+    const ac = new AbortController();
+    const startedAt = Date.now();
+    const initialSteps = createInitialBuildSteps(options);
+    initialSteps[0] = { ...initialSteps[0], status: 'process', message: '校验环境…' };
+
+    set({
+      building: true,
+      progressOpen: true,
+      resultOpen: false,
+      errorModalOpen: false,
+      lastError: null,
+      downloadUrl: null,
+      buildSteps: initialSteps,
+      buildLogs: [],
+      buildStartedAt: startedAt,
+      buildFinishedAt: null,
+      statusMessage: '正在连接构建服务…',
+      abortController: ac,
+    });
+
     try {
-      const result = await getBuildPipeline().build({
-        markdown,
-        templateId,
-        fileName,
-        options,
-      });
-      if (!isBuildSuccess(result)) {
-        set({
-          building: false,
-          lastError: [result.error, result.detail].filter(Boolean).join('\n'),
-          lastJobId: result.jobId ?? null,
-        });
-        return false;
-      }
+      const result = await streamBuild(
+        '/api',
+        { markdown, templateId, fileName, options },
+        {
+          signal: ac.signal,
+          onStep: (event) => {
+            set((s) => ({
+              buildSteps: patchStep(s.buildSteps, event),
+              statusMessage: event.message ?? s.statusMessage,
+            }));
+          },
+          onLog: (line, stream) => {
+            set((s) => ({ buildLogs: appendLog(s.buildLogs, line, stream) }));
+          },
+        },
+      );
+
+      const finalSteps: BuildStepState[] = get().buildSteps.map((s) => ({
+        ...s,
+        status: s.status === 'error' ? ('error' as const) : ('finish' as const),
+      }));
+
       set({
         building: false,
-        lastJobId: result.jobId,
+        progressOpen: false,
+        resultOpen: true,
         downloadUrl: result.downloadUrl,
+        fileName: result.fileName || fileName,
+        buildSteps: finalSteps,
+        buildFinishedAt: Date.now(),
+        statusMessage: '构建完成',
+        abortController: null,
       });
+
+      if (autoDownload) {
+        await get().downloadDocx(true);
+      }
+
       return true;
     } catch (e) {
-      set({
+      if (e instanceof Error && e.name === 'AbortError') {
+        return false;
+      }
+      const detail = (e as Error & { detail?: string }).detail;
+      const msg = e instanceof Error ? e.message : String(e);
+
+      set((s) => ({
         building: false,
-        lastError: e instanceof Error ? e.message : String(e),
+        progressOpen: false,
+        errorModalOpen: true,
+        lastError: [msg, detail].filter(Boolean).join('\n'),
+        buildSteps: s.buildSteps.map((step) =>
+          step.status === 'process' ? { ...step, status: 'error' as const } : step,
+        ),
+        buildFinishedAt: Date.now(),
+        abortController: null,
+      }));
+
+      notification.error({
+        message: '导出失败',
+        description: msg.length > 120 ? `${msg.slice(0, 120)}…` : msg,
+        placement: 'bottomRight',
+        duration: 5,
       });
+
       return false;
     }
   },

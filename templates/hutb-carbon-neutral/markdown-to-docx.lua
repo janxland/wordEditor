@@ -1,6 +1,6 @@
 -- Author：Achuan-2（副本位于 hutb-carbon-neutral 目录，供独立模板专用）
 -- 调用：pandoc input.md -o output.docx --lua-filter=templates/hutb-carbon-neutral/markdown-to-docx.lua
--- 与 vendor/pandoc_docx_template/markdown-to-docx.lua 保持同步；构建时不走 config 全局 lua_filter。
+-- 自包含副本，修改后无需同步 vendor；构建仅使用 templates.json 中的 lua_filter。
 
 -- =================================================================
 -- 路径处理：动态获取当前脚本所在目录，确保 require 能找到子模块
