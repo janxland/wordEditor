@@ -1,11 +1,10 @@
-# 湖南工商大学 · 碳中和报告模板
+﻿# 湖南工商大学 · 共享资源（reference.docx + Lua 过滤器，被所有 hutb 模板复用）
 
-本目录为**自包含**模板包，构建时只使用此目录下的 `reference.docx`、Lua 与 `styles.yaml`。
+本目录**不含 styles.yaml**，仅存放被多个 hutb 模板共享的 `reference.docx` 与 Lua 过滤器。样式 DSL 在各模板自己的 `templates/hutb-{guanke,gongke,xingce,math-modeling}/styles.yaml`。
 
 | 文件 | 作用 |
 |------|------|
 | `reference.docx` | 学校官方 Word 样式母版（须自行放入） |
-| `styles.yaml` | OOXML 样式 DSL（正文 / Abstract / 参考文献 / 图 等） |
 | `markdown-to-docx.lua` + `lua/` | Pandoc 过滤器 |
 | `zhengwen-style.lua` | 段落语义 → Word custom-style |
 

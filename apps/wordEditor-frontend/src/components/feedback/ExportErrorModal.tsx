@@ -15,7 +15,7 @@ export interface ExportErrorModalProps {
 
 export const ExportErrorModal: React.FC<ExportErrorModalProps> = ({
   open,
-  title = '????',
+  title = '导出失败',
   error,
   logs,
   onRetry,
@@ -26,10 +26,10 @@ export const ExportErrorModal: React.FC<ExportErrorModalProps> = ({
     onCancel={onClose}
     footer={[
       <Button key="close" onClick={onClose}>
-        ??
+        关闭
       </Button>,
       <Button key="retry" type="primary" danger onClick={onRetry}>
-        ??
+        重试
       </Button>,
     ]}
     centered
@@ -44,7 +44,7 @@ export const ExportErrorModal: React.FC<ExportErrorModalProps> = ({
           {title}
         </Text>
         <Paragraph type="secondary" style={{ margin: '4px 0 0' }}>
-          ??? Pandoc?Word ??? reference.docx
+          请检查 Pandoc / Word 是否可用，以及模板 reference.docx 是否存在。
         </Paragraph>
       </div>
     </div>
@@ -57,7 +57,7 @@ export const ExportErrorModal: React.FC<ExportErrorModalProps> = ({
         items={[
           {
             key: 'log',
-            label: `?????${logs.length} ??`,
+            label: `查看日志（${logs.length} 行）`,
             children: <pre className="export-error-pre export-error-log">{logs.join('\n')}</pre>,
           },
         ]}

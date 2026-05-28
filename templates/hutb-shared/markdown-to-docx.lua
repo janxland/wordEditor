@@ -1,5 +1,5 @@
--- Author：Achuan-2（副本位于 hutb-carbon-neutral 目录，供独立模板专用）
--- 调用：pandoc input.md -o output.docx --lua-filter=templates/hutb-carbon-neutral/markdown-to-docx.lua
+﻿-- Author：Achuan-2（副本位于 hutb-shared 目录，供独立模板专用）
+-- 调用：pandoc input.md -o output.docx --lua-filter=templates/hutb-shared/markdown-to-docx.lua
 -- 自包含副本，修改后无需同步 vendor；构建仅使用 templates.json 中的 lua_filter。
 
 -- =================================================================

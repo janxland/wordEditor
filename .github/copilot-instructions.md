@@ -17,8 +17,10 @@ MD → Pandoc（`reference.docx` + Lua）→ DOCX → `postprocess_document.py`�
 | 用途 | 路径 |
 |------|------|
 | 模板注册 | `config/templates.json` |
-| 样式 DSL | `templates/hutb-carbon-neutral/styles.yaml` |
-| 语义 Lua | `templates/hutb-carbon-neutral/zhengwen-style.lua` |
+| 样式 DSL 基库 | `templates/_shared/hutb-base.yaml` + `templates/_shared/list-style-library.yaml` |
+| 各模板样式覆盖 | `templates/hutb-{guanke,gongke,xingce,math-modeling}/styles.yaml` |
+| 共享 reference + Lua | `templates/hutb-shared/`（reference.docx 需自行放入）|
+| 语义 Lua | `templates/hutb-shared/zhengwen-style.lua` |
 | MD 约定 | `docs/markdown-conventions.md` |
 
 ## 注意

@@ -24,7 +24,7 @@ python scripts/build.py -i input/你的论文.md
 python scripts/build.py --no-postprocess
 ```
 
-首次使用请将学校官方 Word 另存为 `templates/hutb-carbon-neutral/reference.docx`，详见 [templates/hutb-carbon-neutral/README.md](templates/hutb-carbon-neutral/README.md)。
+首次使用请将学校官方 Word 另存为 `templates/hutb-shared/reference.docx`，详见 [templates/hutb-shared/README.md](templates/hutb-shared/README.md)。
 
 ## 可视化编辑（可选）
 
@@ -41,7 +41,12 @@ pnpm dev
 ```
 config/templates.json           # 模板注册（hutb-gongke 工科 / hutb-guanke 管科）
 config/preview-cdn.json         # 样式预览图片 CDN
-templates/hutb-carbon-neutral/  # reference.docx、Lua、styles.yaml
+templates/hutb-shared/             # reference.docx + Lua 过滤器（所有 hutb 模板共享）
+templates/_shared/                  # 样式 DSL 基库 / 列表样式库
+templates/hutb-guanke/styles.yaml   # 管科样式覆盖
+templates/hutb-gongke/styles.yaml   # 工科样式覆盖
+templates/hutb-xingce/styles.yaml   # 形势与政策 1500 字论文
+templates/hutb-math-modeling/styles.yaml  # 数学建模
 scripts/build.py                # 主入口
 scripts/postprocess_document.py # 标题/引用（OOXML）
 scripts/postprocess_styles.py   # styles.yaml 注入
@@ -57,4 +62,4 @@ docs/                           # DSL 与 Markdown 约定
 
 ## 许可证
 
-模板内 Lua 参考 [Achuan-2/pandoc_docx_template](https://github.com/Achuan-2/pandoc_docx_template)，在 `templates/hutb-carbon-neutral/` 独立维护。
+模板内 Lua 参考 [Achuan-2/pandoc_docx_template](https://github.com/Achuan-2/pandoc_docx_template)，在 `templates/hutb-shared/` 独立维护。

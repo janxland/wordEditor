@@ -95,19 +95,6 @@ export const RUN_FIELDS: FieldMeta[] = [
   },
 ];
 
-export const OVERRIDE_TOP_FIELDS: FieldMeta[] = [
-  {
-    key: 'word_wrap_break_latin',
-    label: '西文断行',
-    type: 'bool',
-  },
-  { key: 'clear_indent', label: '清除缩进', type: 'bool' },
-  {
-    key: 'latin_font',
-    label: '西文字体',
-    type: 'font',
-  },
-];
 
 /** 半磅 → 常见中文字号展示 */
 export function halfPtLabel(v?: number): string {

@@ -17,7 +17,7 @@ __pycache__/
 venv/
 
 # 用户自定义模板（含学校官方 docx，勿提交敏感内容时可取消忽略）
-# templates/hutb-carbon-neutral/reference.docx
+# templates/hutb-shared/reference.docx
 
 # IDE / OS
 .idea/
@@ -26,8 +26,5 @@ venv/
 .DS_Store
 Thumbs.db
 
-# 已弃用：上游克隆目录（模板 Lua 已迁入 templates/hutb-carbon-neutral/）
+# 已弃用：上游克隆目录（模板 Lua 已迁入 templates/hutb-shared/）
 vendor/
-
-# 可选：学校源模板备份（体积大时不提交）
-templates/hutb-carbon-neutral/_user-template.docx

@@ -88,7 +88,7 @@ headings:   [ ... ]         # 仅作文档，与 postprocess_document.py 标题�
 
 ## 7. 示例
 
-完整示例见 [templates/hutb-carbon-neutral/styles.yaml](../templates/hutb-carbon-neutral/styles.yaml)。
+完整示例见 [templates/_shared/hutb-base.yaml](../templates/_shared/hutb-base.yaml) 与 [templates/hutb-guanke/styles.yaml](../templates/hutb-guanke/styles.yaml)。
 
 ## 8. 调用
 

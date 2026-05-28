@@ -1,5 +1,5 @@
---[[
-  hutb-carbon-neutral 模板专用：按段落语义重定向到 reference.docx 中的命名样式。
+﻿--[[
+  hutb-shared 模板专用：按段落语义重定向到 reference.docx 中的命名样式。
 
   规则：
     - 段落 plain text == '摘要'                              → custom-style "摘要标题"，进入 in_zhaiyao

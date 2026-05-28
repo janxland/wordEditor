@@ -36,7 +36,7 @@ def load_config() -> dict:
         return json.load(f)
 
 
-TEMPLATE_ALIASES = {"hutb-carbon-neutral": "hutb-guanke"}
+TEMPLATE_ALIASES = {"hutb-shared": "hutb-guanke"}
 
 
 def resolve_template(cfg: dict, template_id: str | None) -> dict:
@@ -145,7 +145,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Markdown 转 Word（碳中和模板）")
     parser.add_argument("-i", "--input", type=Path, default=DEFAULT_INPUT, help="输入 .md")
     parser.add_argument("-o", "--output", type=Path, help="输出 .docx（默认 output/<名>-<模板>.docx）")
-    parser.add_argument("-t", "--template", help="模板 id（默认 hutb-guanke；hutb-carbon-neutral 等同管科）")
+    parser.add_argument("-t", "--template", help="模板 id（默认 hutb-guanke；hutb-shared 等同管科）")
     parser.add_argument("--list-templates", action="store_true", help="列出模板")
     parser.add_argument("--no-html-pipe", action="store_true", help="不使用 html 管道（更快，HTML 支持较弱）")
     parser.add_argument(
@@ -165,7 +165,7 @@ def main() -> int:
     ref = ROOT / template["reference_doc"]
     if not ref.is_file():
         print(f"模板文件不存在: {ref}", file=sys.stderr)
-        print("请阅读 templates/hutb-carbon-neutral/README.md 放置学校官方 reference.docx。", file=sys.stderr)
+        print("请阅读 templates/hutb-shared/README.md 放置学校官方 reference.docx。", file=sys.stderr)
         return 1
 
     input_md = args.input if args.input.is_absolute() else ROOT / args.input
