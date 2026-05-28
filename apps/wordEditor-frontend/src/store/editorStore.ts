@@ -53,18 +53,39 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const entry = config?.templates.find((t) => t.id === id);
     if (!entry) return;
 
+    const prevTab = get().activeTab;
+    // 仅当当前 Tab 在新模板下会被禁用时才回退；否则保留用户视角
+    const tabStillValid = (tab: EditorTab): boolean => {
+      if (tab === 'overview' || tab === 'styles') return true;
+      if (tab === 'visual' || tab === 'yaml') return Boolean(entry.styles_yaml);
+      if (tab === 'lua') return Boolean(entry.extra_lua_filters?.length);
+      return true;
+    };
+
     set({ selectedTemplateId: id, stylesPath: entry.styles_yaml ?? null });
 
     if (entry.styles_yaml) {
       try {
         const text = await get().loadFile(entry.styles_yaml);
         const doc = parseDslYaml(text);
-        set({ dslDoc: doc, yamlText: text, activeTab: 'visual' });
+        set({
+          dslDoc: doc,
+          yamlText: text,
+          activeTab: tabStillValid(prevTab) ? prevTab : 'visual',
+        });
       } catch {
-        set({ dslDoc: null, yamlText: '', activeTab: 'overview' });
+        set({
+          dslDoc: null,
+          yamlText: '',
+          activeTab: tabStillValid(prevTab) ? prevTab : 'overview',
+        });
       }
     } else {
-      set({ dslDoc: null, yamlText: '', activeTab: 'overview' });
+      set({
+        dslDoc: null,
+        yamlText: '',
+        activeTab: tabStillValid(prevTab) ? prevTab : 'overview',
+      });
     }
   },
 

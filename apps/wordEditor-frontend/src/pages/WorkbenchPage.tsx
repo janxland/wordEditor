@@ -21,6 +21,7 @@ import { DocxPreviewDrawer } from '@/components/preview';
 import { useEditorStore, getSelectedTemplate } from '@/store/editorStore';
 import { useAppStore } from '@/store/appStore';
 import { DslVisualEditor } from '@/components/dsl/DslVisualEditor';
+import { ReferenceStylesPanel } from '@/components/dsl/ReferenceStylesPanel';
 import { LazyCodeEditor } from '@/components/code/LazyCodeEditor';
 import { validateDslYaml } from '@/core/yaml';
 import type { EditorTab } from '@/core/types';
@@ -139,6 +140,7 @@ export const WorkbenchPage: React.FC = () => {
 
   const tabItems = [
     { key: 'overview', label: '概览' },
+    { key: 'styles', label: '样式总览', disabled: !entry },
     { key: 'visual', label: 'DSL 可视化', disabled: !stylesPath },
     { key: 'yaml', label: 'YAML 源码', disabled: !stylesPath },
     { key: 'lua', label: 'Lua Filter', disabled: luaFilters.length === 0 },
@@ -288,6 +290,10 @@ export const WorkbenchPage: React.FC = () => {
                     Pandoc → OOXML 标题/引用 → styles.yaml 注入（见规范文档）
                   </Descriptions.Item>
                 </Descriptions>
+              )}
+
+              {activeTab === 'styles' && (
+                <ReferenceStylesPanel templateId={entry?.id ?? null} />
               )}
 
               {activeTab === 'visual' && <DslVisualEditor />}

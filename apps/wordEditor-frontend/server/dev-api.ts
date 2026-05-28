@@ -300,6 +300,28 @@ export function createDevApiMiddleware(): Connect.NextHandleFunction {
       return;
     }
 
+    if (req.method === 'GET' && pathname === '/templates/reference-styles') {
+      const templateId = url.searchParams.get('template');
+      if (!templateId || !/^[\w-]+$/.test(templateId)) {
+        sendJson(res, 400, { error: 'template 参数缺失或非法' });
+        return;
+      }
+      void (async () => {
+        try {
+          const out = await runPythonJson([
+            path.join(REPO_ROOT, 'scripts', 'list_reference_styles.py'),
+            '-t',
+            templateId,
+            '--json',
+          ]);
+          sendJson(res, 200, JSON.parse(out));
+        } catch (e) {
+          sendJson(res, 500, { error: String(e) });
+        }
+      })();
+      return;
+    }
+
     if (req.method === 'GET' && pathname === '/docs') {
       const name = url.searchParams.get('name');
       if (!name || !/^[\w-]+\.md$/.test(name)) {

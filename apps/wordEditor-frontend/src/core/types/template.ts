@@ -37,4 +37,4 @@ export interface TemplatesConfig {
   templates: TemplateEntry[];
 }
 
-export type EditorTab = 'visual' | 'yaml' | 'lua' | 'overview';
+export type EditorTab = 'visual' | 'yaml' | 'lua' | 'overview' | 'styles';
