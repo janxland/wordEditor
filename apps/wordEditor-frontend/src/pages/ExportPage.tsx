@@ -1,10 +1,13 @@
-import React, { useEffect, useMemo } from 'react';
-import { Button, Select, Space, Checkbox, Input, Tooltip } from 'antd';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Button, Select, Space, Checkbox, Input, Tooltip, message } from 'antd';
 import {
   ThunderboltOutlined,
   CloudDownloadOutlined,
   FileTextOutlined,
+  FolderOpenOutlined,
+  CloseCircleOutlined,
 } from '@ant-design/icons';
+import type { BuildUploadEntry } from '@/kernel/pipeline';
 import { LazyMarkdownEditor } from '@/components/code/LazyMarkdownEditor';
 import {
   BuildProgressModal,
@@ -22,6 +25,11 @@ export const ExportPage: React.FC = () => {
   const init = useExportStore((s) => s.init);
   const markdown = useExportStore((s) => s.markdown);
   const setMarkdown = useExportStore((s) => s.setMarkdown);
+  const uploadEntries = useExportStore((s) => s.uploadEntries);
+  const uploadMdRelPath = useExportStore((s) => s.uploadMdRelPath);
+  const uploadLabel = useExportStore((s) => s.uploadLabel);
+  const setUpload = useExportStore((s) => s.setUpload);
+  const clearUpload = useExportStore((s) => s.clearUpload);
   const templateId = useExportStore((s) => s.templateId);
   const setTemplateId = useExportStore((s) => s.setTemplateId);
   const fileName = useExportStore((s) => s.fileName);
@@ -65,7 +73,61 @@ export const ExportPage: React.FC = () => {
 
   const disabled = apiReady === false;
   const pandocOk = tools?.pandoc.ok ?? true;
-  const canExport = !disabled && pandocOk && !!markdown.trim();
+  const hasUpload = uploadEntries.length > 0 && !!uploadMdRelPath;
+  const canExport = !disabled && pandocOk && (hasUpload || !!markdown.trim());
+
+  const folderRef = useRef<HTMLInputElement>(null);
+
+  const arrayBufferToBase64 = (buf: ArrayBuffer) => {
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk) as unknown as number[]);
+    }
+    return btoa(bin);
+  };
+
+  const relOf = (f: File) =>
+    ((f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name).replace(
+      /\\/g,
+      '/',
+    );
+
+  const handleFolder = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const all = Array.from(files);
+    const mdFiles = all.filter((f) => /\.md$/i.test(relOf(f)));
+    if (mdFiles.length === 0) {
+      void message.error('文件夹中未找到 .md');
+      e.target.value = '';
+      return;
+    }
+    // 选最顶层的 .md（路径最短）
+    const md = mdFiles.slice().sort((a, b) => relOf(a).length - relOf(b).length)[0];
+    const mdRel = relOf(md);
+
+    // 自动读取 MD 文本到左侧编辑器
+    const mdText = await md.text();
+    setMarkdown(mdText);
+
+    // 串行读取全部文件为 base64、保留相对路径
+    const entries: BuildUploadEntry[] = [];
+    for (const f of all) {
+      const buf = await f.arrayBuffer();
+      entries.push({ relPath: relOf(f), contentBase64: arrayBufferToBase64(buf) });
+    }
+
+    const totalBytes = all.reduce((s, f) => s + f.size, 0);
+    const sizeLabel =
+      totalBytes > 1024 * 1024
+        ? `${(totalBytes / 1024 / 1024).toFixed(1)} MB`
+        : `${Math.round(totalBytes / 1024)} KB`;
+    setUpload(entries, mdRel, `${md.name} · ${all.length} 个文件 · ${sizeLabel}`);
+    void message.success(`已加载 ${md.name}，共 ${all.length} 个文件`);
+    e.target.value = '';
+  };
 
   const templateName = useMemo(
     () => config?.templates.find((t) => t.id === templateId)?.name,
@@ -181,6 +243,66 @@ export const ExportPage: React.FC = () => {
               value={fileName}
               onChange={(e) => setFileName(e.target.value)}
             />
+          </section>
+
+          <section className="export-rail-block">
+            <label className="export-rail-label">
+              选择本地稿件 <span style={{ color: '#999', fontWeight: 'normal' }}>（可选）</span>
+            </label>
+            <input
+              ref={folderRef}
+              type="file"
+              // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+              // @ts-expect-error webkitdirectory 非标准但 Chromium/Edge/Firefox 均支持
+              webkitdirectory=""
+              directory=""
+              multiple
+              style={{ display: 'none' }}
+              onChange={(e) => void handleFolder(e)}
+            />
+            <Tooltip title="选中 MD 所在文件夹；自动读取唯一/最顶层 .md 到编辑器，images/ 一并上传">
+              <Button
+                icon={<FolderOpenOutlined />}
+                onClick={() => folderRef.current?.click()}
+                block
+              >
+                选择文件夹
+              </Button>
+            </Tooltip>
+            {hasUpload && (
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: '6px 8px',
+                  background: '#f5f5f5',
+                  borderRadius: 4,
+                  fontSize: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <span
+                  style={{
+                    flex: 1,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title={uploadLabel}
+                >
+                  {uploadLabel}
+                </span>
+                <Tooltip title="清除上传">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<CloseCircleOutlined />}
+                    onClick={clearUpload}
+                  />
+                </Tooltip>
+              </div>
+            )}
           </section>
 
           <section className="export-rail-block">

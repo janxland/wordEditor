@@ -10,6 +10,7 @@
       "lua_filter": "templates/hutb-carbon-neutral/markdown-to-docx.lua",
       "extra_lua_filters": ["templates/hutb-carbon-neutral/zhengwen-style.lua"],
       "styles_yaml": "templates/hutb-gongke/styles.yaml",
+      "three_line_tables": true,
       "source": "user",
       "note": "标题编号：1 → 1.1 → 1.1.1 → 1.1.1.1（阿拉伯数字章）"
     },
@@ -22,6 +23,7 @@
       "lua_filter": "templates/hutb-carbon-neutral/markdown-to-docx.lua",
       "extra_lua_filters": ["templates/hutb-carbon-neutral/zhengwen-style.lua"],
       "styles_yaml": "templates/hutb-guanke/styles.yaml",
+      "three_line_tables": true,
       "source": "user",
       "note": "标题编号：一、→ 1.1 → 1.1.1 → 1.1.1.1（第一章中文数字）"
     },
@@ -34,6 +36,7 @@
       "lua_filter": "templates/hutb-carbon-neutral/markdown-to-docx.lua",
       "extra_lua_filters": ["templates/hutb-carbon-neutral/zhengwen-style.lua"],
       "styles_yaml": "templates/hutb-xingce/styles.yaml",
+      "three_line_tables": true,
       "source": "user",
       "note": "形势与政策 1500 字论文：题目宋体二号加粗居中，正文宋体小三 1.5 倍行距首行缩进 2 字符，无摘要/关键词/参考文献"
     },

@@ -112,6 +112,7 @@ def run_pandoc(
             str(output_docx),
             "--reference-doc",
             str(reference_doc),
+            "--syntax-highlighting=none",
             f"--resource-path={md_dir}",
             *lua_arg,
         ]
@@ -134,6 +135,7 @@ def run_pandoc(
             str(output_docx),
             "--reference-doc",
             str(reference_doc),
+            "--syntax-highlighting=none",
             *lua_arg,
         ]
         subprocess.run(cmd, check=True)

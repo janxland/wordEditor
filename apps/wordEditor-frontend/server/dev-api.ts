@@ -399,19 +399,23 @@ export function createDevApiMiddleware(): Connect.NextHandleFunction {
     if (req.method === 'POST' && pathname === '/build/stream') {
       void (async () => {
         try {
-          const raw = await readBody(req);
+          // 上传文件夹时 body 可能为数 MB，放宽到 96MB
+          const raw = await readBody(req, 96 * 1024 * 1024);
           const body = JSON.parse(raw) as {
             markdown?: string;
+            entries?: { relPath: string; contentBase64: string }[];
+            mdRelPath?: string;
             templateId?: string;
             fileName?: string;
             options?: BuildApiOptions;
           };
-          if (!body.markdown?.trim()) {
-            sendJson(res, 400, { error: 'markdown is required' });
-            return;
-          }
           if (!body.templateId) {
             sendJson(res, 400, { error: 'templateId is required' });
+            return;
+          }
+          const useEntries = Array.isArray(body.entries) && body.entries.length > 0;
+          if (!useEntries && !body.markdown?.trim()) {
+            sendJson(res, 400, { error: 'markdown 或 entries 必填' });
             return;
           }
 
@@ -425,17 +429,48 @@ export function createDevApiMiddleware(): Connect.NextHandleFunction {
           const jobId = randomUUID();
           const workDir = path.join(CACHE_DIR, jobId);
           fs.mkdirSync(workDir, { recursive: true });
-          const inputMd = path.join(workDir, 'input.md');
-          const outputDocx = path.join(workDir, 'output.docx');
-          const fileName = sanitizeDownloadName(body.fileName ?? `export-${body.templateId}.docx`);
 
           const pushStep = (id: string, status: string, message?: string) => {
             writeSse(res, 'step', { id, status, message });
           };
 
-          pushStep('prepare', 'process', '写入 Markdown…');
-          fs.writeFileSync(inputMd, body.markdown, 'utf-8');
-          pushStep('prepare', 'finish');
+          let inputMd: string;
+          let defaultName: string;
+
+          if (useEntries) {
+            pushStep('prepare', 'process', `写入 ${body.entries!.length} 个文件…`);
+            const mdRel = (body.mdRelPath ?? '').trim();
+            if (!mdRel || !/\.md$/i.test(mdRel)) {
+              writeSse(res, 'error', { error: 'mdRelPath 必须指向 .md' });
+              res.end();
+              return;
+            }
+            // 安全落盘：防止 .. 穿越
+            for (const ent of body.entries!) {
+              const rel = path.normalize(ent.relPath).replace(/^([\\/])+/, '');
+              const abs = path.join(workDir, rel);
+              if (!abs.startsWith(workDir)) continue;
+              fs.mkdirSync(path.dirname(abs), { recursive: true });
+              fs.writeFileSync(abs, Buffer.from(ent.contentBase64, 'base64'));
+            }
+            inputMd = path.join(workDir, path.normalize(mdRel).replace(/^([\\/])+/, ''));
+            if (!fs.existsSync(inputMd)) {
+              writeSse(res, 'error', { error: `mdRelPath 未在上传列表中: ${mdRel}` });
+              res.end();
+              return;
+            }
+            defaultName = `${path.basename(inputMd, path.extname(inputMd))}-${body.templateId}.docx`;
+            pushStep('prepare', 'finish');
+          } else {
+            inputMd = path.join(workDir, 'input.md');
+            defaultName = `export-${body.templateId}.docx`;
+            pushStep('prepare', 'process', '写入 Markdown…');
+            fs.writeFileSync(inputMd, body.markdown!, 'utf-8');
+            pushStep('prepare', 'finish');
+          }
+
+          const outputDocx = path.join(workDir, 'output.docx');
+          const fileName = sanitizeDownloadName(body.fileName || defaultName);
           pushStep('pandoc', 'process', '启动 Pandoc…');
 
           const { code, stderr } = await runBuild(

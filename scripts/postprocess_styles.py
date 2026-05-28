@@ -78,6 +78,25 @@ def _set_or_replace(parent: ET.Element, tag: str, attrs: dict[str, str]) -> None
         el.set(_q(k), v)
 
 
+def _replace_child(parent: ET.Element, tag: str, attrs: dict[str, Any] | None = None) -> ET.Element:
+    """删除同名子元素并新建一个；attrs 中的值会被 str() 化后设为 w: 命名空间属性。"""
+    old = parent.find(f"w:{tag}", NS)
+    if old is not None:
+        parent.remove(old)
+    el = ET.SubElement(parent, _q(tag))
+    if attrs:
+        for k, v in attrs.items():
+            el.set(_q(k), str(v))
+    return el
+
+
+def _remove_children(parent: ET.Element, *tags: str) -> None:
+    for tag in tags:
+        el = parent.find(f"w:{tag}", NS)
+        if el is not None:
+            parent.remove(el)
+
+
 def _set_wordwrap_zero(ppr: ET.Element) -> bool:
     ww = ppr.find("w:wordWrap", NS)
     if ww is not None and ww.get(_q("val")) == "0":
@@ -152,10 +171,7 @@ def _apply_paragraph(style: ET.Element, p: dict[str, Any]) -> None:
     if "spacing_after_dxa" in p:
         sp_attrs["after"] = str(p["spacing_after_dxa"])
     if sp_attrs:
-        old = ppr.find("w:spacing", NS)
-        if old is not None:
-            ppr.remove(old)
-        ET.SubElement(ppr, _q("spacing"), {_q(k): v for k, v in sp_attrs.items()})
+        _replace_child(ppr, "spacing", sp_attrs)
     ind_attrs: dict[str, str] = {}
     if "hanging_indent_chars" in p:
         chars = int(p["hanging_indent_chars"])
@@ -176,10 +192,7 @@ def _apply_paragraph(style: ET.Element, p: dict[str, Any]) -> None:
             "firstLine": str(int(first_line)),
         })
     if ind_attrs:
-        old = ppr.find("w:ind", NS)
-        if old is not None:
-            ppr.remove(old)
-        ET.SubElement(ppr, _q("ind"), {_q(k): v for k, v in ind_attrs.items()})
+        _replace_child(ppr, "ind", ind_attrs)
     if "align" in p:
         _set_or_replace(ppr, "jc", {"val": str(p["align"])})
 
@@ -202,24 +215,18 @@ def _apply_run(style: ET.Element, r: dict[str, Any], fonts: dict[str, Any]) -> N
         sz = r.get("size_half_pt")
         sz_cs = r.get("size_cs_half_pt", sz)
         if sz is not None:
-            old = rpr.find("w:sz", NS)
-            if old is not None:
-                rpr.remove(old)
-            ET.SubElement(rpr, _q("sz"), {_q("val"): str(sz)})
+            _replace_child(rpr, "sz", {"val": sz})
         if sz_cs is not None:
-            old = rpr.find("w:szCs", NS)
-            if old is not None:
-                rpr.remove(old)
-            ET.SubElement(rpr, _q("szCs"), {_q("val"): str(sz_cs)})
+            _replace_child(rpr, "szCs", {"val": sz_cs})
     if "bold" in r:
         rpr = _ensure_rpr(style)
-        for tag in ("w:b", "w:bCs"):
-            old = rpr.find(tag, NS)
-            if old is not None:
-                rpr.remove(old)
+        _remove_children(rpr, "b", "bCs")
         if r["bold"]:
             ET.SubElement(rpr, _q("b"))
             ET.SubElement(rpr, _q("bCs"))
+    if "color" in r:
+        # 形如 "000000" / "auto"；用于强制覆盖 reference.docx 主题色或 Pandoc 高亮残留
+        _replace_child(_ensure_rpr(style), "color", {"val": r["color"]})
 
 
 # ============================================================
@@ -303,12 +310,11 @@ def apply_dsl(xml_bytes: bytes, dsl: dict[str, Any]) -> bytes:
         sid = c["id"]
         name = c["name"]
         based_on = c.get("based_on", "a")
-        existing = _find_style_by_id(root, sid) or _find_style_by_name(root, name)
+        existing = _find_style_by_id(root, sid)
+        if existing is None:
+            existing = _find_style_by_name(root, name)
         if existing is not None:
-            for tag in ("w:pPr", "w:rPr"):
-                el = existing.find(tag, NS)
-                if el is not None:
-                    existing.remove(el)
+            _remove_children(existing, "pPr", "rPr")
             if existing.find("w:qFormat", NS) is None:
                 ET.SubElement(existing, _q("qFormat"))
             target = existing
@@ -389,13 +395,14 @@ def patch_docx(path: Path, dsl: dict[str, Any]) -> None:
                     preserved.add(int(multilevel.get("num_id", 2)))
                 except (TypeError, ValueError):
                     pass
-            new_doc, redirected = redirect_list_num_ids(
-                new_doc, used_ids[default_sid], preserved
+            new_doc, new_numbering, redirected = redirect_list_num_ids(
+                new_doc, new_numbering, used_ids[default_sid], preserved,
+                default_style_id=default_sid,
             )
             if redirected:
                 print(
                     f"[postprocess_list_styles] 重定向 {redirected} 处 Pandoc 列表 → "
-                    f"{default_sid}(numId:{used_ids[default_sid]})"
+                    f"{default_sid}(numId:{used_ids[default_sid]}, 每块独立重置)"
                 )
         elif default_sid:
             print(f"  ! default_list_style={default_sid!r} 未在 use_list_styles 中启用，跳过重定向")

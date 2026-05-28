@@ -18,6 +18,32 @@ custom_styles:
       size_half_pt: 36
       size_cs_half_pt: 36
       bold: true
+  # 代码块（Pandoc fenced code）：当作普通附件正文，黑色宋体小四，22 磅固定行距，无首行缩进
+  - id: "SourceCode"
+    name: "Source Code"
+    based_on: "a"
+    paragraph:
+      align: "left"
+      line_spacing: "22pt"
+      indent_clear: true
+      first_line_chars: 0
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "宋体"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+      color: "000000"
+  # 行内代码字符样式：同样强制黑色宋体
+  - id: "VerbatimChar"
+    name: "Verbatim Char"
+    based_on: "a0"
+    run:
+      cjk_font: "宋体"
+      latin_font: "宋体"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+      color: "000000"
 overrides: []
 fonts: {}
 multilevel_list:

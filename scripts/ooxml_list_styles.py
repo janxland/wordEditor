@@ -277,26 +277,67 @@ def apply_list_styles(
 
 # ─────────────────────────────── document.xml 列表重定向 ───────────────────────────────
 
+def _abstract_id_of(num_root: ET.Element, num_id: int) -> int | None:
+    target = str(num_id)
+    for n in num_root.findall("w:num", NS):
+        if n.get(_q("numId")) == target:
+            ab = n.find("w:abstractNumId", NS)
+            try:
+                return int(ab.get(_q("val"), "-1")) if ab is not None else None
+            except ValueError:
+                return None
+    return None
+
+
 def redirect_list_num_ids(
     document_xml: bytes,
+    numbering_xml: bytes,
     default_num_id: int,
     preserved_num_ids: set[int],
     *,
     default_ilvl: int = 0,
-) -> tuple[bytes, int]:
-    """把 document.xml 中所有 `numPr/numId` 不在 preserved 集合的引用改写为 default_num_id。
+    default_style_id: str | None = None,
+) -> tuple[bytes, bytes, int]:
+    """把 document.xml 中 Pandoc 散装 numId 重定向到模板默认列表样式。
 
-    Pandoc 默认为每个 `-`/`1.` 列表新建一个 numId（>=1000），并不会引用我们注入的列表样式。
-    通过把这些"散装" numId 全部重定向到模板默认列表样式的 numId，即可让 use_list_styles 真正生效。
+    为每个原 numId 分配一个**独立的新 numId**，都指向 `default_num_id` 对应的
+    abstractNumId 并强制 9 级 startOverride=1 → 每个列表块从 1 重新计数。
+    若提供 `default_style_id`，同时为这些段落注入 `w:pStyle`，让列表段套用
+    DSL 中定义的列表样式（如「数字列表」），从而继承基样式（如「文章的正文」）
+    的字体/字号/行距。找不到 abstract 时退化为共享 `default_num_id`。
 
-    preserved 通常 = {multilevel.num_id, *use_list_styles 各自的 num_id}
-    返回 (新 document_xml, 重写次数)。
+    返回 (新 document_xml, 新 numbering_xml, 重写次数)。
     """
     if not document_xml.strip():
-        return document_xml, 0
-    root = ET.fromstring(document_xml)
+        return document_xml, numbering_xml, 0
+    doc_root = ET.fromstring(document_xml)
+    num_root = _ensure_numbering_root(numbering_xml)
+
+    target_abs = _abstract_id_of(num_root, default_num_id)
+    used = _used_num_ids(num_root)
+    next_id = max(used | {default_num_id, 199}) + 1
+    mapping: dict[int, int] = {}
+
+    def remap(orig: int) -> int:
+        if target_abs is None:
+            return default_num_id  # 退化：无可继承的 abstract → 共享 numId
+        if orig not in mapping:
+            nonlocal next_id
+            while next_id in used:
+                next_id += 1
+            mapping[orig] = next_id
+            used.add(next_id)
+            next_id += 1
+        return mapping[orig]
+
     count = 0
-    for numpr in root.iter(_q("numPr")):
+    for p in doc_root.iter(_q("p")):
+        ppr = p.find("w:pPr", NS)
+        if ppr is None:
+            continue
+        numpr = ppr.find("w:numPr", NS)
+        if numpr is None:
+            continue
         nid_el = numpr.find("w:numId", NS)
         if nid_el is None:
             continue
@@ -304,15 +345,33 @@ def redirect_list_num_ids(
             cur = int(nid_el.get(_q("val"), "-1"))
         except ValueError:
             continue
-        if cur in preserved_num_ids or cur <= 0:
+        if cur <= 0 or cur in preserved_num_ids:
             continue
-        nid_el.set(_q("val"), str(default_num_id))
-        # ilvl 保持原值（保留 Pandoc 的嵌套层级）；仅在缺失时补 default_ilvl
-        ilvl_el = numpr.find("w:ilvl", NS)
-        if ilvl_el is None:
-            il = ET.Element(_q("ilvl"), {_q("val"): str(default_ilvl)})
-            numpr.insert(0, il)
+        nid_el.set(_q("val"), str(remap(cur)))
+        if numpr.find("w:ilvl", NS) is None:
+            numpr.insert(0, ET.Element(_q("ilvl"), {_q("val"): str(default_ilvl)}))
+        if default_style_id:
+            ps = ppr.find("w:pStyle", NS)
+            if ps is None:
+                ppr.insert(0, ET.Element(_q("pStyle"), {_q("val"): default_style_id}))
+            else:
+                ps.set(_q("val"), default_style_id)
         count += 1
+
     if count == 0:
-        return document_xml, 0
-    return ET.tostring(root, encoding="utf-8", xml_declaration=True), count
+        return document_xml, numbering_xml, 0
+
+    for new_id in mapping.values():  # 仅当 target_abs 存在时 mapping 才非空
+        n = ET.SubElement(num_root, _q("num"), {_q("numId"): str(new_id)})
+        ET.SubElement(n, _q("abstractNumId"), {_q("val"): str(target_abs)})
+        for ilvl in range(9):
+            lo = ET.SubElement(n, _q("lvlOverride"), {_q("ilvl"): str(ilvl)})
+            ET.SubElement(lo, _q("startOverride"), {_q("val"): "1"})
+
+    return (
+        ET.tostring(doc_root, encoding="utf-8", xml_declaration=True),
+        ET.tostring(num_root, encoding="utf-8", xml_declaration=True),
+        count,
+    )
+
+

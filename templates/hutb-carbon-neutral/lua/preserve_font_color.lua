@@ -107,3 +107,5 @@ function Span(el)
 
   return el
 end
+
+return { Span = Span }

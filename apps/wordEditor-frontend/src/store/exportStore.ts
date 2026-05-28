@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { notification } from 'antd';
-import type { BuildOptions } from '@/kernel/pipeline';
+import type { BuildOptions, BuildUploadEntry } from '@/kernel/pipeline';
 import { streamBuild } from '@/kernel/pipeline/streamBuild';
 import type { BuildStreamStepEvent } from '@/kernel/pipeline/streamBuild';
 import {
@@ -65,6 +65,10 @@ function appendLog(logs: string[], line: string, stream: 'stdout' | 'stderr'): s
 interface ExportState {
   config: TemplatesConfig | null;
   markdown: string;
+  /** 文件夹上传状态（含 MD 与 images/） */
+  uploadEntries: BuildUploadEntry[];
+  uploadMdRelPath: string;
+  uploadLabel: string;
   templateId: string;
   fileName: string;
   options: BuildOptions;
@@ -86,6 +90,8 @@ interface ExportState {
 
   init: (config: TemplatesConfig | null) => void;
   setMarkdown: (v: string) => void;
+  setUpload: (entries: BuildUploadEntry[], mdRelPath: string, label: string) => void;
+  clearUpload: () => void;
   setTemplateId: (id: string) => void;
   setFileName: (name: string) => void;
   setOptions: (patch: Partial<BuildOptions>) => void;
@@ -101,6 +107,9 @@ interface ExportState {
 export const useExportStore = create<ExportState>((set, get) => ({
   config: null,
   markdown: '',
+  uploadEntries: [],
+  uploadMdRelPath: '',
+  uploadLabel: '',
   templateId: '',
   fileName: 'export.docx',
   options: {},
@@ -130,6 +139,13 @@ export const useExportStore = create<ExportState>((set, get) => ({
   },
 
   setMarkdown: (markdown) => set({ markdown }),
+  setUpload: (uploadEntries, uploadMdRelPath, uploadLabel) => {
+    const base = uploadMdRelPath.split(/[\\/]/).pop() ?? 'export';
+    const stem = base.replace(/\.md$/i, '');
+    const tid = get().templateId || 'out';
+    set({ uploadEntries, uploadMdRelPath, uploadLabel, fileName: `${stem}-${tid}.docx` });
+  },
+  clearUpload: () => set({ uploadEntries: [], uploadMdRelPath: '', uploadLabel: '' }),
   setTemplateId: (templateId) =>
     set({ templateId, fileName: `export-${templateId}.docx` }),
   setFileName: (fileName) => set({ fileName }),
@@ -177,9 +193,21 @@ export const useExportStore = create<ExportState>((set, get) => ({
   },
 
   exportDocx: async () => {
-    const { markdown, templateId, fileName, options, autoDownload } = get();
-    if (!markdown.trim()) {
-      notification.warning({ message: '请输入 Markdown 正文', placement: 'bottomRight' });
+    const {
+      markdown,
+      uploadEntries,
+      uploadMdRelPath,
+      templateId,
+      fileName,
+      options,
+      autoDownload,
+    } = get();
+    const useUpload = uploadEntries.length > 0 && !!uploadMdRelPath;
+    if (!useUpload && !markdown.trim()) {
+      notification.warning({
+        message: '请选择文件夹或输入 Markdown',
+        placement: 'bottomRight',
+      });
       return false;
     }
     if (!templateId) {
@@ -210,7 +238,14 @@ export const useExportStore = create<ExportState>((set, get) => ({
     try {
       const result = await streamBuild(
         '/api',
-        { markdown, templateId, fileName, options },
+        {
+          markdown: useUpload ? undefined : markdown,
+          entries: useUpload ? uploadEntries : undefined,
+          mdRelPath: useUpload ? uploadMdRelPath : undefined,
+          templateId,
+          fileName,
+          options,
+        },
         {
           signal: ac.signal,
           onStep: (event) => {

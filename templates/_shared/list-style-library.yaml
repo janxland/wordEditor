@@ -29,16 +29,17 @@ list_style_library:
   - id: "ListBase"
     name: "列表基样式"
     based_on: "a"
-    description: "元样式：0 缩进 + 无制表符 + 单倍行距。其它列表样式以此为基。"
+    description: "元样式：宋体小四 / 22 磅固定行距 / 0 缩进 / 无制表符。与「文章的正文」视觉一致，但去除首行缩进。"
     paragraph:
       align: "both"
-      line_spacing: "single"
+      line_spacing: "22pt"
       spacing_before_dxa: 0
       spacing_after_dxa: 0
       indent_clear: true            # 清空 ind（左/右/首行/悬挂）
       first_line_chars: 0
       hanging_indent_chars: 0
     run:
+      cjk_font: "宋体"
       latin_font: "inherit"
       size_half_pt: 24              # 小四
     # list 字段：none 表示"基样式不带编号"
