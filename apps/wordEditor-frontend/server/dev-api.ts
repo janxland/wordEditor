@@ -150,6 +150,58 @@ function sanitizeDownloadName(name: string): string {
   return cleaned.endsWith('.docx') ? cleaned : `${cleaned || 'export'}.docx`;
 }
 
+function sanitizeImportName(name: string): string {
+  const base = path.basename(name || 'input.docx');
+  const cleaned = base.replace(/[^\w.\-()\u4e00-\u9fff\s]/g, '_').trim() || 'input.docx';
+  return cleaned.toLowerCase().endsWith('.docx') ? cleaned : `${cleaned}.docx`;
+}
+
+function slugify(input: string): string {
+  const cleaned = input
+    .trim()
+    .replace(/\.docx$/i, '')
+    .replace(/[\s\\/]+/g, '-')
+    .replace(/[^\w\-\u4e00-\u9fff]/g, '');
+  return cleaned || 'doc';
+}
+
+function runExtract(
+  inputDocx: string,
+  outputMd: string,
+  imageDir: string,
+  imageRel: string,
+): Promise<{ code: number; stderr: string }> {
+  return new Promise((resolve) => {
+    const child = spawnPython(
+      [
+        path.join(REPO_ROOT, 'scripts', 'extract_docx_to_md.py'),
+        '-i',
+        inputDocx,
+        '-o',
+        outputMd,
+        '--image-dir',
+        imageDir,
+        '--image-rel',
+        imageRel,
+      ],
+      { cwd: REPO_ROOT, env: spawnEnv() },
+    );
+    let stderr = '';
+    child.stdout?.on('data', (d) => {
+      stderr += d.toString();
+    });
+    child.stderr?.on('data', (d) => {
+      stderr += d.toString();
+    });
+    child.on('error', (err) => {
+      const py = resolvePython();
+      stderr += `无法启动 Python (${py.command}): ${err.message}\n`;
+      resolve({ code: 1, stderr });
+    });
+    child.on('close', (code) => resolve({ code: code ?? 1, stderr }));
+  });
+}
+
 type BuildLineHandler = (stream: 'stdout' | 'stderr', line: string) => void;
 
 function emitStepFromBuildLine(
@@ -533,6 +585,82 @@ export function createDevApiMiddleware(): Connect.NextHandleFunction {
             writeSse(res, 'error', { error: String(e) });
             res.end();
           }
+        }
+      })();
+      return;
+    }
+
+    if (req.method === 'POST' && pathname === '/import/docx') {
+      void (async () => {
+        try {
+          // DOCX 通常 < 50MB；按 96MB 上限
+          const raw = await readBody(req, 96 * 1024 * 1024);
+          const body = JSON.parse(raw) as {
+            filename?: string;
+            contentBase64?: string;
+            imageSlug?: string;
+          };
+          if (!body.contentBase64) {
+            sendJson(res, 400, { error: 'contentBase64 is required' });
+            return;
+          }
+          const filename = sanitizeImportName(body.filename ?? 'input.docx');
+          const stem = filename.replace(/\.docx$/i, '') || 'document';
+          const slug = (body.imageSlug && /^[\w\-]+$/.test(body.imageSlug)
+            ? body.imageSlug
+            : slugify(stem));
+
+          const jobId = randomUUID();
+          const workDir = path.join(CACHE_DIR, jobId);
+          fs.mkdirSync(workDir, { recursive: true });
+          const docxPath = path.join(workDir, filename);
+          fs.writeFileSync(docxPath, Buffer.from(body.contentBase64, 'base64'));
+
+          const mdPath = path.join(workDir, `${stem}.md`);
+          const imageDir = path.join(workDir, 'images', slug);
+          const imageRel = `images/${slug}`;
+
+          const { code, stderr } = await runExtract(docxPath, mdPath, imageDir, imageRel);
+          if (code !== 0 || !fs.existsSync(mdPath)) {
+            sendJson(res, 500, {
+              error: 'extract failed',
+              detail: stderr.slice(-4000) || `exit code ${code}`,
+              jobId,
+            });
+            return;
+          }
+
+          const markdown = fs.readFileSync(mdPath, 'utf-8');
+          const entries: { relPath: string; contentBase64: string; size: number }[] = [];
+          // 总是先把 md 自身作为 entry，便于后续“发送到导出页”
+          entries.push({
+            relPath: `${stem}.md`,
+            contentBase64: Buffer.from(markdown, 'utf-8').toString('base64'),
+            size: Buffer.byteLength(markdown, 'utf-8'),
+          });
+          if (fs.existsSync(imageDir)) {
+            for (const name of fs.readdirSync(imageDir)) {
+              const abs = path.join(imageDir, name);
+              const st = fs.statSync(abs);
+              if (!st.isFile()) continue;
+              entries.push({
+                relPath: `${imageRel}/${name}`,
+                contentBase64: fs.readFileSync(abs).toString('base64'),
+                size: st.size,
+              });
+            }
+          }
+
+          sendJson(res, 200, {
+            jobId,
+            fileName: `${stem}.md`,
+            mdRelPath: `${stem}.md`,
+            markdown,
+            entries,
+            log: stderr.slice(-4000),
+          });
+        } catch (e) {
+          sendJson(res, 500, { error: String(e) });
         }
       })();
       return;

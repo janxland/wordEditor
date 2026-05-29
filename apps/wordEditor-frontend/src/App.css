@@ -791,3 +791,95 @@ body,
     max-height: 200px;
   }
 }
+
+/* ===== DOCX ¡ú MD »¹Ô­Ò³ ===== */
+.import-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.import-uploader-card {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  padding: 16px;
+}
+.docx-uploader .ant-upload-drag {
+  border-radius: 12px;
+}
+.import-busy {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+.import-result {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  padding: 16px;
+}
+.import-result-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.import-md-area {
+  height: calc(100vh - 360px);
+  min-height: 420px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.import-images-area {
+  max-height: calc(100vh - 360px);
+  overflow: auto;
+  padding: 4px;
+}
+.import-log {
+  max-height: calc(100vh - 360px);
+  overflow: auto;
+  background: #0b1020;
+  color: #d6e1ff;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.import-hint {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+.image-card {
+  position: relative;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fafafa;
+}
+.image-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.image-card-download {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  text-decoration: none;
+}
+.image-card-download:hover {
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+}

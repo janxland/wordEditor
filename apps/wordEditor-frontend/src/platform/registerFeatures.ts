@@ -13,6 +13,15 @@ export function registerAppFeatures(): void {
   });
 
   registerFeature({
+    id: 'import',
+    path: '/import',
+    label: 'Word 还原 MD',
+    icon: 'import',
+    order: 15,
+    lazy: lazy(() => import('@/pages/ImportPage').then((m) => ({ default: m.ImportPage }))),
+  });
+
+  registerFeature({
     id: 'templates',
     path: '/',
     label: '模板工作台',
