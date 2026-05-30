@@ -139,7 +139,7 @@ list_style_library:
   # ─────────────────────────────────────────
   # 自定义 bullet 符号列表（从用户 list-style.docx 提取/参考）
   # 所有符号通过 lvl_text 直接写 Unicode；num_fmt=bullet
-  # 如需再添加，可运行：py scripts/extract_list_styles.py -i <your.docx>
+  # 如需再添加，可运行：py scripts/tools/extract_list_styles.py -i <your.docx>
   # ─────────────────────────────────────────
   - id: "StarSolidList"
     name: "★ 实心五角星列表"

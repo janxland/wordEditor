@@ -273,5 +273,5 @@ headings:
 # 每个子模板必须在自己的 styles.yaml 中显式声明 multilevel_list，
 # 因为工科 / 管科 / 数学建模 / 形策 / 碳中和 的标题编号方案各不相同。
 # 参见各 templates/<id>/styles.yaml 的 multilevel_list 节。
-# 可用 `py scripts/inspect_heading_numbering.py <docx>` 反查官方 docx 的方案。
+# 可用 `py scripts/tools/inspect_heading_numbering.py <docx>` 反查官方 docx 的方案。
 # ────────────────────────────────────────────────────────────────

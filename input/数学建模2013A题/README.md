@@ -15,7 +15,7 @@ py scripts/extract_docx_to_md.py `
 
 # 2. 修复 OMML → 内联数学（启发式：补 \frac / \alpha 等命令的反斜杠；
 #    含中文/编号 `#` 的行内"伪公式"降级为反引号代码块）
-py scripts/_repair_math_inline.py "input/数学建模2013A题/车道被占用对城市道路通行能力的影响.md"
+py scripts/tools/_repair_math_inline.py "input/数学建模2013A题/车道被占用对城市道路通行能力的影响.md"
 
 # 3. 套用 hutb-math-modeling 模板导出 docx
 py scripts/build.py -t hutb-math-modeling `
