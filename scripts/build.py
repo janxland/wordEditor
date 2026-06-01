@@ -153,6 +153,14 @@ def main() -> int:
         action="store_true",
         help="不运行后处理（标题/引用 + OOXML 样式注入）",
     )
+    parser.add_argument(
+        "--password",
+        help="为输出 .docx 设置「修改密码」（明文；与 --password-env 二选一）",
+    )
+    parser.add_argument(
+        "--password-env",
+        help="从指定环境变量读取「修改密码」，避免明文出现在命令行",
+    )
     args = parser.parse_args()
 
     cfg = load_config()
@@ -237,6 +245,20 @@ def main() -> int:
             if rc != 0:
                 print("三线表后处理失败。", file=sys.stderr)
                 return rc
+
+    pwd: str | None = None
+    if args.password_env:
+        import os as _os
+        pwd = _os.environ.get(args.password_env)
+        if not pwd:
+            print(f"环境变量 {args.password_env} 为空，已跳过设置修改密码。", file=sys.stderr)
+    elif args.password:
+        pwd = args.password
+    if pwd:
+        from apply_password import apply_password  # noqa: WPS433
+        print("\n[后处理] 设置修改密码 …")
+        apply_password(out, pwd)
+        print("[apply_password] 已设置修改密码")
     return 0
 
 

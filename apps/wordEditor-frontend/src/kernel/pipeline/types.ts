@@ -3,6 +3,8 @@
 export interface BuildOptions {
   noHtmlPipe?: boolean;
   noPostprocess?: boolean;
+  /** Word「修改密码」（writeProtection），空值/未设则不加锁 */
+  password?: string;
 }
 
 export interface BuildUploadEntry {

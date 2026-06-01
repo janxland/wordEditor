@@ -306,6 +306,22 @@ export const ExportPage: React.FC = () => {
           </section>
 
           <section className="export-rail-block">
+            <label className="export-rail-label">
+              修改密码 <span style={{ color: '#999', fontWeight: 'normal' }}>（可选）</span>
+            </label>
+            <Tooltip title="未输入密码者只能以「只读」方式打开；不加密文件内容。留空则不加锁。">
+              <Input.Password
+                size="middle"
+                placeholder="留空 = 不加锁"
+                value={options.password ?? ''}
+                onChange={(e) => setOptions({ password: e.target.value })}
+                autoComplete="new-password"
+                allowClear
+              />
+            </Tooltip>
+          </section>
+
+          <section className="export-rail-block">
             <label className="export-rail-label">管线</label>
             <div className="export-rail-checks">
               <Tooltip title="TeX 公式（$...$、$$...$$、\\(...\\)）由 Pandoc 转为 Word OMML">

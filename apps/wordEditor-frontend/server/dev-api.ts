@@ -43,6 +43,8 @@ function readBody(req: IncomingMessage, limit = MAX_BODY): Promise<string> {
 export interface BuildApiOptions {
   noHtmlPipe?: boolean;
   noPostprocess?: boolean;
+  /** Word 「修改密码」（writeProtection），空则不设置 */
+  password?: string;
 }
 
 function spawnEnv(): NodeJS.ProcessEnv {
@@ -141,6 +143,7 @@ function buildScriptArgs(
   ];
   if (options.noHtmlPipe) scriptArgs.push('--no-html-pipe');
   if (options.noPostprocess) scriptArgs.push('--no-postprocess');
+  if (options.password) scriptArgs.push('--password-env', 'WORDEDITOR_DOCX_PASSWORD');
   return scriptArgs;
 }
 
@@ -275,9 +278,11 @@ function runBuild(
   onLine?: BuildLineHandler,
 ): Promise<{ code: number; stderr: string }> {
   return new Promise((resolve) => {
+    const env = spawnEnv();
+    if (options.password) env.WORDEDITOR_DOCX_PASSWORD = options.password;
     const child = spawnPython(buildScriptArgs(inputMd, outputDocx, templateId, options), {
       cwd: REPO_ROOT,
-      env: spawnEnv(),
+      env,
     });
     let stderr = '';
     let outBuf = '';
