@@ -163,7 +163,7 @@ custom_styles:
       latin_font: "Times New Roman"
       size_half_pt: 24
       size_cs_half_pt: 24
-      bold: true
+      bold: false
 
   # Keywords（英文）
   - id: "KeyWordsEn"

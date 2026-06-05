@@ -37,6 +37,44 @@ def _q(t: str) -> str:
     return f"{{{W}}}{t}"
 
 
+_HEADER_FOOTER_PART_RE = re.compile(r"^word/(header|footer)\d+\.xml$")
+
+
+def _local_name(tag: str) -> str:
+    return tag.split("}", 1)[1] if "}" in tag else tag
+
+
+def _looks_like_page_frame_rect(el: ET.Element) -> bool:
+    if _local_name(el.tag) != "rect":
+        return False
+    style = el.get("style", "")
+    return (
+        el.get("filled") == "f"
+        and el.get("stroked") == "t"
+        and "mso-position-horizontal-relative:page" in style
+        and "mso-position-vertical-relative:page" in style
+    )
+
+
+def _strip_page_frame_shapes(xml_bytes: bytes) -> tuple[bytes, int]:
+    """移除页眉/页脚中的整页描边矩形（WPS/Word 兼容回退形状），避免导出文档出现黑框。"""
+    root = ET.fromstring(xml_bytes)
+    removed = 0
+
+    for parent in root.iter():
+        for child in list(parent):
+            if _local_name(child.tag) != "pict":
+                continue
+            has_frame_rect = any(_looks_like_page_frame_rect(desc) for desc in child.iter())
+            if has_frame_rect:
+                parent.remove(child)
+                removed += 1
+
+    if removed == 0:
+        return xml_bytes, 0
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True), removed
+
+
 HEADING_IDS = {f"Heading{i}" for i in range(1, 6)} | {f"\u6807\u9898 {i}" for i in range(1, 6)}
 HEADING_NAMES = {f"heading {i}" for i in range(1, 6)} | {f"\u6807\u9898 {i}" for i in range(1, 6)}
 BODY_IDS = {"Normal", "a", "ae"}  # ae = 文章的正文（reference.docx styleId）
@@ -195,6 +233,11 @@ def _apply_paragraph(style: ET.Element, p: dict[str, Any]) -> None:
         _replace_child(ppr, "ind", ind_attrs)
     if "align" in p:
         _set_or_replace(ppr, "jc", {"val": str(p["align"])})
+    if "page_break_before" in p:
+        if p["page_break_before"]:
+            _replace_child(ppr, "pageBreakBefore", {})
+        else:
+            _set_or_replace(ppr, "pageBreakBefore", {"val": "0"})
 
 
 def _apply_run(style: ET.Element, r: dict[str, Any], fonts: dict[str, Any]) -> None:
@@ -416,6 +459,7 @@ def patch_docx(path: Path, dsl: dict[str, Any]) -> None:
             overrides_map["word/numbering.xml"] = new_numbering
 
     written = set()
+    removed_page_frames = 0
     with zipfile.ZipFile(path, "r") as zin, zipfile.ZipFile(
         tmp, "w", zipfile.ZIP_DEFLATED
     ) as zout:
@@ -423,12 +467,18 @@ def patch_docx(path: Path, dsl: dict[str, Any]) -> None:
             if item.filename in overrides_map:
                 zout.writestr(item, overrides_map[item.filename])
             else:
-                zout.writestr(item, zin.read(item.filename))
+                data = zin.read(item.filename)
+                if _HEADER_FOOTER_PART_RE.match(item.filename):
+                    data, removed = _strip_page_frame_shapes(data)
+                    removed_page_frames += removed
+                zout.writestr(item, data)
             written.add(item.filename)
         # 新增不存在的 part（例如原 docx 无 numbering.xml）
         if has_numbering_output and "word/numbering.xml" not in written:
             zout.writestr("word/numbering.xml", new_numbering)
     shutil.move(str(tmp), str(path))
+    if removed_page_frames:
+        print(f"[postprocess_styles] 已移除页眉/页脚页面黑框 {removed_page_frames} 处")
 
 
 _LIST_MERGE_KEYS = {"overrides", "custom_styles", "headings", "list_style_library", "use_list_styles"}

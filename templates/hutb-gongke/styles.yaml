@@ -1,10 +1,65 @@
-# 湖南工商大学 · 工科：H1=1 H2=1.1 H3=1.1.1 H4=1.1.1.1 全程 isLgl 阿拉伯编号
+﻿# 湖南工商大学 · 工科：H1=1 H2=1.1 H3=1.1.1 H4=1.1.1.1 全程 isLgl 阿拉伯编号
 extends: "../_shared/hutb-base.yaml"
 template:
   id: "hutb-gongke"
   name: "湖南工商大学 · 工科"
 
-overrides: []
+overrides:
+  - match:
+      id: "1"         # 标题 1 段落
+    paragraph:
+      align: "left"
+      line_spacing: "single"
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+      page_break_before: true   # 每个一级标题前自动分页（新章节起新页）
+    run:
+      cjk_font: "黑体"
+      latin_font: "黑体"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+      bold: true
+  - match:
+      id: "2"         # 标题 2 段落
+    paragraph:
+      first_line_chars: 2
+    run:
+      cjk_font: "宋体"
+      latin_font: "宋体"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+      bold: true
+  - match:
+      id: "3"         # 标题 3 段落
+    paragraph:
+      first_line_chars: 2
+    run:
+      cjk_font: "宋体"
+      latin_font: "宋体"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+      bold: true
+  - match:
+      id: "10"        # 标题 1 字符
+    run:
+      cjk_font: "黑体"
+      latin_font: "黑体"
+      size_half_pt: 28
+      bold: true
+  - match:
+      id: "11"        # 标题 2 字符
+    run:
+      cjk_font: "宋体"
+      latin_font: "宋体"
+      size_half_pt: 28
+      bold: true
+  - match:
+      id: "12"        # 标题 3 字符
+    run:
+      cjk_font: "宋体"
+      latin_font: "宋体"
+      size_half_pt: 28
+      bold: true
 custom_styles:
   # 代码块（Pandoc fenced code）：附件代码，黑色宋体小四，22pt 固定行距，无首行缩进
   # 与 hutb-math-modeling 对齐
@@ -65,3 +120,6 @@ multilevel_list:
       suff: "space"
       start: 1
       is_lgl: true
+
+
+

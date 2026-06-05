@@ -1,7 +1,59 @@
-extends: "../_shared/hutb-base.yaml"
+﻿extends: "../_shared/hutb-base.yaml"
 template:
   id: "hutb-math-modeling"
   name: "湖南工商大学 · 数学建模"
+overrides:
+  - match:
+      id: "1"         # 标题 1 段落
+    paragraph:
+      page_break_before: true   # 每个一级标题前自动分页（新章节起新页）
+    run:
+      cjk_font: "黑体"
+      latin_font: "黑体"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+      bold: true
+  - match:
+      id: "2"         # 标题 2 段落
+    paragraph:
+      first_line_chars: 2
+    run:
+      cjk_font: "宋体"
+      latin_font: "宋体"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+      bold: true
+  - match:
+      id: "3"         # 标题 3 段落
+    paragraph:
+      first_line_chars: 2
+    run:
+      cjk_font: "宋体"
+      latin_font: "宋体"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+      bold: true
+  - match:
+      id: "10"        # 标题 1 字符
+    run:
+      cjk_font: "黑体"
+      latin_font: "黑体"
+      size_half_pt: 28
+      bold: true
+  - match:
+      id: "11"        # 标题 2 字符
+    run:
+      cjk_font: "宋体"
+      latin_font: "宋体"
+      size_half_pt: 28
+      bold: true
+  - match:
+      id: "12"        # 标题 3 字符
+    run:
+      cjk_font: "宋体"
+      latin_font: "宋体"
+      size_half_pt: 28
+      bold: true
 custom_styles:
   - id: "Title"
     name: "Title"
@@ -44,7 +96,6 @@ custom_styles:
       size_half_pt: 24
       size_cs_half_pt: 24
       color: "000000"
-overrides: []
 fonts: {}
 multilevel_list:
   num_id: 2
@@ -78,3 +129,9 @@ multilevel_list:
       is_lgl: true
 use_list_styles:
   - id: "DecimalList"
+
+
+
+
+
+

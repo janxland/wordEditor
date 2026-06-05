@@ -1,4 +1,4 @@
-import { execSync, spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
+import { execFileSync, execSync, spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -15,7 +15,7 @@ function isStoreStub(filePath: string): boolean {
 
 function canRun(bin: string, prefixArgs: string[] = []): boolean {
   try {
-    execSync([bin, ...prefixArgs, '--version'].join(' '), {
+    execFileSync(bin, [...prefixArgs, '--version'], {
       stdio: 'ignore',
       env: process.env,
       windowsHide: true,
@@ -56,6 +56,21 @@ export function resolvePython(): PythonLauncher {
     }
   } catch {
     /* where/which 不可用 */
+  }
+
+  if (process.platform === 'win32') {
+    try {
+      const pyLines = execSync('where.exe py', { encoding: 'utf-8', env: process.env })
+        .trim()
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l);
+      for (const line of pyLines) {
+        candidates.push({ command: line, prefixArgs: ['-3'] });
+      }
+    } catch {
+      /* py launcher 不可用 */
+    }
   }
 
   if (process.platform === 'win32') {

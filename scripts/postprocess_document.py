@@ -36,6 +36,7 @@ from ooxml_util import (  # noqa: E402
 )
 
 REF_IN_TEXT = re.compile(r"\[(\d+)\]")
+TABLE_CAPTION_FALLBACK = re.compile(r"^\s*表(?:格)?\s*\d+\s*[-—:：.、）)]?\s*\S+")
 
 
 def apply_headings(
@@ -145,6 +146,49 @@ def apply_refs(document_xml: bytes) -> tuple[bytes, int]:
     return ET.tostring(root, encoding="utf-8", xml_declaration=True), changed
 
 
+def _is_empty_para(p: ET.Element) -> bool:
+    return paragraph_plain_text(p).strip() == ""
+
+
+def _set_paragraph_style(p: ET.Element, style_name_or_id: str) -> None:
+    ppr = p.find("w:pPr", NS)
+    if ppr is None:
+        ppr = ET.Element(q("pPr"))
+        p.insert(0, ppr)
+    ps = ppr.find("w:pStyle", NS)
+    if ps is None:
+        ps = ET.SubElement(ppr, q("pStyle"))
+    ps.set(q("val"), style_name_or_id)
+
+
+def apply_table_caption_fallback(document_xml: bytes) -> tuple[bytes, int]:
+    """兜底：识别“表1/表 1/表格1 ...”且后面紧跟表格的段落，套用“表注”样式。"""
+    root = ET.fromstring(document_xml)
+    body = root.find("w:body", NS)
+    if body is None:
+        return document_xml, 0
+
+    children = list(body)
+    changed = 0
+    for i, child in enumerate(children):
+        if child.tag != q("p"):
+            continue
+        txt = paragraph_plain_text(child).strip()
+        if not TABLE_CAPTION_FALLBACK.match(txt):
+            continue
+
+        j = i + 1
+        while j < len(children) and children[j].tag == q("p") and _is_empty_para(children[j]):
+            j += 1
+        if j >= len(children) or children[j].tag != q("tbl"):
+            continue
+
+        _set_paragraph_style(child, "表注")
+        changed += 1
+
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True), changed
+
+
 def patch_docx(
     path: Path,
     *,
@@ -154,7 +198,7 @@ def patch_docx(
 ) -> dict[str, int]:
     import zipfile
 
-    stats = {"headings": 0, "refs": 0}
+    stats = {"headings": 0, "refs": 0, "table_captions": 0}
     with zipfile.ZipFile(path, "r") as z:
         styles_xml = z.read("word/styles.xml")
         doc_xml = z.read("word/document.xml")
@@ -170,6 +214,8 @@ def patch_docx(
 
     if not skip_refs:
         doc_xml, stats["refs"] = apply_refs(doc_xml)
+
+    doc_xml, stats["table_captions"] = apply_table_caption_fallback(doc_xml)
 
     patches: dict[str, bytes] = {"word/document.xml": doc_xml}
     if not skip_headings:
@@ -209,6 +255,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[postprocess_headings] {stats['headings']} 段（scheme={args.heading_scheme}）")
     if not args.skip_refs:
         print(f"[postprocess_refs] {stats['refs']} 段含引用")
+    print(f"[postprocess_table_caption_fallback] {stats['table_captions']} 段")
     print("[postprocess_document] 完成")
     return 0
 

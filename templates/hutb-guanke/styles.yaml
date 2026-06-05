@@ -4,7 +4,11 @@ template:
   id: "hutb-guanke"
   name: "湖南工商大学 · 管科"
 
-overrides: []
+overrides:
+  - match:
+      id: "1"         # 标题 1 段落
+    paragraph:
+      page_break_before: true   # 每个一级标题前自动分页（新章节起新页）
 custom_styles: []
 fonts: {}
 
