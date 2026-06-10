@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { notification } from 'antd';
-import type { BuildOptions, BuildUploadEntry } from '@/kernel/pipeline';
+import type { BuildOptions, BuildUploadEntry, BuildProvenance } from '@/kernel/pipeline';
+import { DEFAULT_BUILD_PROVENANCE } from '@/kernel/pipeline';
 import { streamBuild } from '@/kernel/pipeline/streamBuild';
 import type { BuildStreamStepEvent } from '@/kernel/pipeline/streamBuild';
 import {
@@ -72,6 +73,7 @@ interface ExportState {
   templateId: string;
   fileName: string;
   options: BuildOptions;
+  provenance: BuildProvenance;
   building: boolean;
   lastError: string | null;
   downloadUrl: string | null;
@@ -95,6 +97,7 @@ interface ExportState {
   setTemplateId: (id: string) => void;
   setFileName: (name: string) => void;
   setOptions: (patch: Partial<BuildOptions>) => void;
+  setProvenance: (patch: Partial<BuildProvenance>) => void;
   setAutoDownload: (v: boolean) => void;
   loadSample: () => void;
   exportDocx: () => Promise<boolean>;
@@ -113,6 +116,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
   templateId: '',
   fileName: 'export.docx',
   options: {},
+  provenance: { ...DEFAULT_BUILD_PROVENANCE },
   building: false,
   lastError: null,
   downloadUrl: null,
@@ -150,6 +154,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
     set({ templateId, fileName: `export-${templateId}.docx` }),
   setFileName: (fileName) => set({ fileName }),
   setOptions: (patch) => set((s) => ({ options: { ...s.options, ...patch } })),
+  setProvenance: (patch) => set((s) => ({ provenance: { ...s.provenance, ...patch } })),
   setAutoDownload: (autoDownload) => set({ autoDownload }),
   loadSample: () => set({ markdown: SAMPLE_MD }),
 
@@ -200,6 +205,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
       templateId,
       fileName,
       options,
+      provenance,
       autoDownload,
     } = get();
     const useUpload = uploadEntries.length > 0 && !!uploadMdRelPath;
@@ -245,6 +251,14 @@ export const useExportStore = create<ExportState>((set, get) => ({
           templateId,
           fileName,
           options,
+          provenance: {
+            author: provenance.author?.trim() || DEFAULT_BUILD_PROVENANCE.author,
+            remark: provenance.remark?.trim() || DEFAULT_BUILD_PROVENANCE.remark,
+            title:
+              provenance.title?.trim() ||
+              fileName.replace(/\.docx$/i, '') ||
+              undefined,
+          },
         },
         {
           signal: ac.signal,

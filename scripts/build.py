@@ -161,6 +161,9 @@ def main() -> int:
         "--password-env",
         help="从指定环境变量读取「修改密码」，避免明文出现在命令行",
     )
+    parser.add_argument("--author", help="文档作者（写入 docProps，产出留痕）")
+    parser.add_argument("--remark", help="文档备注（Word 属性「备注」/ dc:description）")
+    parser.add_argument("--doc-title", dest="doc_title", help="文档标题属性（dc:title）")
     args = parser.parse_args()
 
     cfg = load_config()
@@ -259,6 +262,18 @@ def main() -> int:
         print("\n[后处理] 设置修改密码 …")
         apply_password(out, pwd)
         print("[apply_password] 已设置修改密码")
+
+    if args.author or args.remark or args.doc_title:
+        from apply_docx_metadata import apply_docx_metadata  # noqa: WPS433
+
+        print("\n[后处理] 写入文档属性 …")
+        apply_docx_metadata(
+            out,
+            author=args.author,
+            remark=args.remark,
+            title=args.doc_title,
+        )
+        print("[apply_docx_metadata] 完成")
     return 0
 
 

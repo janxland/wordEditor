@@ -33,7 +33,12 @@ custom_styles:
       latin_font: "Times New Roman"
       size_half_pt: 30
       size_cs_half_pt: 30
-overrides: []
+overrides:
+  - match:
+      id: "1"         # 标题 1 段落
+    paragraph:
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
 fonts: {}
 multilevel_list:
   num_id: 2

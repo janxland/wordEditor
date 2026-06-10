@@ -36,7 +36,8 @@ from ooxml_util import (  # noqa: E402
 )
 
 REF_IN_TEXT = re.compile(r"\[(\d+)\]")
-TABLE_CAPTION_FALLBACK = re.compile(r"^\s*表(?:格)?\s*\d+\s*[-—:：.、）)]?\s*\S+")
+TABLE_CAPTION_FALLBACK = re.compile(r"^\s*表(?:格)?\s*\d+[\s．.：:、　]*\S")
+TABLE_CAPTION_STYLE_ID = "表注"  # 与 hutb-base.yaml custom_styles.id / Pandoc custom-style 一致
 
 
 def apply_headings(
@@ -183,7 +184,7 @@ def apply_table_caption_fallback(document_xml: bytes) -> tuple[bytes, int]:
         if j >= len(children) or children[j].tag != q("tbl"):
             continue
 
-        _set_paragraph_style(child, "表注")
+        _set_paragraph_style(child, TABLE_CAPTION_STYLE_ID)
         changed += 1
 
     return ET.tostring(root, encoding="utf-8", xml_declaration=True), changed

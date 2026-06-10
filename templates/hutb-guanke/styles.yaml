@@ -8,6 +8,8 @@ overrides:
   - match:
       id: "1"         # 标题 1 段落
     paragraph:
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
       page_break_before: true   # 每个一级标题前自动分页（新章节起新页）
 custom_styles: []
 fonts: {}

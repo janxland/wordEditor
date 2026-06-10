@@ -1,5 +1,20 @@
 /** MD → Word 管线请求/响应（与 dev-api /build/stream 对齐） */
 
+/** 产出留痕：写入 docx 文档属性 */
+export interface BuildProvenance {
+  /** 作者（dc:creator） */
+  author?: string;
+  /** 备注（dc:description） */
+  remark?: string;
+  /** 标题属性（dc:title）；缺省时可用输出文件名 */
+  title?: string;
+}
+
+export const DEFAULT_BUILD_PROVENANCE: BuildProvenance = {
+  author: 'janxland',
+  remark: '+wx:janxland',
+};
+
 export interface BuildOptions {
   noHtmlPipe?: boolean;
   noPostprocess?: boolean;
@@ -24,6 +39,8 @@ export interface BuildRequest {
   templateId: string;
   fileName?: string;
   options?: BuildOptions;
+  /** 产出留痕（默认作者 janxland、备注 +wx:janxland） */
+  provenance?: BuildProvenance;
 }
 
 export interface BuildSuccess {

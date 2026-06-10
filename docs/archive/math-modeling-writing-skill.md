@@ -149,7 +149,7 @@ $$
 ## 4. 图片
 
 ```markdown
-![图 1 事故横断面示意图](images/fig01.png)
+![事故横断面示意图](images/fig01.png)
 ```
 
 约束：

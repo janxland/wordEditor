@@ -36,6 +36,8 @@ export const ExportPage: React.FC = () => {
   const setFileName = useExportStore((s) => s.setFileName);
   const options = useExportStore((s) => s.options);
   const setOptions = useExportStore((s) => s.setOptions);
+  const provenance = useExportStore((s) => s.provenance);
+  const setProvenance = useExportStore((s) => s.setProvenance);
   const autoDownload = useExportStore((s) => s.autoDownload);
   const setAutoDownload = useExportStore((s) => s.setAutoDownload);
   const building = useExportStore((s) => s.building);
@@ -98,6 +100,9 @@ export const ExportPage: React.FC = () => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const all = Array.from(files);
+    // 只保留 .md 和常见图片格式，跳过 PPTX/DOCX/PDF 等大型二进制文件
+    const ALLOWED_EXT = /\.(md|png|jpg|jpeg|gif|webp|svg|bmp|tiff?)$/i;
+    const filtered = all.filter((f) => ALLOWED_EXT.test(relOf(f)));
     const mdFiles = all.filter((f) => /\.md$/i.test(relOf(f)));
     if (mdFiles.length === 0) {
       void message.error('文件夹中未找到 .md');
@@ -114,18 +119,20 @@ export const ExportPage: React.FC = () => {
 
     // 串行读取全部文件为 base64、保留相对路径
     const entries: BuildUploadEntry[] = [];
-    for (const f of all) {
+    const skipped = all.length - filtered.length;
+    for (const f of filtered) {
       const buf = await f.arrayBuffer();
       entries.push({ relPath: relOf(f), contentBase64: arrayBufferToBase64(buf) });
     }
 
-    const totalBytes = all.reduce((s, f) => s + f.size, 0);
+    const totalBytes = filtered.reduce((s, f) => s + f.size, 0);
     const sizeLabel =
       totalBytes > 1024 * 1024
         ? `${(totalBytes / 1024 / 1024).toFixed(1)} MB`
         : `${Math.round(totalBytes / 1024)} KB`;
     setUpload(entries, mdRel, `${md.name} · ${all.length} 个文件 · ${sizeLabel}`);
-    void message.success(`已加载 ${md.name}，共 ${all.length} 个文件`);
+    const skippedTip = skipped > 0 ? `，已跳过 ${skipped} 个非图文文件` : '';
+    void message.success(`已加载 ${md.name}，共 ${filtered.length} 个文件${skippedTip}`);
     e.target.value = '';
   };
 
@@ -303,6 +310,35 @@ export const ExportPage: React.FC = () => {
                 </Tooltip>
               </div>
             )}
+          </section>
+
+          <section className="export-rail-block">
+            <label className="export-rail-label">产出留痕</label>
+            <Tooltip title="写入 Word 文档属性：文件 → 信息 → 属性">
+              <Input
+                size="middle"
+                style={{ marginBottom: 8 }}
+                placeholder="作者"
+                value={provenance.author ?? ''}
+                onChange={(e) => setProvenance({ author: e.target.value })}
+                allowClear
+              />
+            </Tooltip>
+            <Input
+              size="middle"
+              style={{ marginBottom: 8 }}
+              placeholder="备注"
+              value={provenance.remark ?? ''}
+              onChange={(e) => setProvenance({ remark: e.target.value })}
+              allowClear
+            />
+            <Input
+              size="middle"
+              placeholder="标题属性（默认取输出文件名）"
+              value={provenance.title ?? ''}
+              onChange={(e) => setProvenance({ title: e.target.value })}
+              allowClear
+            />
           </section>
 
           <section className="export-rail-block">

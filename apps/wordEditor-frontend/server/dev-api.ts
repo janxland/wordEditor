@@ -47,6 +47,12 @@ export interface BuildApiOptions {
   password?: string;
 }
 
+export interface BuildProvenance {
+  author?: string;
+  remark?: string;
+  title?: string;
+}
+
 function spawnEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, PYTHONIOENCODING: 'utf-8' };
   const pandocDir = findPandocDirForPath();
@@ -131,6 +137,7 @@ function buildScriptArgs(
   outputDocx: string,
   templateId: string,
   options: BuildApiOptions,
+  provenance?: BuildProvenance,
 ): string[] {
   const scriptArgs = [
     path.join(REPO_ROOT, 'scripts', 'build.py'),
@@ -144,6 +151,11 @@ function buildScriptArgs(
   if (options.noHtmlPipe) scriptArgs.push('--no-html-pipe');
   if (options.noPostprocess) scriptArgs.push('--no-postprocess');
   if (options.password) scriptArgs.push('--password-env', 'WORDEDITOR_DOCX_PASSWORD');
+  if (provenance?.author?.trim()) scriptArgs.push('--author', provenance.author.trim());
+  if (provenance?.remark != null && provenance.remark.trim()) {
+    scriptArgs.push('--remark', provenance.remark.trim());
+  }
+  if (provenance?.title?.trim()) scriptArgs.push('--doc-title', provenance.title.trim());
   return scriptArgs;
 }
 
@@ -234,6 +246,9 @@ function emitStepFromBuildLine(
   if (t.includes('[postprocess_styles] 完成')) {
     write('ooxml', 'finish');
   }
+  if (t.includes('[apply_docx_metadata]')) {
+    write('ooxml', 'finish', '文档属性已写入');
+  }
 }
 
 function runStylePreview(
@@ -276,14 +291,18 @@ function runBuild(
   templateId: string,
   options: BuildApiOptions,
   onLine?: BuildLineHandler,
+  provenance?: BuildProvenance,
 ): Promise<{ code: number; stderr: string }> {
   return new Promise((resolve) => {
     const env = spawnEnv();
     if (options.password) env.WORDEDITOR_DOCX_PASSWORD = options.password;
-    const child = spawnPython(buildScriptArgs(inputMd, outputDocx, templateId, options), {
-      cwd: REPO_ROOT,
-      env,
-    });
+    const child = spawnPython(
+      buildScriptArgs(inputMd, outputDocx, templateId, options, provenance),
+      {
+        cwd: REPO_ROOT,
+        env,
+      },
+    );
     let stderr = '';
     let outBuf = '';
     let errBuf = '';
@@ -487,6 +506,7 @@ export function createDevApiMiddleware(): Connect.NextHandleFunction {
             templateId?: string;
             fileName?: string;
             options?: BuildApiOptions;
+            provenance?: BuildProvenance;
           };
           if (!body.templateId) {
             sendJson(res, 400, { error: 'templateId is required' });
@@ -529,6 +549,8 @@ export function createDevApiMiddleware(): Connect.NextHandleFunction {
               const rel = path.normalize(ent.relPath).replace(/^([\\/])+/, '');
               const abs = path.join(workDir, rel);
               if (!abs.startsWith(workDir)) continue;
+              // 跳过超过 20MB 的单个条目（base64 长度约为原始大小 * 1.37）
+              if (ent.contentBase64.length > 20 * 1024 * 1024 * 1.37) continue;
               fs.mkdirSync(path.dirname(abs), { recursive: true });
               fs.writeFileSync(abs, Buffer.from(ent.contentBase64, 'base64'));
             }
@@ -561,6 +583,7 @@ export function createDevApiMiddleware(): Connect.NextHandleFunction {
               writeSse(res, 'log', { line, stream });
               emitStepFromBuildLine(line, options, pushStep);
             },
+            body.provenance,
           );
 
           if (code !== 0 || !fs.existsSync(outputDocx)) {
