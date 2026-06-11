@@ -8,7 +8,8 @@ import {
   createInitialBuildSteps,
   type BuildStepState,
 } from '@/kernel/pipeline/buildSteps';
-import { downloadFile } from '@/services/download';
+import { downloadBlob, fetchAsBlob } from '@/services/download';
+import { saveBlobToWorkspaceFolder } from '@/services/localFolder';
 import type { TemplatesConfig } from '@/core/types';
 
 const SAMPLE_MD = `<!-- 导出页示例：完整稿见 input/carbon-neutral-renewable.md -->
@@ -88,6 +89,10 @@ interface ExportState {
   statusMessage: string;
   downloading: boolean;
   autoDownload: boolean;
+  /** 导出后直接写入所选工作区文件夹，不经过浏览器下载目录 */
+  saveToWorkspaceFolder: boolean;
+  workspaceDirHandle: FileSystemDirectoryHandle | null;
+  workspaceDirName: string;
   abortController: AbortController | null;
 
   init: (config: TemplatesConfig | null) => void;
@@ -99,6 +104,8 @@ interface ExportState {
   setOptions: (patch: Partial<BuildOptions>) => void;
   setProvenance: (patch: Partial<BuildProvenance>) => void;
   setAutoDownload: (v: boolean) => void;
+  setSaveToWorkspaceFolder: (v: boolean) => void;
+  setWorkspaceFolder: (handle: FileSystemDirectoryHandle | null, name?: string) => void;
   loadSample: () => void;
   exportDocx: () => Promise<boolean>;
   cancelBuild: () => void;
@@ -131,6 +138,9 @@ export const useExportStore = create<ExportState>((set, get) => ({
   statusMessage: '',
   downloading: false,
   autoDownload: true,
+  saveToWorkspaceFolder: false,
+  workspaceDirHandle: null,
+  workspaceDirName: '',
   abortController: null,
 
   init: (config) => {
@@ -149,13 +159,28 @@ export const useExportStore = create<ExportState>((set, get) => ({
     const tid = get().templateId || 'out';
     set({ uploadEntries, uploadMdRelPath, uploadLabel, fileName: `${stem}-${tid}.docx` });
   },
-  clearUpload: () => set({ uploadEntries: [], uploadMdRelPath: '', uploadLabel: '' }),
+  clearUpload: () =>
+    set({
+      uploadEntries: [],
+      uploadMdRelPath: '',
+      uploadLabel: '',
+      workspaceDirHandle: null,
+      workspaceDirName: '',
+      saveToWorkspaceFolder: false,
+    }),
   setTemplateId: (templateId) =>
     set({ templateId, fileName: `export-${templateId}.docx` }),
   setFileName: (fileName) => set({ fileName }),
   setOptions: (patch) => set((s) => ({ options: { ...s.options, ...patch } })),
   setProvenance: (patch) => set((s) => ({ provenance: { ...s.provenance, ...patch } })),
   setAutoDownload: (autoDownload) => set({ autoDownload }),
+  setSaveToWorkspaceFolder: (saveToWorkspaceFolder) => set({ saveToWorkspaceFolder }),
+  setWorkspaceFolder: (workspaceDirHandle, name) =>
+    set({
+      workspaceDirHandle,
+      workspaceDirName: name ?? workspaceDirHandle?.name ?? '',
+      saveToWorkspaceFolder: workspaceDirHandle ? get().saveToWorkspaceFolder : false,
+    }),
   loadSample: () => set({ markdown: SAMPLE_MD }),
 
   closeErrorModal: () => set({ errorModalOpen: false, lastError: null }),
@@ -173,22 +198,36 @@ export const useExportStore = create<ExportState>((set, get) => ({
   },
 
   downloadDocx: async (silent = false) => {
-    const { downloadUrl, fileName } = get();
+    const { downloadUrl, fileName, saveToWorkspaceFolder, workspaceDirHandle, workspaceDirName } =
+      get();
     if (!downloadUrl) return;
     set({ downloading: true });
     try {
-      await downloadFile(downloadUrl, fileName);
-      if (!silent) {
-        notification.success({
-          message: '下载已开始',
-          description: fileName,
-          placement: 'bottomRight',
-          duration: 3,
-        });
+      const blob = await fetchAsBlob(downloadUrl);
+      if (saveToWorkspaceFolder && workspaceDirHandle) {
+        await saveBlobToWorkspaceFolder(workspaceDirHandle, fileName, blob);
+        if (!silent) {
+          notification.success({
+            message: '已保存到工作区文件夹',
+            description: `${workspaceDirName}/${fileName}`,
+            placement: 'bottomRight',
+            duration: 3,
+          });
+        }
+      } else {
+        await downloadBlob(blob, fileName);
+        if (!silent) {
+          notification.success({
+            message: '下载已开始',
+            description: fileName,
+            placement: 'bottomRight',
+            duration: 3,
+          });
+        }
       }
     } catch (e) {
       notification.error({
-        message: '下载失败',
+        message: saveToWorkspaceFolder ? '保存失败' : '下载失败',
         description: e instanceof Error ? e.message : String(e),
         placement: 'bottomRight',
       });

@@ -83,7 +83,7 @@ custom_styles:
       latin_font: "inherit"
       size_half_pt: 20
 
-  # 英文摘要正文（首行缩进 2 字符，小四）
+  # 英文摘要正文（首行缩进 2 字符）
   - id: "AbstractPara"
     name: "Abstract"
     based_on: "a"
@@ -95,10 +95,10 @@ custom_styles:
     run:
       latin_font: "Times New Roman"
       cjk_font: "Times New Roman"
-      size_half_pt: 21       # 小四 = 10.5pt
-      size_cs_half_pt: 21
+      size_half_pt: 24       # 小四 = 12pt
+      size_cs_half_pt: 24
 
-  # 英文摘要标题 "Abstract"（居中三号 TNR 加粗，段前段后 0）
+  # 英文摘要标题 "Abstract"（居中三号 TNR 加粗）
   - id: "AbstractTitle"
     name: "Abstract 标题"
     based_on: "a"
@@ -116,7 +116,7 @@ custom_styles:
       size_cs_half_pt: 32
       bold: true
 
-  # 中文摘要正文（小四，宋体）
+  # 中文摘要正文（与 Abstract 字号一致，宋体）
   - id: "ZhaiYao"
     name: "摘要"
     based_on: "a"
@@ -128,10 +128,10 @@ custom_styles:
     run:
       cjk_font: "宋体"
       latin_font: "Times New Roman"
-      size_half_pt: 21       # 小四 = 10.5pt
-      size_cs_half_pt: 21
+      size_half_pt: 24
+      size_cs_half_pt: 24
 
-  # 中文摘要标题 "摘要"（居中三号宋体加粗，段前段后 0）
+  # 中文摘要标题 "摘要"（居中三号宋体加粗）
   - id: "ZhaiYaoTitle"
     name: "摘要标题"
     based_on: "a"

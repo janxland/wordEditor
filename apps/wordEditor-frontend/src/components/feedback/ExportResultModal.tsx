@@ -15,6 +15,8 @@ export interface ExportResultModalProps {
   templateName?: string;
   elapsedMs?: number;
   downloading?: boolean;
+  saveToWorkspaceFolder?: boolean;
+  workspaceDirName?: string;
   onDownload: () => void;
   onExportAgain: () => void;
   onClose: () => void;
@@ -32,11 +34,18 @@ export const ExportResultModal: React.FC<ExportResultModalProps> = ({
   templateName,
   elapsedMs,
   downloading,
+  saveToWorkspaceFolder,
+  workspaceDirName,
   onDownload,
   onExportAgain,
   onClose,
 }) => {
   const elapsedLabel = formatElapsed(elapsedMs);
+  const saveToFolder = saveToWorkspaceFolder && !!workspaceDirName;
+  const deliverLabel = saveToFolder ? '保存到工作区文件夹' : '下载 Word 文档';
+  const deliverHint = saveToFolder
+    ? `将写入 ${workspaceDirName}/${fileName}`
+    : '管线执行完成，可立即下载或继续编辑文稿';
 
   return (
     <Modal
@@ -56,7 +65,7 @@ export const ExportResultModal: React.FC<ExportResultModalProps> = ({
           Word 文档已就绪
         </Title>
         <Text type="secondary" style={{ display: 'block', textAlign: 'center', marginBottom: 16 }}>
-          管线执行完成，可立即下载或继续编辑文稿
+          {deliverHint}
         </Text>
 
         <div className="export-result-file">
@@ -81,7 +90,7 @@ export const ExportResultModal: React.FC<ExportResultModalProps> = ({
             loading={downloading}
             onClick={onDownload}
           >
-            下载 Word 文档
+            {deliverLabel}
           </Button>
           <Button block icon={<ReloadOutlined />} onClick={onExportAgain}>
             再次导出

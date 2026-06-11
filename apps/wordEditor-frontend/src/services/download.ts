@@ -9,6 +9,11 @@ export async function fetchAsBlob(url: string): Promise<Blob> {
 /** 触发浏览器下载 */
 export async function downloadFile(url: string, fileName: string): Promise<void> {
   const blob = await fetchAsBlob(url);
+  await downloadBlob(blob, fileName);
+}
+
+/** 将 Blob 触发浏览器下载 */
+export async function downloadBlob(blob: Blob, fileName: string): Promise<void> {
   const objectUrl = URL.createObjectURL(blob);
   try {
     const a = document.createElement('a');

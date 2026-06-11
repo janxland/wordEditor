@@ -15,6 +15,7 @@ import {
   ExportErrorModal,
 } from '@/components/feedback';
 import { fetchToolsStatus, type ToolsStatus } from '@/kernel/pipeline';
+import { isFileSystemAccessSupported, loadWorkspaceFolder } from '@/services/localFolder';
 import { useAppStore } from '@/store/appStore';
 import { useExportStore } from '@/store/exportStore';
 
@@ -40,6 +41,11 @@ export const ExportPage: React.FC = () => {
   const setProvenance = useExportStore((s) => s.setProvenance);
   const autoDownload = useExportStore((s) => s.autoDownload);
   const setAutoDownload = useExportStore((s) => s.setAutoDownload);
+  const saveToWorkspaceFolder = useExportStore((s) => s.saveToWorkspaceFolder);
+  const setSaveToWorkspaceFolder = useExportStore((s) => s.setSaveToWorkspaceFolder);
+  const workspaceDirHandle = useExportStore((s) => s.workspaceDirHandle);
+  const workspaceDirName = useExportStore((s) => s.workspaceDirName);
+  const setWorkspaceFolder = useExportStore((s) => s.setWorkspaceFolder);
   const building = useExportStore((s) => s.building);
   const lastError = useExportStore((s) => s.lastError);
   const downloadUrl = useExportStore((s) => s.downloadUrl);
@@ -79,6 +85,7 @@ export const ExportPage: React.FC = () => {
   const canExport = !disabled && pandocOk && (hasUpload || !!markdown.trim());
 
   const folderRef = useRef<HTMLInputElement>(null);
+  const fsAccessSupported = isFileSystemAccessSupported();
 
   const arrayBufferToBase64 = (buf: ArrayBuffer) => {
     const bytes = new Uint8Array(buf);
@@ -99,6 +106,7 @@ export const ExportPage: React.FC = () => {
   const handleFolder = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    setWorkspaceFolder(null);
     const all = Array.from(files);
     // 只保留 .md 和常见图片格式，跳过 PPTX/DOCX/PDF 等大型二进制文件
     const ALLOWED_EXT = /\.(md|png|jpg|jpeg|gif|webp|svg|bmp|tiff?)$/i;
@@ -134,6 +142,27 @@ export const ExportPage: React.FC = () => {
     const skippedTip = skipped > 0 ? `，已跳过 ${skipped} 个非图文文件` : '';
     void message.success(`已加载 ${md.name}，共 ${filtered.length} 个文件${skippedTip}`);
     e.target.value = '';
+  };
+
+  const pickFolder = async () => {
+    if (fsAccessSupported) {
+      try {
+        const handle = await window.showDirectoryPicker!({ mode: 'readwrite' });
+        const loaded = await loadWorkspaceFolder(handle);
+        setMarkdown(loaded.mdText);
+        setUpload(loaded.entries, loaded.mdRelPath, loaded.label);
+        setWorkspaceFolder(loaded.handle, handle.name);
+        const skippedTip = loaded.skipped > 0 ? `，已跳过 ${loaded.skipped} 个非图文文件` : '';
+        void message.success(
+          `已加载 ${handle.name}，共 ${loaded.entries.length} 个文件${skippedTip}`,
+        );
+      } catch (e) {
+        if (e instanceof Error && e.name === 'AbortError') return;
+        void message.error(e instanceof Error ? e.message : String(e));
+      }
+      return;
+    }
+    folderRef.current?.click();
   };
 
   const templateName = useMemo(
@@ -172,6 +201,8 @@ export const ExportPage: React.FC = () => {
         templateName={templateName}
         elapsedMs={elapsedMs}
         downloading={downloading}
+        saveToWorkspaceFolder={saveToWorkspaceFolder}
+        workspaceDirName={workspaceDirName}
         onDownload={() => void downloadDocx()}
         onExportAgain={() => {
           closeResult();
@@ -207,7 +238,7 @@ export const ExportPage: React.FC = () => {
                   icon={<CloudDownloadOutlined />}
                   onClick={() => void downloadDocx()}
                 >
-                  下载
+                  {saveToWorkspaceFolder && workspaceDirHandle ? '保存' : '下载'}
                 </Button>
               )}
               <Button
@@ -267,15 +298,22 @@ export const ExportPage: React.FC = () => {
               style={{ display: 'none' }}
               onChange={(e) => void handleFolder(e)}
             />
-            <Tooltip title="选中 MD 所在文件夹；自动读取唯一/最顶层 .md 到编辑器，images/ 一并上传">
-              <Button
-                icon={<FolderOpenOutlined />}
-                onClick={() => folderRef.current?.click()}
-                block
-              >
+            <Tooltip
+              title={
+                fsAccessSupported
+                  ? '选中 MD 所在文件夹；自动读取唯一/最顶层 .md 到编辑器，images/ 一并上传'
+                  : '当前浏览器不支持直接写入文件夹，将使用传统文件夹选择（仅读取）'
+              }
+            >
+              <Button icon={<FolderOpenOutlined />} onClick={() => void pickFolder()} block>
                 选择文件夹
               </Button>
             </Tooltip>
+            {workspaceDirName && (
+              <div style={{ marginTop: 6, fontSize: 12, color: '#666' }}>
+                工作区：{workspaceDirName}
+              </div>
+            )}
             {hasUpload && (
               <div
                 style={{
@@ -375,8 +413,23 @@ export const ExportPage: React.FC = () => {
                 结构 + 样式
               </Checkbox>
               <Checkbox checked={autoDownload} onChange={(e) => setAutoDownload(e.target.checked)}>
-                自动下载
+                {saveToWorkspaceFolder && workspaceDirHandle ? '自动保存' : '自动下载'}
               </Checkbox>
+              <Tooltip
+                title={
+                  workspaceDirHandle
+                    ? '导出完成后直接写入所选工作区文件夹，不经过浏览器下载目录'
+                    : '请先通过「选择文件夹」选定可写入的工作区（需 Chrome / Edge）'
+                }
+              >
+                <Checkbox
+                  checked={saveToWorkspaceFolder}
+                  disabled={!workspaceDirHandle}
+                  onChange={(e) => setSaveToWorkspaceFolder(e.target.checked)}
+                >
+                  保存到工作区文件夹
+                </Checkbox>
+              </Tooltip>
             </div>
           </section>
         </aside>
