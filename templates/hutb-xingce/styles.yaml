@@ -1,4 +1,4 @@
-extends: "../_shared/list-style-library.yaml"
+extends: "../_shared/hutb-base.yaml"
 template:
   id: "hutb-xingce"
   name: "湖南工商大学 · 形策论文 1500 字模板"

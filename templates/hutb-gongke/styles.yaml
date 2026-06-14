@@ -1,5 +1,5 @@
 ﻿# 湖南工商大学 · 工科：H1=1 H2=1.1 H3=1.1.1 H4=1.1.1.1 全程 isLgl 阿拉伯编号
-extends: "../_shared/list-style-library.yaml"
+extends: "../_shared/hutb-base.yaml"
 template:
   id: "hutb-gongke"
   name: "湖南工商大学 · 工科"

@@ -1,14 +1,6 @@
 # Shared base DSL for HUTB templates.
+# 注：default_list_style / use_list_styles 由各子模板自行声明，以避免 list-merge 重复。
 extends: "./list-style-library.yaml"
-
-default_list_style: "DecimalList"
-
-use_list_styles:
-  - id: "DecimalList"
-  - id: "BulletList"
-  - id: "ParenDecimalList"
-  - id: "CircledList"
-  - id: "ChineseList"
 
 fonts:
   latin: "Times New Roman"
@@ -42,14 +34,15 @@ custom_styles:
     based_on: "a"
     paragraph:
       align: "both"
-      line_spacing: "single"
+      line_spacing: "22pt"
       spacing_before_dxa: 60
       spacing_after_dxa: 60
-      hanging_indent_chars: 2
+      indent_clear: true
       word_wrap_break_latin: true
     run:
       latin_font: "inherit"
-      size_half_pt: 21
+      size_half_pt: 24
+      size_cs_half_pt: 24
 
   - id: "TuStyle"
     name: "图"
@@ -69,7 +62,21 @@ custom_styles:
       align: "center"
       line_spacing: "single"
       spacing_before_dxa: 0
-      spacing_after_dxa: 120
+      spacing_after_dxa: 0
+      indent_clear: true
+      word_wrap_break_latin: true
+    run:
+      latin_font: "inherit"
+      size_half_pt: 20
+
+  - id: "表注"
+    name: "表注"
+    based_on: "a"
+    paragraph:
+      align: "center"
+      line_spacing: "single"
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
       indent_clear: true
       word_wrap_break_latin: true
     run:

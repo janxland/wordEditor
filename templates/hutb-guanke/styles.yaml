@@ -1,5 +1,5 @@
 # 湖南工商大学 · 管科：H1=一、 H2=（一） H3=1. H4=1.1（H1/H2 中文数字，H3+ 阿拉伯）
-extends: "../_shared/list-style-library.yaml"
+extends: "../_shared/hutb-base.yaml"
 template:
   id: "hutb-guanke"
   name: "湖南工商大学 · 管科"

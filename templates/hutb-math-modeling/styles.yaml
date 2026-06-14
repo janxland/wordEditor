@@ -1,4 +1,4 @@
-﻿extends: "../_shared/list-style-library.yaml"
+﻿extends: "../_shared/hutb-base.yaml"
 template:
   id: "hutb-math-modeling"
   name: "湖南工商大学 · 数学建模"
