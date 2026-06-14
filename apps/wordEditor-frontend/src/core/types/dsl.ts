@@ -1,4 +1,4 @@
-/** 与 docs/styles-dsl.md 对齐的 YAML DSL 结构 */
+﻿/** 涓?docs/styles-dsl.md 瀵归綈鐨?YAML DSL 缁撴瀯 */
 
 export type TextAlign = 'left' | 'center' | 'right' | 'both' | 'distribute';
 export type LineSpacing = 'single' | '1.5' | 'double' | number;
@@ -58,34 +58,34 @@ export interface HeadingRule {
   level: number;
 }
 
-/** 多级列表单级（对齐 scripts/ooxml_multilevel.py 的 spec.levels[i]） */
+/** 澶氱骇鍒楄〃鍗曠骇锛堝榻?services/api-python/pipeline/ooxml_multilevel.py 鐨?spec.levels[i]锛?*/
 export interface MultilevelLevel {
   /** ilvl: 0=H1 / 1=H2 / 2=H3 / 3=H4 */
   ilvl: number;
-  /** 绑定的 Heading styleId（与 Pandoc 输出一致："1"/"2"/"3"/"4"） */
+  /** 缁戝畾鐨?Heading styleId锛堜笌 Pandoc 杈撳嚭涓€鑷达細"1"/"2"/"3"/"4"锛?*/
   heading_style?: string;
-  /** OOXML numFmt：chineseCounting / decimal / decimalEnclosedCircle / upperRoman 等 */
+  /** OOXML numFmt锛歝hineseCounting / decimal / decimalEnclosedCircle / upperRoman 绛?*/
   num_fmt: string;
-  /** 编号显示模板，例如 "%1、" / "%1.%2" / "第%1章" */
+  /** 缂栧彿鏄剧ず妯℃澘锛屼緥濡?"%1銆? / "%1.%2" / "绗?1绔? */
   lvl_text: string;
-  /** 编号后的分隔：space / tab / nothing */
+  /** 缂栧彿鍚庣殑鍒嗛殧锛歴pace / tab / nothing */
   suff?: 'space' | 'tab' | 'nothing';
-  /** 起始号（默认 1） */
+  /** 璧峰鍙凤紙榛樿 1锛?*/
   start?: number;
-  /** 把上级中文/罗马数字也按 1,2,3 显示——多级 1.1 必备 */
+  /** 鎶婁笂绾т腑鏂?缃楅┈鏁板瓧涔熸寜 1,2,3 鏄剧ず鈥斺€斿绾?1.1 蹇呭 */
   is_lgl?: boolean;
-  /** 对齐：left / center / right */
+  /** 瀵归綈锛歭eft / center / right */
   align?: 'left' | 'center' | 'right';
 }
 
-/** 多级列表 DSL */
+/** 澶氱骇鍒楄〃 DSL */
 export interface MultilevelList {
-  /** 关联到 word/numbering.xml 中的 numId（默认 2） */
+  /** 鍏宠仈鍒?word/numbering.xml 涓殑 numId锛堥粯璁?2锛?*/
   num_id: number;
   levels: MultilevelLevel[];
 }
 
-/** 列表样式库的一条样式（list_style_library 元素 / use_list_styles 解析结果） */
+/** 鍒楄〃鏍峰紡搴撶殑涓€鏉℃牱寮忥紙list_style_library 鍏冪礌 / use_list_styles 瑙ｆ瀽缁撴灉锛?*/
 export interface ListStyleNumbering {
   num_fmt: string;
   lvl_text: string;
@@ -104,7 +104,7 @@ export interface ListStyleLibraryItem {
   list?: ListStyleNumbering;
 }
 
-/** 模板对库样式的启用项；可带 overrides 覆盖段落/字体 */
+/** 妯℃澘瀵瑰簱鏍峰紡鐨勫惎鐢ㄩ」锛涘彲甯?overrides 瑕嗙洊娈佃惤/瀛椾綋 */
 export interface UseListStyleItem {
   id: string;
   overrides?: {
@@ -122,8 +122,9 @@ export interface DslDocument {
   semantics?: Record<string, unknown>;
   headings?: HeadingRule[];
   multilevel_list?: MultilevelList;
-  /** 来自 _shared/list-style-library.yaml 的预设样式池 */
+  /** 鏉ヨ嚜 _shared/list-style-library.yaml 鐨勯璁炬牱寮忔睜 */
   list_style_library?: ListStyleLibraryItem[];
-  /** 本模板启用的列表样式（带可选覆盖） */
+  /** 鏈ā鏉垮惎鐢ㄧ殑鍒楄〃鏍峰紡锛堝甫鍙€夎鐩栵級 */
   use_list_styles?: UseListStyleItem[];
 }
+

@@ -10,7 +10,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 CONFIG_PATH = ROOT / "config" / "preview-cdn.json"
 
 _IMG_MD_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")

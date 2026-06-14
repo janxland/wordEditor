@@ -1,8 +1,23 @@
-﻿extends: "../_shared/hutb-base.yaml"
+﻿extends: "../_shared/list-style-library.yaml"
 template:
   id: "hutb-math-modeling"
   name: "湖南工商大学 · 数学建模"
+
+default_list_style: "DecimalList"
+
+use_list_styles:
+  - id: "DecimalList"
+  - id: "BulletList"
+  - id: "ParenDecimalList"
+  - id: "CircledList"
+  - id: "ChineseList"
 overrides:
+  - match: { kind: "body" }
+    word_wrap_break_latin: true
+  - match: { kind: "heading" }
+    word_wrap_break_latin: true
+    clear_indent: true
+    latin_font: "inherit"
   - match:
       id: "1"         # 标题 1 段落
     paragraph:
@@ -57,6 +72,48 @@ overrides:
       size_half_pt: 28
       bold: true
 custom_styles:
+  - id: "ZhaiYaoTitle"
+    name: "摘要标题"
+    based_on: "a"
+    paragraph:
+      align: "center"
+      line_spacing: "single"
+      indent_clear: true
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "宋体"
+      size_half_pt: 36
+      size_cs_half_pt: 36
+      bold: true
+  - id: "ZhaiYao"
+    name: "摘要"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: 1.5
+      first_line_chars: 2
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "宋体"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+  - id: "KeyWordsZh"
+    name: "关键词"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: 1.5
+      first_line_chars: 0
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "宋体"
+      size_half_pt: 24
+      size_cs_half_pt: 24
   - id: "Title"
     name: "Title"
     based_on: "a"
@@ -98,7 +155,9 @@ custom_styles:
       size_half_pt: 24
       size_cs_half_pt: 24
       color: "000000"
-fonts: {}
+fonts:
+  latin: "Times New Roman"
+  cjk: "宋体"
 multilevel_list:
   num_id: 2
   levels:
@@ -129,8 +188,7 @@ multilevel_list:
       suff: "space"
       start: 1
       is_lgl: true
-use_list_styles:
-  - id: "DecimalList"
+
 
 
 

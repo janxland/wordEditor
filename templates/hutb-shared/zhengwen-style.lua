@@ -42,6 +42,23 @@ local function _trim(s)
   return (s or ''):gsub('^%s+', ''):gsub('%s+$', '')
 end
 
+-- 剥离用户手写的「图N / 表N」前缀，避免与自动编号叠加（表注常见写法是独立段落，图注多在 alt 中）
+local CAP_LABEL = {
+  figure = '^图%s*%d+[%s．%.：:、　]*',
+  table  = '^表(?:格)?%s*%d+[%s．%.：:、　]*',
+}
+
+local function strip_caption_label(inlines, kind)
+  if #inlines == 0 then return inlines end
+  local pattern = CAP_LABEL[kind]
+  if not pattern then return inlines end
+  local plain = _trim(pandoc.utils.stringify(inlines))
+  local rest = _trim(plain:gsub(pattern, '', 1))
+  if rest == plain then return inlines end
+  if rest == '' then return {} end
+  return { pandoc.Str(rest) }
+end
+
 -- 段落首字符是中文章号（一/二/.../十/百/千），且紧跟「、」 → 视为章节标题
 -- 数字 "1.1 " "1 " "1. " 同样视为章节标题
 local function is_section_heading(text)
@@ -209,6 +226,7 @@ function Table(tbl)
     -- 没写 caption 时不强加表注
     return tbl
   end
+  cap_inlines = strip_caption_label(cap_inlines, 'table')
   table.insert(cap_inlines, 1, pandoc.Str(string.format('表 %d　', table_counter)))
   -- 清掉表自带 caption，避免在表下再出现一份
   tbl.caption = { long = {}, short = nil }
@@ -247,6 +265,7 @@ function Figure(fig)
       for _, inl in ipairs(img.caption) do cap_inlines[#cap_inlines + 1] = inl end
     end
   end
+  cap_inlines = strip_caption_label(cap_inlines, 'figure')
   table.insert(cap_inlines, 1, pandoc.Str(string.format('图 %d　', fig_counter)))
   return { img_div, wrap('图注', { pandoc.Para(cap_inlines) }) }
 end

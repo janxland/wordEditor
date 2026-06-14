@@ -140,7 +140,7 @@ function buildScriptArgs(
   provenance?: BuildProvenance,
 ): string[] {
   const scriptArgs = [
-    path.join(REPO_ROOT, 'scripts', 'build.py'),
+    path.join(REPO_ROOT, 'services', 'api-python', 'pipeline', 'build.py'),
     '-i',
     inputMd,
     '-o',
@@ -189,7 +189,7 @@ function runExtract(
   return new Promise((resolve) => {
     const child = spawnPython(
       [
-        path.join(REPO_ROOT, 'scripts', 'extract_docx_to_md.py'),
+        path.join(REPO_ROOT, 'services', 'api-python', 'pipeline', 'extract_docx_to_md.py'),
         '-i',
         inputDocx,
         '-o',
@@ -259,7 +259,7 @@ function runStylePreview(
   return new Promise((resolve) => {
     const child = spawnPython(
       [
-        path.join(REPO_ROOT, 'scripts', 'preview_styles.py'),
+        path.join(REPO_ROOT, 'services', 'api-python', 'pipeline', 'preview_styles.py'),
         '-t',
         templateId,
         '-o',
@@ -355,7 +355,7 @@ export function createDevApiMiddleware(): Connect.NextHandleFunction {
       void (async () => {
         try {
           const out = await runPythonJson([
-            path.join(REPO_ROOT, 'scripts', 'tool_paths.py'),
+            path.join(REPO_ROOT, 'services', 'api-python', 'pipeline', 'tool_paths.py'),
             '--json',
           ]);
           sendJson(res, 200, JSON.parse(out));
@@ -385,7 +385,7 @@ export function createDevApiMiddleware(): Connect.NextHandleFunction {
       void (async () => {
         try {
           const out = await runPythonJson([
-            path.join(REPO_ROOT, 'scripts', 'list_reference_styles.py'),
+            path.join(REPO_ROOT, 'services', 'api-python', 'pipeline', 'list_reference_styles.py'),
             '-t',
             templateId,
             '--json',

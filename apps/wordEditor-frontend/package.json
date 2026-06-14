@@ -4,6 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "vite",
+    "dev:python": "py -m uvicorn app:app --app-dir ../../services/api-python --reload --port 8787",
+    "dev:backend": "pnpm --dir ../../services/api-node dev",
+    "dev:node": "pnpm dev:backend",
+    "dev:full": "pnpm dev:backend & pnpm dev",
+    "dev:full:python": "pnpm dev:python & pnpm dev",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .ts,.tsx",

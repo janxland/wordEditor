@@ -1,99 +1,90 @@
-# 模板样式 DSL 规范
+﻿# 妯℃澘鏍峰紡 DSL 瑙勮寖
 
-> 适用于 `scripts/postprocess_styles.py`。每个模板目录下放一份 `styles.yaml`，由 `build.py` 在 `postprocess_document.py` 之后加载并改写 `word/styles.xml`。
-
-## 1. 单位与术语
-
-| 字段 | 单位 | 例子 | 说明 |
+> 閫傜敤浜?`services/api-python/pipeline/postprocess_styles.py`銆傛瘡涓ā鏉跨洰褰曚笅鏀句竴浠?`styles.yaml`锛岀敱 `build.py` 鍦?`postprocess_document.py` 涔嬪悗鍔犺浇骞舵敼鍐?`word/styles.xml`銆?
+## 1. 鍗曚綅涓庢湳璇?
+| 瀛楁 | 鍗曚綅 | 渚嬪瓙 | 璇存槑 |
 |---|---|---|---|
-| `size_half_pt` | 半磅 | 21 = 小四(10.5pt)、24 = 小三(12pt)、28 = 小二(14pt) | OOXML `w:sz w:val=` 的原生单位 |
-| `spacing_before_dxa` / `spacing_after_dxa` | dxa = 1/20 pt | 240 = 一行(12pt)、120 = 半行 | `w:spacing before/after` |
-| `line_spacing` | enum 或半磅 | `single` / `1.5` / `double` / `360` | 单倍=240，1.5=360，双倍=480 |
-| `*_indent_chars` | 中文字符 | 2 = 两字符 | 自动换算为 `firstLineChars=200, firstLine=420` |
+| `size_half_pt` | 鍗婄 | 21 = 灏忓洓(10.5pt)銆?4 = 灏忎笁(12pt)銆?8 = 灏忎簩(14pt) | OOXML `w:sz w:val=` 鐨勫師鐢熷崟浣?|
+| `spacing_before_dxa` / `spacing_after_dxa` | dxa = 1/20 pt | 240 = 涓€琛?12pt)銆?20 = 鍗婅 | `w:spacing before/after` |
+| `line_spacing` | enum 鎴栧崐纾?| `single` / `1.5` / `double` / `360` | 鍗曞€?240锛?.5=360锛屽弻鍊?480 |
+| `*_indent_chars` | 涓枃瀛楃 | 2 = 涓ゅ瓧绗?| 鑷姩鎹㈢畻涓?`firstLineChars=200, firstLine=420` |
 | `align` | enum | `left` / `center` / `right` / `both` / `distribute` | `w:jc w:val=` |
 
-## 2. 顶层结构
+## 2. 椤跺眰缁撴瀯
 
 ```yaml
 template:
-  id: <模板 id，与 config/templates.json 一致>
-  name: <显示名>
+  id: <妯℃澘 id锛屼笌 config/templates.json 涓€鑷?
+  name: <鏄剧ず鍚?
 
 fonts:
-  latin: Times New Roman    # 全局西文字体，可在样式里写 latin_font: inherit 引用
-  cjk: 宋体                 # 全局中文字体（null = 不动模板默认）
-
-overrides:                  # 覆盖已有样式（按 match 选择）
-  - match: { kind: heading }
+  latin: Times New Roman    # 鍏ㄥ眬瑗挎枃瀛椾綋锛屽彲鍦ㄦ牱寮忛噷鍐?latin_font: inherit 寮曠敤
+  cjk: 瀹嬩綋                 # 鍏ㄥ眬涓枃瀛椾綋锛坣ull = 涓嶅姩妯℃澘榛樿锛?
+overrides:                  # 瑕嗙洊宸叉湁鏍峰紡锛堟寜 match 閫夋嫨锛?  - match: { kind: heading }
     word_wrap_break_latin: true
     clear_indent: true
     latin_font: inherit
 
-custom_styles:              # 新增 / 重写自定义样式（按 name 匹配，缺失则建）
+custom_styles:              # 鏂板 / 閲嶅啓鑷畾涔夋牱寮忥紙鎸?name 鍖归厤锛岀己澶卞垯寤猴級
   - id: Cankaowenxian
-    name: 参考文献
-    based_on: a
+    name: 鍙傝€冩枃鐚?    based_on: a
     paragraph: { ... }
     run:       { ... }
 
-semantics: { ... }          # 仅作文档，与 Lua filter 对照
-headings:   [ ... ]         # 仅作文档，与 postprocess_document.py 标题规则对照
+semantics: { ... }          # 浠呬綔鏂囨。锛屼笌 Lua filter 瀵圭収
+headings:   [ ... ]         # 浠呬綔鏂囨。锛屼笌 postprocess_document.py 鏍囬瑙勫垯瀵圭収
 ```
 
-## 3. `match` 选择器
+## 3. `match` 閫夋嫨鍣?
+浠婚€夊叾涓€鎴栫粍鍚堬細
 
-任选其一或组合：
-
-| 字段 | 含义 |
+| 瀛楁 | 鍚箟 |
 |---|---|
-| `id` | 精确匹配 `w:styleId` |
-| `name` | 精确匹配 `<w:name w:val>` |
-| `name_regex` | 正则匹配 name（小写化后） |
-| `kind` | `heading`（Heading 1–5 / 标题 1–5）或 `body`（Normal / 文章的正文） |
+| `id` | 绮剧‘鍖归厤 `w:styleId` |
+| `name` | 绮剧‘鍖归厤 `<w:name w:val>` |
+| `name_regex` | 姝ｅ垯鍖归厤 name锛堝皬鍐欏寲鍚庯級 |
+| `kind` | `heading`锛圚eading 1鈥? / 鏍囬 1鈥?锛夋垨 `body`锛圢ormal / 鏂囩珷鐨勬鏂囷級 |
 
-## 4. `overrides` / `custom_styles` 共享字段
+## 4. `overrides` / `custom_styles` 鍏变韩瀛楁
 
 ### paragraph
 
-| 字段 | 类型 | 作用 | 生成 OOXML |
+| 瀛楁 | 绫诲瀷 | 浣滅敤 | 鐢熸垚 OOXML |
 |---|---|---|---|
-| `word_wrap_break_latin` | bool | 允许西文中间断行（避免两端对齐时大空格） | `<w:wordWrap w:val="0"/>` |
-| `clear_indent` / `indent_clear` | bool | 删除 `<w:ind>` 与 `<w:tabs>` | — |
-| `align` | enum | 对齐 | `<w:jc>` |
-| `line_spacing` | enum/num | 行距 | `<w:spacing line= lineRule=>` |
-| `spacing_before_dxa` / `spacing_after_dxa` | int | 段前/段后 | `<w:spacing before= after=>` |
-| `hanging_indent_chars` | int | 悬挂缩进（参考文献 `[1] ` 对齐） | `<w:ind leftChars hangingChars hanging firstLine>` |
-| `first_line_chars` | int | 首行缩进 | `<w:ind firstLineChars firstLine>` |
+| `word_wrap_break_latin` | bool | 鍏佽瑗挎枃涓棿鏂锛堥伩鍏嶄袱绔榻愭椂澶х┖鏍硷級 | `<w:wordWrap w:val="0"/>` |
+| `clear_indent` / `indent_clear` | bool | 鍒犻櫎 `<w:ind>` 涓?`<w:tabs>` | 鈥?|
+| `align` | enum | 瀵归綈 | `<w:jc>` |
+| `line_spacing` | enum/num | 琛岃窛 | `<w:spacing line= lineRule=>` |
+| `spacing_before_dxa` / `spacing_after_dxa` | int | 娈靛墠/娈靛悗 | `<w:spacing before= after=>` |
+| `hanging_indent_chars` | int | 鎮寕缂╄繘锛堝弬鑰冩枃鐚?`[1] ` 瀵归綈锛?| `<w:ind leftChars hangingChars hanging firstLine>` |
+| `first_line_chars` | int | 棣栬缂╄繘 | `<w:ind firstLineChars firstLine>` |
 
 ### run
 
-| 字段 | 类型 | 作用 |
+| 瀛楁 | 绫诲瀷 | 浣滅敤 |
 |---|---|---|
-| `latin_font` | str / `inherit` | 设 `rFonts ascii hAnsi cs` |
-| `cjk_font`   | str / `inherit` | 设 `rFonts eastAsia` |
-| `size_half_pt` | int | 西文字号 `w:sz` |
-| `size_cs_half_pt` | int | 复杂文种字号 `w:szCs`（未设时与 `size_half_pt` 相同） |
-| `first_line_dxa` | int | 可选，覆盖 `first_line_chars` 推算的 `w:firstLine`（twips） |
+| `latin_font` | str / `inherit` | 璁?`rFonts ascii hAnsi cs` |
+| `cjk_font`   | str / `inherit` | 璁?`rFonts eastAsia` |
+| `size_half_pt` | int | 瑗挎枃瀛楀彿 `w:sz` |
+| `size_cs_half_pt` | int | 澶嶆潅鏂囩瀛楀彿 `w:szCs`锛堟湭璁炬椂涓?`size_half_pt` 鐩稿悓锛?|
+| `first_line_dxa` | int | 鍙€夛紝瑕嗙洊 `first_line_chars` 鎺ㄧ畻鐨?`w:firstLine`锛坱wips锛?|
 
-## 5. `custom_styles` 行为细节
+## 5. `custom_styles` 琛屼负缁嗚妭
 
-执行顺序：
-1. 按 `name` 查找已有样式（Pandoc 遇到 `<div custom-style="X">` 会自动生成空壳样式）
-2. 命中：清空其 `pPr` 与 `rPr`，确保有 `<w:qFormat/>`，再按 DSL 重建
-3. 未命中且 `id` 也不存在：以指定 `id` + `customStyle=1` + `basedOn` 新建
+鎵ц椤哄簭锛?1. 鎸?`name` 鏌ユ壘宸叉湁鏍峰紡锛圥andoc 閬囧埌 `<div custom-style="X">` 浼氳嚜鍔ㄧ敓鎴愮┖澹虫牱寮忥級
+2. 鍛戒腑锛氭竻绌哄叾 `pPr` 涓?`rPr`锛岀‘淇濇湁 `<w:qFormat/>`锛屽啀鎸?DSL 閲嶅缓
+3. 鏈懡涓笖 `id` 涔熶笉瀛樺湪锛氫互鎸囧畾 `id` + `customStyle=1` + `basedOn` 鏂板缓
 
-## 6. `semantics` / `headings`（说明性）
+## 6. `semantics` / `headings`锛堣鏄庢€э級
 
-这两节当前**仅作文档**用途——真正生效的是 `zhengwen-style.lua`（语义映射）和 `postprocess_document.py`（标题识别）。
+杩欎袱鑺傚綋鍓?*浠呬綔鏂囨。**鐢ㄩ€斺€斺€旂湡姝ｇ敓鏁堢殑鏄?`zhengwen-style.lua`锛堣涔夋槧灏勶級鍜?`postprocess_document.py`锛堟爣棰樿瘑鍒級銆?
+## 7. 绀轰緥
 
-## 7. 示例
-
-完整示例见 [templates/_shared/hutb-base.yaml](../templates/_shared/hutb-base.yaml) 与 [templates/hutb-guanke/styles.yaml](../templates/hutb-guanke/styles.yaml)。
-
-## 8. 调用
+瀹屾暣绀轰緥瑙?[templates/_shared/hutb-base.yaml](../templates/_shared/hutb-base.yaml) 涓?[templates/hutb-guanke/styles.yaml](../templates/hutb-guanke/styles.yaml)銆?
+## 8. 璋冪敤
 
 ```powershell
-py scripts/postprocess_styles.py output.docx --styles templates/<id>/styles.yaml
+py services/api-python/pipeline/postprocess_styles.py output.docx --styles templates/<id>/styles.yaml
 ```
 
-由 `build.py` 自动调用：按 `config/templates.json` 中的 `styles_yaml` 注入 OOXML 样式。
+鐢?`build.py` 鑷姩璋冪敤锛氭寜 `config/templates.json` 涓殑 `styles_yaml` 娉ㄥ叆 OOXML 鏍峰紡銆?

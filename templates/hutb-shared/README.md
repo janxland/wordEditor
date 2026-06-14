@@ -16,19 +16,19 @@
 
 ```powershell
 # 管科：一、 → 1.1 → 1.1.1（默认）
-python scripts/build.py -i input/你的文稿.md -t hutb-guanke
+python services/api-python/pipeline/build.py -i input/你的文稿.md -t hutb-guanke
 
 # 工科：1 → 1.1 → 1.1.1
-python scripts/build.py -i input/你的文稿.md -t hutb-gongke
+python services/api-python/pipeline/build.py -i input/你的文稿.md -t hutb-gongke
 ```
 
 ## 样式调整
 
 - **前端工作台**：编辑 `styles.yaml`，点 **在线预览**（Pandoc + OOXML 标题/引用 + 样式注入，无需 Word）。
-- **命令行预览**：`python scripts/preview_styles.py -t hutb-guanke -o output/preview.docx`
+- **命令行预览**：`python services/api-python/pipeline/preview_styles.py -t hutb-guanke -o output/preview.docx`
 - 样例稿：`preview-styles.md`（摘要/关键词/Abstract/公式/双图 CDN/参考文献≥6 条）。
 - 预览图 CDN：默认 `config/preview-cdn.json`（jsDelivr）；内网可设 `WORDEDITOR_PREVIEW_CDN=https://你的CDN根路径`。
-- **命令行全文导出**：改 `styles.yaml` 后 `python scripts/build.py`。
+- **命令行全文导出**：改 `styles.yaml` 后 `python services/api-python/pipeline/build.py`。
 
 ## reference.docx 维护
 
@@ -38,3 +38,4 @@ python scripts/build.py -i input/你的文稿.md -t hutb-gongke
 ## Lua 维护说明
 
 `markdown-to-docx.lua` 与 `lua/` 三文件逻辑参考 [Achuan-2/pandoc_docx_template](https://github.com/Achuan-2/pandoc_docx_template)，在本目录独立拷贝维护，**不依赖** 仓库 `vendor/`。
+

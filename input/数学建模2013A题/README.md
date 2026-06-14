@@ -1,31 +1,32 @@
-# 数学建模 2013 A 题示例
+﻿# 鏁板寤烘ā 2013 A 棰樼ず渚?
 
-来源：学生提交的 docx《交通事故影响下的城市道路通行能力与排队长度预测研究》。
-通过 `scripts/extract_docx_to_md.py` 提取得到本目录的 Markdown + 图片。
+鏉ユ簮锛氬鐢熸彁浜ょ殑 docx銆婁氦閫氫簨鏁呭奖鍝嶄笅鐨勫煄甯傞亾璺€氳鑳藉姏涓庢帓闃熼暱搴﹂娴嬬爺绌躲€嬨€?
+閫氳繃 `services/api-python/pipeline/extract_docx_to_md.py` 鎻愬彇寰楀埌鏈洰褰曠殑 Markdown + 鍥剧墖銆?
 
-## 重新生成
+## 閲嶆柊鐢熸垚
 
 ```powershell
-# 1. 从 docx 提取 → 当前目录
-py scripts/extract_docx_to_md.py `
-  -i <源 docx 路径> `
-  -o "input/数学建模2013A题/车道被占用对城市道路通行能力的影响.md" `
-  --image-dir "input/数学建模2013A题/images" `
+# 1. 浠?docx 鎻愬彇 鈫?褰撳墠鐩綍
+py services/api-python/pipeline/extract_docx_to_md.py `
+  -i <婧?docx 璺緞> `
+  -o "input/鏁板寤烘ā2013A棰?杞﹂亾琚崰鐢ㄥ鍩庡競閬撹矾閫氳鑳藉姏鐨勫奖鍝?md" `
+  --image-dir "input/鏁板寤烘ā2013A棰?images" `
   --image-rel "images"
 
-# 2. 修复 OMML → 内联数学（启发式：补 \frac / \alpha 等命令的反斜杠；
-#    含中文/编号 `#` 的行内"伪公式"降级为反引号代码块）
-py scripts/tools/_repair_math_inline.py "input/数学建模2013A题/车道被占用对城市道路通行能力的影响.md"
+# 2. 淇 OMML 鈫?鍐呰仈鏁板锛堝惎鍙戝紡锛氳ˉ \frac / \alpha 绛夊懡浠ょ殑鍙嶆枩鏉狅紱
+#    鍚腑鏂?缂栧彿 `#` 鐨勮鍐?浼叕寮?闄嶇骇涓哄弽寮曞彿浠ｇ爜鍧楋級
+py services/api-python/pipeline/tools/_repair_math_inline.py "input/鏁板寤烘ā2013A棰?杞﹂亾琚崰鐢ㄥ鍩庡競閬撹矾閫氳鑳藉姏鐨勫奖鍝?md"
 
-# 3. 套用 hutb-math-modeling 模板导出 docx
-py scripts/build.py -t hutb-math-modeling `
-  -i "input/数学建模2013A题/车道被占用对城市道路通行能力的影响.md" `
-  -o "output/数学建模2013A题.docx"
+# 3. 濂楃敤 hutb-math-modeling 妯℃澘瀵煎嚭 docx
+py services/api-python/pipeline/build.py -t hutb-math-modeling `
+  -i "input/鏁板寤烘ā2013A棰?杞﹂亾琚崰鐢ㄥ鍩庡競閬撹矾閫氳鑳藉姏鐨勫奖鍝?md" `
+  -o "output/鏁板寤烘ā2013A棰?docx"
 ```
 
-## 已知人工修补点
+## 宸茬煡浜哄伐淇ˉ鐐?
 
-- YAML title / 顶级 `#` 标题：原 docx 封面页（含课程信息表）被剥除，统一以 `# 车道被占用对城市道路通行能力的影响` 起篇。
-- 「四、 数据获取与处理」：原 docx 该段为正文样式而非 Heading，已手动改为 `# 数据获取与处理`。
-- OMML 公式仅能取到 `m:t` 序列文本，结构丢失（如 `\frac{n_k}{n}` → `fracnkn`）。脚本对常见命令做了反斜杠补全；含 CJK / `#（编号）` 的伪公式整体降级为反引号代码，避免 Pandoc TeX 解析失败。
-- 部分图片在原 docx 中重复引用同一 rId，导出后会看到 `image05` 之后的图序与正文 "图 N" 标号不连续，需要时按图注顺序在 Markdown 中删除多余 `![]()`。
+- YAML title / 椤剁骇 `#` 鏍囬锛氬師 docx 灏侀潰椤碉紙鍚绋嬩俊鎭〃锛夎鍓ラ櫎锛岀粺涓€浠?`# 杞﹂亾琚崰鐢ㄥ鍩庡競閬撹矾閫氳鑳藉姏鐨勫奖鍝峘 璧风瘒銆?
+- 銆屽洓銆?鏁版嵁鑾峰彇涓庡鐞嗐€嶏細鍘?docx 璇ユ涓烘鏂囨牱寮忚€岄潪 Heading锛屽凡鎵嬪姩鏀逛负 `# 鏁版嵁鑾峰彇涓庡鐞哷銆?
+- OMML 鍏紡浠呰兘鍙栧埌 `m:t` 搴忓垪鏂囨湰锛岀粨鏋勪涪澶憋紙濡?`\frac{n_k}{n}` 鈫?`fracnkn`锛夈€傝剼鏈甯歌鍛戒护鍋氫簡鍙嶆枩鏉犺ˉ鍏紱鍚?CJK / `#锛堢紪鍙凤級` 鐨勪吉鍏紡鏁翠綋闄嶇骇涓哄弽寮曞彿浠ｇ爜锛岄伩鍏?Pandoc TeX 瑙ｆ瀽澶辫触銆?
+- 閮ㄥ垎鍥剧墖鍦ㄥ師 docx 涓噸澶嶅紩鐢ㄥ悓涓€ rId锛屽鍑哄悗浼氱湅鍒?`image05` 涔嬪悗鐨勫浘搴忎笌姝ｆ枃 "鍥?N" 鏍囧彿涓嶈繛缁紝闇€瑕佹椂鎸夊浘娉ㄩ『搴忓湪 Markdown 涓垹闄ゅ浣?`![]()`銆?
+

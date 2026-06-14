@@ -5,12 +5,16 @@ React 可视化管理台：Markdown 导出 Word、编辑模板 DSL / Lua。
 ## 启动
 
 ```powershell
+cd services/api-node
+pnpm install
+pnpm dev
+
 cd apps/wordEditor-frontend
 pnpm install
 pnpm dev
 ```
 
-依赖：本机 **Python**、**Pandoc**（后处理为 OOXML，无需 Word）。
+依赖：本机 **Pandoc**（纯 Node 后端）；无需 Python、无需 Word。
 
 ## 页面
 
@@ -21,6 +25,8 @@ pnpm dev
 | `/docs` | 规范文档只读 |
 
 ## API（开发态 `/api`）
+
+前端开发服务器通过 Vite Proxy 将 `/api` 转发到 `http://localhost:8787`（`services/api-node`）。
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
