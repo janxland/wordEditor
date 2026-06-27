@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   Button,
   Card,
   Col,
+  Collapse,
   InputNumber,
   Input,
   Row,
@@ -20,26 +21,85 @@ import {
   RetweetOutlined,
   ArrowDownOutlined,
   ArrowUpOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import type {
   DslDocument,
   MultilevelLevel,
   MultilevelList,
+  ParagraphProps,
+  RunProps,
 } from '@/core/types';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
-/* ───────────── 默认值（与 templates/_shared/hutb-base.yaml 一致） ───────────── */
+/* ───────────── 默认值（与 hutb-gongke / hutb-guanke 的 multilevel_list 规范一致）
+ *  工科/管科通用默认值：
+ *    H1 = 四号黑体 bold，单倍行距，居左
+ *    H2/H3/H4 = 小四(24)宋体 bold，单倍行距，居左，首行缩进2字符
+───────────── */
 
 const HUTB_DEFAULT: MultilevelList = {
   num_id: 2,
   levels: [
-    { ilvl: 0, heading_style: '1', num_fmt: 'chineseCounting', lvl_text: '%1、', suff: 'nothing', start: 1 },
-    { ilvl: 1, heading_style: '2', num_fmt: 'decimal', lvl_text: '%1.%2', suff: 'space', start: 1, is_lgl: true },
-    { ilvl: 2, heading_style: '3', num_fmt: 'decimal', lvl_text: '%1.%2.%3', suff: 'space', start: 1, is_lgl: true },
-    { ilvl: 3, heading_style: '4', num_fmt: 'decimal', lvl_text: '%1.%2.%3.%4', suff: 'space', start: 1, is_lgl: true },
+    {
+      ilvl: 0, heading_style: '1', num_fmt: 'chineseCounting', lvl_text: '%1、', suff: 'nothing', start: 1,
+      run: { cjk_font: '黑体', size_half_pt: 28, size_cs_half_pt: 28, bold: true },
+      paragraph: { align: 'left', line_spacing: 'single', first_line_chars: 0, spacing_before_dxa: 0, spacing_after_dxa: 0 },
+    },
+    {
+      ilvl: 1, heading_style: '2', num_fmt: 'chineseCounting', lvl_text: '（%2）', suff: 'nothing', start: 1,
+      run: { cjk_font: '宋体', size_half_pt: 24, size_cs_half_pt: 24, bold: true },
+      paragraph: { align: 'left', line_spacing: 'single', first_line_chars: 2, spacing_before_dxa: 0, spacing_after_dxa: 0 },
+    },
+    {
+      ilvl: 2, heading_style: '3', num_fmt: 'decimalEnclosedCircle', lvl_text: '%3.', suff: 'space', start: 1,
+      run: { cjk_font: '宋体', size_half_pt: 24, size_cs_half_pt: 24, bold: true },
+      paragraph: { align: 'left', line_spacing: 'single', first_line_chars: 2, spacing_before_dxa: 0, spacing_after_dxa: 0 },
+    },
+    {
+      ilvl: 3, heading_style: '4', num_fmt: 'decimal', lvl_text: '%3.%4', suff: 'space', start: 1,
+      run: { cjk_font: '宋体', size_half_pt: 24, size_cs_half_pt: 24, bold: true },
+      paragraph: { align: 'left', line_spacing: 'single', first_line_chars: 2, spacing_before_dxa: 0, spacing_after_dxa: 0 },
+    },
   ],
 };
+
+/* ───────────── 常用中文字体选项 ───────────── */
+
+const CJK_FONT_OPTIONS = [
+  { label: '宋体', value: '宋体' },
+  { label: '黑体', value: '黑体' },
+  { label: '仿宋', value: '仿宋' },
+  { label: '楷体', value: '楷体' },
+  { label: '微软雅黑', value: '微软雅黑' },
+];
+
+/* ───────────── 常用西文字体选项 ───────────── */
+
+const LATIN_FONT_OPTIONS = [
+  { label: 'Times New Roman', value: 'Times New Roman' },
+  { label: 'Arial', value: 'Arial' },
+  { label: 'Calibri', value: 'Calibri' },
+  { label: '等宽 (Courier New)', value: 'Courier New' },
+];
+
+/* ───────────── 常用字号选项（半磅单位） ───────────── */
+
+const SIZE_OPTIONS = [
+  { label: '一号 (52)', value: 52 },
+  { label: '小一 (48)', value: 48 },
+  { label: '二号 (32)', value: 32 },
+  { label: '小二 (28)', value: 28 },
+  { label: '三号 (30)', value: 30 },
+  { label: '小三 (24)', value: 24 },
+  { label: '四号 (28)', value: 28 },
+  { label: '小四 (21)', value: 21 },
+  { label: '五号 (21)', value: 21 },
+  { label: '小五 (18)', value: 18 },
+  { label: '六号 (16)', value: 16 },
+  { label: '自定义...', value: -1 },
+];
 
 /* ───────────── OOXML numFmt 选项（常用集） ───────────── */
 
@@ -68,6 +128,13 @@ const HEADING_STYLE_OPTIONS = [
   { label: 'Heading 3 (styleId="3")', value: '3' },
   { label: 'Heading 4 (styleId="4")', value: '4' },
   { label: 'Heading 5 (styleId="5")', value: '5' },
+];
+
+const LINE_SPACING_OPTIONS = [
+  { label: '单倍', value: 'single' },
+  { label: '1.5 倍', value: '1.5' },
+  { label: '双倍', value: 'double' },
+  { label: '自定义 pt...', value: 'custom' },
 ];
 
 /* ───────────── 预览：把 %1 %2 渲染成示例编号 ───────────── */
@@ -121,11 +188,133 @@ function previewText(levels: MultilevelLevel[], ilvl: number, counters: number[]
     const refIdx = Number(d) - 1;
     if (refIdx > ilvl) return '';
     const cnt = counters[refIdx] ?? 1;
-    if (refIdx < ilvl && lvl.is_lgl) return String(cnt); // isLgl 强制阿拉伯
+    if (refIdx < ilvl && lvl.is_lgl) return String(cnt);
     const refFmt = levels[refIdx]?.num_fmt ?? 'decimal';
     return fmtNumber(refFmt, cnt);
   });
 }
+
+/* ───────────── 单级样式设置面板 ───────────── */
+
+interface LevelStylePanelProps {
+  lvl: MultilevelLevel;
+  idx: number;
+  onChange: (patch: Partial<MultilevelLevel>) => void;
+}
+
+const LevelStylePanel: React.FC<LevelStylePanelProps> = ({ lvl, idx, onChange }) => {
+  const paragraph = lvl.paragraph ?? {};
+  const run = lvl.run ?? {};
+
+  const setParagraph = (patch: Partial<ParagraphProps>) => {
+    onChange({
+      paragraph: { ...paragraph, ...patch },
+    });
+  };
+
+  const setRun = (patch: Partial<RunProps>) => {
+    onChange({
+      run: { ...run, ...patch },
+    });
+  };
+
+  return (
+    <Space direction="vertical" style={{ width: '100%' }} size="middle">
+      {/* 字体设置 */}
+      <Row gutter={[12, 8]}>
+        <Col span={8}>
+          <Text type="secondary">中文字体</Text>
+          <Select
+            allowClear
+            placeholder="继承模板默认"
+            style={{ width: '100%' }}
+            value={run.cjk_font}
+            options={CJK_FONT_OPTIONS}
+            onChange={(v) => setRun({ cjk_font: v ?? undefined })}
+          />
+        </Col>
+        <Col span={8}>
+          <Text type="secondary">西文字体</Text>
+          <Select
+            allowClear
+            placeholder="继承模板默认"
+            style={{ width: '100%' }}
+            value={run.latin_font}
+            options={LATIN_FONT_OPTIONS}
+            onChange={(v) => setRun({ latin_font: v ?? undefined })}
+          />
+        </Col>
+        <Col span={8}>
+          <Text type="secondary">字号（半磅）</Text>
+          <Select
+            style={{ width: '100%' }}
+            value={run.size_half_pt}
+            options={SIZE_OPTIONS}
+            onChange={(v) => {
+              if (v === -1) return;
+              setRun({ size_half_pt: v ?? undefined });
+            }}
+          />
+        </Col>
+      </Row>
+      {run.size_half_pt && (
+        <Row gutter={[12, 8]}>
+          <Col span={8}>
+            <Text type="secondary">字号自定义（半磅）</Text>
+            <InputNumber
+              style={{ width: '100%' }}
+              min={8}
+              max={96}
+              value={run.size_half_pt}
+              addonAfter="半磅"
+              onChange={(v) => setRun({ size_half_pt: v ?? undefined })}
+            />
+          </Col>
+        </Row>
+      )}
+
+      <Row gutter={[12, 8]}>
+        <Col span={8}>
+          <Text type="secondary">行距</Text>
+          <Select
+            style={{ width: '100%' }}
+            value={typeof paragraph.line_spacing === 'number' ? 'custom' : paragraph.line_spacing ?? 'single'}
+            options={LINE_SPACING_OPTIONS}
+            onChange={(v) => {
+              if (v === 'custom') return;
+              setParagraph({ line_spacing: v as ParagraphProps['line_spacing'] });
+            }}
+          />
+        </Col>
+        {(paragraph.line_spacing as string) === 'custom' && (
+          <Col span={8}>
+            <Text type="secondary">行距固定值（pt）</Text>
+            <InputNumber
+              style={{ width: '100%' }}
+              min={6}
+              max={100}
+              addonAfter="pt"
+              placeholder="如 22"
+              onChange={(v) => setParagraph({ line_spacing: v ? (v + 'pt' as unknown as ParagraphProps['line_spacing']) : undefined })}
+            />
+          </Col>
+        )}
+        <Col span={8}>
+          <Text type="secondary">首行缩进（字符）</Text>
+          <InputNumber
+            style={{ width: '100%' }}
+            min={0}
+            max={10}
+            value={paragraph.first_line_chars}
+            placeholder="0"
+            addonAfter="字符"
+            onChange={(v) => setParagraph({ first_line_chars: v ?? undefined })}
+          />
+        </Col>
+      </Row>
+    </Space>
+  );
+};
 
 /* ───────────── 主组件 ───────────── */
 
@@ -182,7 +371,6 @@ export const MultilevelListEditor: React.FC<Props> = ({ doc, onPatch }) => {
     if (j < 0 || j >= ml.levels.length) return;
     const arr = [...ml.levels];
     [arr[idx], arr[j]] = [arr[j], arr[idx]];
-    // ilvl 跟随顺序重排
     setMl({ ...ml, levels: arr.map((l, i) => ({ ...l, ilvl: i })) });
   };
 
@@ -207,7 +395,6 @@ export const MultilevelListEditor: React.FC<Props> = ({ doc, onPatch }) => {
     );
   }
 
-  // 预览：模拟 H1 #2 的 H2 #1 → 计数器 [2, 1, 1, 1]
   const previewCounters = [2, 1, 1, 1];
 
   return (
@@ -281,68 +468,95 @@ export const MultilevelListEditor: React.FC<Props> = ({ doc, onPatch }) => {
                 </Space>
               }
             >
-              <Row gutter={[12, 12]}>
-                <Col span={8}>
-                  <Text type="secondary">绑定标题样式</Text>
-                  <Select
-                    style={{ width: '100%' }}
-                    value={lvl.heading_style}
-                    options={HEADING_STYLE_OPTIONS}
-                    onChange={(v) => updateLevel(idx, { heading_style: v })}
-                  />
-                </Col>
-                <Col span={8}>
-                  <Text type="secondary">编号格式 (numFmt)</Text>
-                  <Select
-                    style={{ width: '100%' }}
-                    value={lvl.num_fmt}
-                    options={NUM_FMT_OPTIONS}
-                    onChange={(v) => updateLevel(idx, { num_fmt: v })}
-                  />
-                </Col>
-                <Col span={8}>
-                  <Text type="secondary">编号显示模板 (lvlText)</Text>
-                  <Input
-                    value={lvl.lvl_text}
-                    placeholder="例如 %1、 或 %1.%2"
-                    onChange={(e) => updateLevel(idx, { lvl_text: e.target.value })}
-                  />
-                </Col>
-                <Col span={6}>
-                  <Text type="secondary">编号后分隔 (suff)</Text>
-                  <Select
-                    style={{ width: '100%' }}
-                    value={lvl.suff ?? 'space'}
-                    options={SUFF_OPTIONS}
-                    onChange={(v) => updateLevel(idx, { suff: v as MultilevelLevel['suff'] })}
-                  />
-                </Col>
-                <Col span={6}>
-                  <Text type="secondary">起始号 (start)</Text>
-                  <InputNumber
-                    style={{ width: '100%' }}
-                    min={0}
-                    value={lvl.start ?? 1}
-                    onChange={(v) => updateLevel(idx, { start: Number(v ?? 1) })}
-                  />
-                </Col>
-                <Col span={12}>
-                  <Text type="secondary">
-                    正规形式编号{' '}
-                    <Tooltip title="对应 Word「定义新多级列表」中的「正规形式编号」复选框（OOXML 的 isLgl）。勾选后，本级编号里出现的所有上级编号一律按阿拉伯数字显示，例如 H1 用「一、」时，H2 才能正确呈现「1.1」而不是「一.1」。一般 H1 关闭、H2 起开启。">
-                      [?]
-                    </Tooltip>
-                  </Text>
-                  <div>
-                    <Switch
-                      checked={!!lvl.is_lgl}
-                      onChange={(v) => updateLevel(idx, { is_lgl: v })}
-                      checkedChildren="开"
-                      unCheckedChildren="关"
+              <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                {/* 编号配置区 */}
+                <Row gutter={[12, 12]}>
+                  <Col span={8}>
+                    <Text type="secondary">绑定标题样式</Text>
+                    <Select
+                      style={{ width: '100%' }}
+                      value={lvl.heading_style}
+                      options={HEADING_STYLE_OPTIONS}
+                      onChange={(v) => updateLevel(idx, { heading_style: v })}
                     />
-                  </div>
-                </Col>
-              </Row>
+                  </Col>
+                  <Col span={8}>
+                    <Text type="secondary">编号格式 (numFmt)</Text>
+                    <Select
+                      style={{ width: '100%' }}
+                      value={lvl.num_fmt}
+                      options={NUM_FMT_OPTIONS}
+                      onChange={(v) => updateLevel(idx, { num_fmt: v })}
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <Text type="secondary">编号显示模板 (lvlText)</Text>
+                    <Input
+                      value={lvl.lvl_text}
+                      placeholder="例如 %1、 或 %1.%2"
+                      onChange={(e) => updateLevel(idx, { lvl_text: e.target.value })}
+                    />
+                  </Col>
+                  <Col span={6}>
+                    <Text type="secondary">编号后分隔 (suff)</Text>
+                    <Select
+                      style={{ width: '100%' }}
+                      value={lvl.suff ?? 'space'}
+                      options={SUFF_OPTIONS}
+                      onChange={(v) => updateLevel(idx, { suff: v as MultilevelLevel['suff'] })}
+                    />
+                  </Col>
+                  <Col span={6}>
+                    <Text type="secondary">起始号 (start)</Text>
+                    <InputNumber
+                      style={{ width: '100%' }}
+                      min={0}
+                      value={lvl.start ?? 1}
+                      onChange={(v) => updateLevel(idx, { start: Number(v ?? 1) })}
+                    />
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary">
+                      正规形式编号{' '}
+                      <Tooltip title="对应 Word「定义新多级列表」中的「正规形式编号」复选框（OOXML 的 isLgl）。勾选后，本级编号里出现的所有上级编号一律按阿拉伯数字显示，例如 H1 用「一、」时，H2 才能正确呈现「1.1」而不是「一.1」。一般 H1 关闭、H2 起开启。">
+                        [?]
+                      </Tooltip>
+                    </Text>
+                    <div>
+                      <Switch
+                        checked={!!lvl.is_lgl}
+                        onChange={(v) => updateLevel(idx, { is_lgl: v })}
+                        checkedChildren="开"
+                        unCheckedChildren="关"
+                      />
+                    </div>
+                  </Col>
+                </Row>
+
+                {/* 每级独立样式：字体/字号/首行缩进/行距 */}
+                <Collapse
+                  ghost
+                  items={[{
+                    key: 'style',
+                    label: (
+                      <Space>
+                        <SettingOutlined />
+                        <Text type="secondary">该级独立样式设置</Text>
+                        {(lvl.paragraph || lvl.run) && (
+                          <Tag color="green" style={{ marginLeft: 8 }}>已配置</Tag>
+                        )}
+                      </Space>
+                    ),
+                    children: (
+                      <LevelStylePanel
+                        lvl={lvl}
+                        idx={idx}
+                        onChange={(patch) => updateLevel(idx, patch)}
+                      />
+                    ),
+                  }]}
+                />
+              </Space>
             </Card>
           ))}
           <Button block type="dashed" icon={<PlusOutlined />} onClick={addLevel}>

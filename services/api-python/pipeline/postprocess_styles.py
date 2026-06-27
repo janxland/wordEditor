@@ -379,6 +379,154 @@ def apply_dsl(xml_bytes: bytes, dsl: dict[str, Any]) -> bytes:
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
+# ============================================================
+# 摘要 / Abstract / 关键词段落注入
+# ============================================================
+import re as _re
+
+# 正则：中文摘要/关键词匹配（支持裸文字和方括号变体）
+_CN_ABSTRACT_TITLE_RE = _re.compile(
+    r"^\s*\[?内容摘要\]?\s*$|^\s*\[?摘\s+要\]?\s*$"
+)
+_EN_ABSTRACT_TITLE_RE = _re.compile(
+    r"^\s*\[?Abstract\]?\s*$", _re.IGNORECASE
+)
+_CN_KEYWORDS_RE = _re.compile(r"^\s*\[?关键词\]?\s*[:：]?\s*$")
+_EN_KEYWORDS_RE = _re.compile(
+    r"^\s*\[?Keywords?\]?\s*[:：]?\s*$", _re.IGNORECASE
+)
+# 章节标题（用于终止摘要状态）
+_SECTION_RE = _re.compile(r"^\s*[\u4e00-\u9fff]{1,3}、\s|\A\s*\d+\.\d+\s|\A\s*\d+\s+(?!\d)")
+# 参考文献条目
+_REF_RE = _re.compile(r"\[[\dA-Za-z]+\]")
+
+
+def _paragraph_text(p: ET.Element) -> str:
+    """提取段落纯文本（忽略域代码）。"""
+    parts: list[str] = []
+    for r in p.iter(_q("t")):
+        if r.text:
+            parts.append(r.text)
+    return "".join(parts)
+
+
+def _set_paragraph_style_by_id(p: ET.Element, style_id: str) -> None:
+    """给段落设置段落样式（pPr/pStyle）。"""
+    ppr = p.find("w:pPr", NS)
+    if ppr is None:
+        ppr = ET.Element(_q("pPr"))
+        p.insert(0, ppr)
+    ps = ppr.find("w:pStyle", NS)
+    if ps is None:
+        ps = ET.SubElement(ppr, _q("pStyle"))
+    ps.set(_q("val"), style_id)
+
+
+def _is_english_only(text: str) -> bool:
+    """判断是否全英文（不含 CJK 字符）。"""
+    return bool(text) and not _re.search(r"[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]", text)
+
+
+def apply_abstract_styles(
+    doc_xml: bytes,
+    styles_xml: bytes,
+    *,
+    abstract_style_id: str = "ZhaiYao",
+    abstract_title_style_id: str = "ZhaiYaoTitle",
+    en_abstract_style_id: str = "Abstract",
+    en_abstract_title_style_id: str = "AbstractTitle",
+    keywords_style_id: str = "KeyWordsZh",
+    en_keywords_style_id: str = "Keywords",
+) -> tuple[bytes, int]:
+    """识别中文摘要 / Abstract / 关键词段落并注入对应样式。
+
+    匹配逻辑（与 Lua 过滤器对齐）：
+      - 裸文字 `[内容摘要]` / `内容摘要` → 摘要标题
+      - 裸文字 `[Abstract]` / `Abstract` → Abstract 标题
+      - 关键词/Keywords 行（可选冒号） → 对应关键词样式
+      - 摘要状态中、英文纯段落 → Abstract；中文段落 → 摘要
+      - 遇到章节标题（一、/ 1. / 1.1 等）终止摘要状态
+    """
+    root = ET.fromstring(doc_xml)
+    body = root.find("w:body", NS)
+    if body is None:
+        body = root
+
+    in_cn_abstract = False
+    in_en_abstract = False
+    changed = 0
+
+    for child in list(body):
+        if child.tag != _q("p"):
+            continue
+        text = _paragraph_text(child).strip()
+
+        # 参考文献条目 → 退出所有摘要状态
+        if _REF_RE.search(text):
+            in_cn_abstract = False
+            in_en_abstract = False
+            continue
+
+        # 章节标题 → 退出摘要状态
+        if _SECTION_RE.search(text):
+            in_cn_abstract = False
+            in_en_abstract = False
+            continue
+
+        # 空段落保留状态
+        if not text:
+            continue
+
+        # 中文摘要标题
+        if _CN_ABSTRACT_TITLE_RE.match(text):
+            in_cn_abstract = True
+            in_en_abstract = False
+            _set_paragraph_style_by_id(child, abstract_title_style_id)
+            changed += 1
+            continue
+
+        # 英文摘要标题
+        if _EN_ABSTRACT_TITLE_RE.match(text):
+            in_en_abstract = True
+            in_cn_abstract = False
+            _set_paragraph_style_by_id(child, en_abstract_title_style_id)
+            changed += 1
+            continue
+
+        # 中文关键词
+        if _CN_KEYWORDS_RE.match(text):
+            in_cn_abstract = False
+            in_en_abstract = False
+            _set_paragraph_style_by_id(child, keywords_style_id)
+            changed += 1
+            continue
+
+        # 英文关键词
+        if _EN_KEYWORDS_RE.match(text):
+            in_cn_abstract = False
+            in_en_abstract = False
+            _set_paragraph_style_by_id(child, en_keywords_style_id)
+            changed += 1
+            continue
+
+        # 中文摘要正文
+        if in_cn_abstract:
+            _set_paragraph_style_by_id(child, abstract_style_id)
+            changed += 1
+            continue
+
+        # 英文摘要正文（仅英文段落；含中文则退出状态避免误标后续正文）
+        if in_en_abstract:
+            if _is_english_only(text):
+                _set_paragraph_style_by_id(child, en_abstract_style_id)
+                changed += 1
+            else:
+                in_en_abstract = False
+            continue
+
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True), changed
+
+
 def patch_docx(path: Path, dsl: dict[str, Any]) -> None:
     multilevel = dsl.get("multilevel_list") or {}
     has_ml = bool(multilevel.get("levels"))
@@ -401,14 +549,25 @@ def patch_docx(path: Path, dsl: dict[str, Any]) -> None:
     # 第 1 步：DSL 样式覆盖（仅作用于 styles.xml）
     new_styles = apply_dsl(original_styles, dsl)
 
+    # 第 1.5 步：摘要 / Abstract / 关键词段落注入（doc_xml 初态）
+    doc_xml = original_doc
+    abstract_changed = 0
+    if dsl.get("custom_styles"):
+        doc_xml, abstract_changed = apply_abstract_styles(original_doc, new_styles)
+        if abstract_changed:
+            print(f"[postprocess_abstract] 注入摘要/关键词样式 {abstract_changed} 段")
+
     # 第 2 步：DSL 多级列表（同时改 numbering / styles / document）
     if has_ml:
-        new_numbering, new_styles, new_doc, patched = apply_multilevel(
-            original_numbering, new_styles, original_doc, multilevel
+        new_numbering, new_styles, doc_xml, patched = apply_multilevel(
+            original_numbering, new_styles, doc_xml, multilevel
         )
         print(f"[postprocess_multilevel] numId={multilevel.get('num_id', 2)} 段落补齐 {patched} 处")
     else:
-        new_numbering, new_doc = original_numbering, original_doc
+        new_numbering = original_numbering
+
+    # 统一 doc_xml → new_doc 传递给后续步骤
+    new_doc = doc_xml
 
     # 第 3 步：列表样式库（DecimalList / BulletList 等）
     if has_list_styles:

@@ -1,31 +1,29 @@
-# 湖南工商大学 · 管科：H1=一、 H2=（一） H3=1. H4=1.1（H1/H2 中文数字，H3+ 阿拉伯）
 extends: "../_shared/hutb-base.yaml"
 template:
   id: "hutb-guanke"
   name: "湖南工商大学 · 管科"
-
 default_list_style: "DecimalList"
-
 use_list_styles:
   - id: "DecimalList"
   - id: "BulletList"
   - id: "ParenDecimalList"
   - id: "CircledList"
   - id: "ChineseList"
-
 overrides:
-  - match: { kind: "body" }
+  - match:
+      kind: "body"
     word_wrap_break_latin: true
-  - match: { kind: "heading" }
+  - match:
+      kind: "heading"
     word_wrap_break_latin: true
     clear_indent: true
     latin_font: "inherit"
   - match:
-      id: "1"         # 标题 1 段落
+      id: "1"
     paragraph:
       spacing_before_dxa: 0
       spacing_after_dxa: 0
-      page_break_before: true   # 每个一级标题前自动分页（新章节起新页）
+      page_break_before: true
 custom_styles:
   - id: "ZhaiYaoTitle"
     name: "摘要标题"
@@ -43,6 +41,21 @@ custom_styles:
       size_half_pt: 36
       size_cs_half_pt: 36
       bold: true
+  - id: "AbstractTitle"
+    name: "Abstract Title"
+    based_on: "a"
+    paragraph:
+      align: "center"
+      line_spacing: "single"
+      indent_clear: true
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+      word_wrap_break_latin: true
+    run:
+      latin_font: "Times New Roman"
+      size_half_pt: 36
+      size_cs_half_pt: 36
+      bold: true
   - id: "ZhaiYao"
     name: "摘要"
     based_on: "a"
@@ -54,6 +67,19 @@ custom_styles:
     run:
       cjk_font: "宋体"
       latin_font: "宋体"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+  - id: "Abstract"
+    name: "Abstract"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: "22pt"
+      first_line_chars: 2
+      word_wrap_break_latin: true
+    run:
+      latin_font: "Times New Roman"
+      cjk_font: "Times New Roman"
       size_half_pt: 24
       size_cs_half_pt: 24
   - id: "KeyWordsZh"
@@ -69,6 +95,19 @@ custom_styles:
       latin_font: "宋体"
       size_half_pt: 24
       size_cs_half_pt: 24
+  - id: "Keywords"
+    name: "Keywords"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: "22pt"
+      first_line_chars: 0
+      word_wrap_break_latin: true
+    run:
+      latin_font: "Times New Roman"
+      cjk_font: "Times New Roman"
+      size_half_pt: 24
+      size_cs_half_pt: 24
 fonts:
   latin: "Times New Roman"
   cjk: "宋体"
@@ -76,27 +115,78 @@ fonts:
 multilevel_list:
   num_id: 2
   levels:
+    # 一级标题：四号黑体居左，单倍行距
     - ilvl: 0
       heading_style: "1"
       num_fmt: "chineseCounting"
       lvl_text: "%1、"
       suff: "nothing"
       start: 1
+      run:
+        cjk_font: "黑体"
+        size_half_pt: 28
+        size_cs_half_pt: 28
+        bold: true
+      paragraph:
+        align: "left"
+        line_spacing: "single"
+        first_line_chars: 0
+        spacing_before_dxa: 0
+        spacing_after_dxa: 0
+
+    # 二级标题：小四宋体首行缩进2字符，单倍行距
     - ilvl: 1
       heading_style: "2"
       num_fmt: "chineseCounting"
       lvl_text: "（%2）"
       suff: "nothing"
       start: 1
+      run:
+        cjk_font: "宋体"
+        size_half_pt: 24
+        size_cs_half_pt: 24
+        bold: true
+      paragraph:
+        align: "left"
+        line_spacing: "single"
+        first_line_chars: 2
+        spacing_before_dxa: 0
+        spacing_after_dxa: 0
+
+    # 三级标题：小四宋体首行缩进2字符，单倍行距
     - ilvl: 2
       heading_style: "3"
-      num_fmt: "decimal"
+      num_fmt: "decimalEnclosedCircle"
       lvl_text: "%3."
       suff: "space"
       start: 1
+      run:
+        cjk_font: "宋体"
+        size_half_pt: 24
+        size_cs_half_pt: 24
+        bold: true
+      paragraph:
+        align: "left"
+        line_spacing: "single"
+        first_line_chars: 2
+        spacing_before_dxa: 0
+        spacing_after_dxa: 0
+
+    # 四级标题：同三级
     - ilvl: 3
       heading_style: "4"
       num_fmt: "decimal"
       lvl_text: "%3.%4"
       suff: "space"
       start: 1
+      run:
+        cjk_font: "宋体"
+        size_half_pt: 24
+        size_cs_half_pt: 24
+        bold: true
+      paragraph:
+        align: "left"
+        line_spacing: "single"
+        first_line_chars: 2
+        spacing_before_dxa: 0
+        spacing_after_dxa: 0

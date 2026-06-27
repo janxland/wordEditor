@@ -4,17 +4,20 @@
 is_lgl, start, heading_style)。本模块负责三件事：
 
   1. 在 `word/numbering.xml` 中找到指定 numId 对应的 abstractNum，按 spec
-     重写各 lvl 的 numFmt / lvlText / suff / start / isLgl / pStyle。若 numId
-     不存在则在末尾新建一份 abstractNum + num。
+     重写各 lvl 的 numFmt / lvlText / suff / start / isLgl / pStyle / pPr / rPr。
+     若 numId 不存在则在末尾新建一份 abstractNum + num。
   2. 在 `word/styles.xml` 中给每个 spec.levels[i].heading_style 绑定
      numPr(numId, ilvl)，使该标题样式天然挂上多级编号。
   3. 在 `word/document.xml` 中扫描所有段落，对 pStyle 命中且自身缺少 numPr
      的段落补齐 numPr，确保渲染端一定看得到编号。
 
+每级支持独立样式（paragraph: 首行缩进/行距, run: 字体/字号）。
+
 不依赖 Word，只用 zipfile + xml.etree。
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 from xml.etree import ElementTree as ET
 
@@ -47,6 +50,18 @@ def _remove_child(parent: ET.Element, tag: str) -> None:
     el = parent.find(f"w:{tag}", NS)
     if el is not None:
         parent.remove(el)
+
+
+def _replace_child(parent: ET.Element, tag: str, attrs: dict[str, Any] | None = None) -> ET.Element:
+    """删除同名子元素并新建；attrs 中的值会被 str() 化后设为 w: 命名空间属性。"""
+    old = parent.find(f"w:{tag}", NS)
+    if old is not None:
+        parent.remove(old)
+    el = ET.SubElement(parent, _q(tag))
+    if attrs:
+        for k, v in attrs.items():
+            el.set(_q(k), str(v))
+    return el
 
 
 def _new_lvl(ilvl: int) -> ET.Element:
@@ -99,6 +114,118 @@ _DEFAULT_PPR_IND = {
 }
 
 
+# ─────────────── 行间距辅助 ───────────────
+def _line_spacing_attrs(value: Any) -> dict[str, str]:
+    if value in (None, "single"):
+        return {"line": "240", "lineRule": "auto"}
+    if value in (1.5, "1.5"):
+        return {"line": "360", "lineRule": "auto"}
+    if value in (2, "double", "2"):
+        return {"line": "480", "lineRule": "auto"}
+    if isinstance(value, str):
+        m = re.match(r"^\s*([0-9]+(?:\.[0-9]+)?)\s*(pt|磅)\s*$", value, re.IGNORECASE)
+        if m:
+            twips = int(round(float(m.group(1)) * 20))
+            return {"line": str(twips), "lineRule": "exact"}
+    if isinstance(value, (int, float)):
+        return {"line": str(int(value)), "lineRule": "auto"}
+    return {}
+
+
+# ─────────────── lvl 段落属性（首行缩进、行间距、段前段后） ───────────────
+def _ensure_ppr(lvl: ET.Element) -> ET.Element:
+    ppr = lvl.find("w:pPr", NS)
+    if ppr is None:
+        ppr = ET.Element(_q("pPr"))
+        lvl.insert(0, ppr)
+    return ppr
+
+
+def _apply_level_paragraph(lvl: ET.Element, p: dict[str, Any]) -> None:
+    """在 lvl 的 pPr 中写入首行缩进、行间距、段前段后。"""
+    ppr = _ensure_ppr(lvl)
+
+    # 行间距
+    sp_attrs: dict[str, str] = {}
+    if "line_spacing" in p:
+        sp_attrs.update(_line_spacing_attrs(p["line_spacing"]))
+    if "spacing_before_dxa" in p:
+        sp_attrs["before"] = str(int(p["spacing_before_dxa"]))
+    if "spacing_after_dxa" in p:
+        sp_attrs["after"] = str(int(p["spacing_after_dxa"]))
+    if sp_attrs:
+        _replace_child(ppr, "spacing", sp_attrs)
+
+    # 缩进（首行缩进 / 悬挂缩进）
+    ind_attrs: dict[str, str] = {}
+    if "hanging_indent_chars" in p:
+        chars = int(p["hanging_indent_chars"])
+        ind_attrs.update({
+            "leftChars": "0", "left": "0",
+            "hangingChars": str(chars * 100),
+            "hanging": str(chars * 210),
+            "firstLine": "0", "firstLineChars": "0",
+        })
+    if "first_line_chars" in p:
+        chars = int(p["first_line_chars"])
+        first_line = p.get("first_line_dxa")
+        if first_line is None:
+            first_line = chars * 100
+        ind_attrs.update({
+            "firstLineChars": str(chars * 100),
+            "firstLine": str(int(first_line)),
+        })
+    if ind_attrs:
+        _replace_child(ppr, "ind", ind_attrs)
+
+    # 对齐（覆盖 lvlJc）
+    if "align" in p:
+        _replace_child(ppr, "jc", {"val": str(p["align"])})
+
+
+# ─────────────── lvl 字符属性（字体、字号） ───────────────
+def _ensure_rpr(lvl: ET.Element) -> ET.Element:
+    rpr = lvl.find("w:rPr", NS)
+    if rpr is None:
+        rpr = ET.Element(_q("rPr"))
+        lvl.append(rpr)
+    return rpr
+
+
+def _apply_level_run(lvl: ET.Element, r: dict[str, Any]) -> None:
+    """在 lvl 的 rPr 中写入字体（rFonts）、字号（sz / szCs）。"""
+    rpr = _ensure_rpr(lvl)
+
+    # 字体
+    if "latin_font" in r or "cjk_font" in r:
+        rfonts = rpr.find("w:rFonts", NS)
+        if rfonts is None:
+            rfonts = ET.SubElement(rpr, _q("rFonts"))
+        if "latin_font" in r:
+            font = r["latin_font"]
+            if font and font != "inherit":
+                for attr in ("ascii", "hAnsi", "cs"):
+                    rfonts.set(_q(attr), str(font))
+        if "cjk_font" in r:
+            font = r["cjk_font"]
+            if font and font != "inherit":
+                rfonts.set(_q("eastAsia"), str(font))
+
+    # 字号
+    if "size_half_pt" in r or "size_cs_half_pt" in r:
+        sz = r.get("size_half_pt")
+        sz_cs = r.get("size_cs_half_pt", sz)
+        if sz is not None:
+            _replace_child(rpr, "sz", {"val": int(sz)})
+        if sz_cs is not None:
+            _replace_child(rpr, "szCs", {"val": int(sz_cs)})
+
+    # 加粗（可选）
+    if "bold" in r and r["bold"]:
+        if rpr.find("w:b", NS) is None:
+            ET.SubElement(rpr, _q("b"))
+
+
 def _apply_lvl(lvl: ET.Element, spec_lvl: dict[str, Any]) -> None:
     ilvl = int(spec_lvl["ilvl"])
     lvl.set(_q("ilvl"), str(ilvl))
@@ -144,6 +271,12 @@ def _apply_lvl(lvl: ET.Element, spec_lvl: dict[str, Any]) -> None:
         _remove_child(lvl, "lvlRestart")
     else:
         _set_child(lvl, "lvlRestart", {"val": str(int(restart))})
+
+    # ───── 每级独立样式（段落 + 字符） ─────
+    if "paragraph" in spec_lvl:
+        _apply_level_paragraph(lvl, spec_lvl["paragraph"])
+    if "run" in spec_lvl:
+        _apply_level_run(lvl, spec_lvl["run"])
 
 
 def _patch_abstract_num(ab: ET.Element, spec_levels: list[dict[str, Any]]) -> None:

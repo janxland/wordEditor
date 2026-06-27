@@ -147,6 +147,63 @@ local function is_english_para(p)
   return true
 end
 
+-- 判断段落是否为「中文摘要」标题（支持裸文字、Strong、[内容摘要] 等方括号变体）
+local function is_cn_abstract_title(p)
+  local txt = _trim(pandoc.utils.stringify(p))
+  if txt == '摘要' or txt == '内容摘要' then return true end
+  if txt == '[摘要]' or txt == '[内容摘要]' then return true end
+  local c = p.content
+  if c and #c == 1 and c[1].t == 'Strong' then
+    local s = pandoc.utils.stringify(c[1])
+    if s == '摘要' or s == '内容摘要' then return true end
+  end
+  return false
+end
+
+-- 判断段落是否为「英文摘要」标题（支持裸文字、Strong、[Abstract] 等变体）
+local function is_en_abstract_title(p)
+  local txt = _trim(pandoc.utils.stringify(p)):lower()
+  if txt == 'abstract' then return true end
+  if txt == '[abstract]' then return true end
+  local c = p.content
+  if c and #c == 1 and c[1].t == 'Strong' then
+    local s = pandoc.utils.stringify(c[1]):lower()
+    if s == 'abstract' then return true end
+  end
+  return false
+end
+
+-- 段落是否是关键词行：返回 'zh' / 'en' / nil
+-- 支持 [关键词] / [Keywords] 方括号变体
+local function keywords_kind(p)
+  local c = p.content
+  if c and #c > 0 then
+    local first = c[1]
+    if first.t == 'Strong' then
+      local s = pandoc.utils.stringify(first)
+      if s == '关键词' or s == '内容摘要' then return nil end  -- 排除误匹配
+      if s == 'Keywords' or s == 'Key words' or s == 'KeyWords' then return 'en' end
+    end
+  end
+  local plain = pandoc.utils.stringify(p)
+  if plain:match('^%[?内容摘要]?%s*$') then return nil end  -- 排除摘要标题
+  if plain:match('^%[关键词]?%s*[:：]') then return 'zh' end
+  if plain:match('^%[Kk]ey%s*[Ww]ords?]?%s*[:：]') then return 'en' end
+  return nil
+end
+
+-- 是否为章节标题（用于终止摘要状态）
+local function is_section_heading(text)
+  if not text or text == '' then return false end
+  if text:match('^%d+%.%d') then return true end
+  if text:match('^%d+[%.%s]%s*%S') then return true end
+  local first = text:sub(1, 3)
+  if CN_NUMS[first] and text:sub(1, 30):find('、') then
+    return true
+  end
+  return false
+end
+
 function Para(el)
   if in_special > 0 then return nil end
 
@@ -163,18 +220,19 @@ function Para(el)
 
   local txt = _trim(pandoc.utils.stringify(el))
 
-  -- 3) 「摘要」标题段
-  if txt == '摘要' then
+  -- 3) 「中文摘要」标题段（支持 [内容摘要] 方括号变体）
+  if is_cn_abstract_title(el) then
     in_zhaiyao, in_abstract = true, false
     return wrap('摘要标题', { el })
   end
-  -- 4) 「Abstract」标题段
-  if txt:lower() == 'abstract' then
+
+  -- 4) 「英文摘要」标题段（支持 [Abstract] 方括号变体）
+  if is_en_abstract_title(el) then
     in_abstract, in_zhaiyao = true, false
     return wrap('Abstract 标题', { el })
   end
 
-  -- 5) 关键词 / Keywords
+  -- 5) 关键词 / Keywords（支持 [关键词] 方括号变体）
   local kw = keywords_kind(el)
   if kw == 'zh' then
     in_zhaiyao = false
@@ -185,18 +243,18 @@ function Para(el)
     return wrap('Keywords', { el })
   end
 
-  -- 6) 章节标题候选 → 终止摘要状态；样式委托给 Python 后处理升为 Heading
+  -- 6) 章节标题候选 → 终止摘要状态
   if is_section_heading(txt) then
     in_zhaiyao, in_abstract = false, false
     return wrap('文章的正文', { el })
   end
 
-  -- 7) 摘要正文
+  -- 7) 中文摘要正文
   if in_zhaiyao then
     return wrap('摘要', { el })
   end
 
-  -- 8) Abstract 正文（要求英文段落）
+  -- 8) 英文摘要正文（英文段落才进入；中英混排段落退出状态避免后续正文被误标）
   if in_abstract then
     if is_english_para(el) then
       return wrap('Abstract', { el })

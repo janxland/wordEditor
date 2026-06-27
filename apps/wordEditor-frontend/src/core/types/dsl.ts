@@ -1,4 +1,4 @@
-﻿/** 涓?docs/styles-dsl.md 瀵归綈鐨?YAML DSL 缁撴瀯 */
+/** 对齐 docs/styles-dsl.md 的 YAML DSL 结构 */
 
 export type TextAlign = 'left' | 'center' | 'right' | 'both' | 'distribute';
 export type LineSpacing = 'single' | '1.5' | 'double' | number;
@@ -27,6 +27,8 @@ export interface RunProps {
   latin_font?: string | 'inherit';
   cjk_font?: string | 'inherit' | null;
   size_half_pt?: number;
+  size_cs_half_pt?: number;
+  bold?: boolean;
 }
 
 export interface StyleOverride {
@@ -58,34 +60,42 @@ export interface HeadingRule {
   level: number;
 }
 
-/** 澶氱骇鍒楄〃鍗曠骇锛堝榻?services/api-python/pipeline/ooxml_multilevel.py 鐨?spec.levels[i]锛?*/
+/** 多级列表单级（对应 services/api-python/pipeline/ooxml_multilevel.py 的 spec.levels[i]。
+ *  每级可独立设置编号格式 + 字体字号 + 首行缩进 + 行间距。 */
 export interface MultilevelLevel {
   /** ilvl: 0=H1 / 1=H2 / 2=H3 / 3=H4 */
   ilvl: number;
-  /** 缁戝畾鐨?Heading styleId锛堜笌 Pandoc 杈撳嚭涓€鑷达細"1"/"2"/"3"/"4"锛?*/
+  /** 绑定的 Heading styleId（与 Pandoc 输出一致："1"/"2"/"3"/"4"）*/
   heading_style?: string;
-  /** OOXML numFmt锛歝hineseCounting / decimal / decimalEnclosedCircle / upperRoman 绛?*/
+  /** OOXML numFmt：chineseCounting / decimal / decimalEnclosedCircle / upperRoman 等 */
   num_fmt: string;
-  /** 缂栧彿鏄剧ず妯℃澘锛屼緥濡?"%1銆? / "%1.%2" / "绗?1绔? */
+  /** 编号显示模板，例如 "%1、" / "%1.%2" / "第1节" */
   lvl_text: string;
-  /** 缂栧彿鍚庣殑鍒嗛殧锛歴pace / tab / nothing */
+  /** 编号后的分隔符：space / tab / nothing */
   suff?: 'space' | 'tab' | 'nothing';
-  /** 璧峰鍙凤紙榛樿 1锛?*/
+  /** 起始号（默认 1）*/
   start?: number;
-  /** 鎶婁笂绾т腑鏂?缃楅┈鏁板瓧涔熸寜 1,2,3 鏄剧ず鈥斺€斿绾?1.1 蹇呭 */
+  /** 把上级中文/罗马数字也按 1,2,3 显示——多级 1.1 必备 */
   is_lgl?: boolean;
-  /** 瀵归綈锛歭eft / center / right */
+  /** 对齐：left / center / right */
   align?: 'left' | 'center' | 'right';
+
+  /** ───── 以下为新增：每级独立样式 ───── */
+
+  /** 该级别的段落属性（首行缩进、行间距、段前段后等） */
+  paragraph?: ParagraphProps;
+  /** 该级别的字符属性（字体、字号等） */
+  run?: RunProps;
 }
 
-/** 澶氱骇鍒楄〃 DSL */
+/** 多级列表 DSL */
 export interface MultilevelList {
-  /** 鍏宠仈鍒?word/numbering.xml 涓殑 numId锛堥粯璁?2锛?*/
+  /** 关联到 word/numbering.xml 中的 numId（默认 2）*/
   num_id: number;
   levels: MultilevelLevel[];
 }
 
-/** 鍒楄〃鏍峰紡搴撶殑涓€鏉℃牱寮忥紙list_style_library 鍏冪礌 / use_list_styles 瑙ｆ瀽缁撴灉锛?*/
+/** 列表样式库的一条样式（list_style_library 元素 / use_list_styles 解析结果）*/
 export interface ListStyleNumbering {
   num_fmt: string;
   lvl_text: string;
@@ -104,7 +114,7 @@ export interface ListStyleLibraryItem {
   list?: ListStyleNumbering;
 }
 
-/** 妯℃澘瀵瑰簱鏍峰紡鐨勫惎鐢ㄩ」锛涘彲甯?overrides 瑕嗙洊娈佃惤/瀛椾綋 */
+/** 模板级列表样式的启用项；可额外 overrides 覆盖字体/段落 */
 export interface UseListStyleItem {
   id: string;
   overrides?: {
@@ -122,9 +132,8 @@ export interface DslDocument {
   semantics?: Record<string, unknown>;
   headings?: HeadingRule[];
   multilevel_list?: MultilevelList;
-  /** 鏉ヨ嚜 _shared/list-style-library.yaml 鐨勯璁炬牱寮忔睜 */
+  /** 来自 _shared/list-style-library.yaml 的预设样式池 */
   list_style_library?: ListStyleLibraryItem[];
-  /** 鏈ā鏉垮惎鐢ㄧ殑鍒楄〃鏍峰紡锛堝甫鍙€夎鐩栵級 */
+  /** 本模板启用的列表样式（带可选覆盖）*/
   use_list_styles?: UseListStyleItem[];
 }
-
