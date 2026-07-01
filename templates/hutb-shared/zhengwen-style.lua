@@ -3,17 +3,17 @@
 
   规则：
     - 段落 plain text == '摘要'                              → custom-style "摘要标题"，进入 in_zhaiyao
-    - 段落 plain text == 'Abstract'（不区分大小写）          → custom-style "Abstract 标题"，进入 in_abstract
-    - 段落以 '关键词' / 'Keywords' 起手                       → custom-style "关键词" / "Keywords"
+    - 段落 plain text == 'Abstract'（不区分大小写）          → 进入 in_abstract，使用"文章的正文"样式
+    - 段落以 '关键词' 起手                                  → custom-style "关键词"
+    - 段落以 'Keywords' 起手                                 → 使用"文章的正文"样式
     - in_zhaiyao 期间的中文段                                → custom-style "摘要"
-    - in_abstract 期间的英文段                               → custom-style "Abstract"
+    - in_abstract 期间的英文段                               → custom-style "文章的正文"
     - 包含 Link/Span[id^="Ref"] 的段落                       → custom-style "参考文献"
     - 仅含单个 Image 的段落                                  → custom-style "图"
     - Figure 中的 Caption                                    → custom-style "图注"，并加 "图 N　" 前缀
     - Table 的 caption                                       → custom-style "表注" 移到表前，并加 "表 N　" 前缀
     - 行首为 "N、" "1." "1.1 " 等数字章节标题                 → 终止 in_zhaiyao/in_abstract（由 Python 后处理升级为 Heading）
-    - 其它纯英文段                                           → custom-style "英文段落"
-    - 其它裸正文段落                                         → custom-style "文章的正文"
+    - 其它所有段落                                           → custom-style "文章的正文"
     - 跳过 Header / CodeBlock / List / BlockQuote
     - 不动 Div 已经显式标了 custom-style 的段落
 ]]
@@ -133,7 +133,7 @@ local function is_bib_para(p)
   return false
 end
 
--- 整段英文（不含任何 CJK 字符且非空）→ 英文段落 / Abstract 等
+-- 判断段落是否全为英文（不含任何 CJK 字符且非空），用于英文摘要状态检测
 local function is_english_para(p)
   local s = pandoc.utils.stringify(p)
   if not s:find('%S') then return false end
@@ -229,7 +229,7 @@ function Para(el)
   -- 4) 「英文摘要」标题段（支持 [Abstract] 方括号变体）
   if is_en_abstract_title(el) then
     in_abstract, in_zhaiyao = true, false
-    return wrap('Abstract 标题', { el })
+    return wrap('文章的正文', { el })
   end
 
   -- 5) 关键词 / Keywords（支持 [关键词] 方括号变体）
@@ -240,7 +240,7 @@ function Para(el)
   end
   if kw == 'en' then
     in_abstract = false
-    return wrap('Keywords', { el })
+    return wrap('文章的正文', { el })
   end
 
   -- 6) 章节标题候选 → 终止摘要状态
@@ -257,16 +257,12 @@ function Para(el)
   -- 8) 英文摘要正文（英文段落才进入；中英混排段落退出状态避免后续正文被误标）
   if in_abstract then
     if is_english_para(el) then
-      return wrap('Abstract', { el })
+      return wrap('文章的正文', { el })
     end
     in_abstract = false
   end
 
-  -- 9) 其它纯英文段
-  if is_english_para(el) then
-    return wrap('英文段落', { el })
-  end
-
+  -- 9) 其它所有段落统一使用"文章的正文"样式（不再区分中英文）
   return wrap('文章的正文', { el })
 end
 

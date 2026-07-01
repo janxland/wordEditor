@@ -117,8 +117,15 @@ export const ExportPage: React.FC = () => {
       e.target.value = '';
       return;
     }
-    // 选最顶层的 .md（路径最短）
-    const md = mdFiles.slice().sort((a, b) => relOf(a).length - relOf(b).length)[0];
+    // 只选根目录的 MD（路径中没有 / 或 \）
+    const rootMdFiles = mdFiles.filter((f) => !relOf(f).includes('/') && !relOf(f).includes('\\'));
+    if (rootMdFiles.length === 0) {
+      void message.error('请将 .md 文件放在所选文件夹的根目录下，不要放在子文件夹中');
+      e.target.value = '';
+      return;
+    }
+    // 多于一个时选第一个
+    const md = rootMdFiles[0];
     const mdRel = relOf(md);
 
     // 自动读取 MD 文本到左侧编辑器

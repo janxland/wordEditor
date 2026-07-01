@@ -433,18 +433,19 @@ def apply_abstract_styles(
     *,
     abstract_style_id: str = "ZhaiYao",
     abstract_title_style_id: str = "ZhaiYaoTitle",
-    en_abstract_style_id: str = "Abstract",
-    en_abstract_title_style_id: str = "AbstractTitle",
+    # 英文摘要/关键词使用"文章的正文"样式（ae），而非独立样式
+    en_abstract_style_id: str = "ae",
+    en_abstract_title_style_id: str = "ae",
     keywords_style_id: str = "KeyWordsZh",
-    en_keywords_style_id: str = "Keywords",
+    en_keywords_style_id: str = "ae",
 ) -> tuple[bytes, int]:
     """识别中文摘要 / Abstract / 关键词段落并注入对应样式。
 
     匹配逻辑（与 Lua 过滤器对齐）：
       - 裸文字 `[内容摘要]` / `内容摘要` → 摘要标题
-      - 裸文字 `[Abstract]` / `Abstract` → Abstract 标题
-      - 关键词/Keywords 行（可选冒号） → 对应关键词样式
-      - 摘要状态中、英文纯段落 → Abstract；中文段落 → 摘要
+      - 裸文字 `[Abstract]` / `Abstract` → 英文摘要标题（使用"文章的正文"样式）
+      - 关键词/Keywords 行（可选冒号） → 中文关键词使用独立样式；英文关键词使用"文章的正文"样式
+      - 摘要状态中、英文纯段落 → "文章的正文"样式；中文段落 → 摘要
       - 遇到章节标题（一、/ 1. / 1.1 等）终止摘要状态
     """
     root = ET.fromstring(doc_xml)

@@ -54,7 +54,13 @@ export async function loadWorkspaceFolder(
     throw new Error('文件夹中未找到 .md');
   }
 
-  const md = mdFiles.slice().sort((a, b) => a.relPath.length - b.relPath.length)[0];
+  // 只选根目录的 MD（路径中没有 /）
+  const rootMdFiles = mdFiles.filter(({ relPath }) => !relPath.includes('/'));
+  if (rootMdFiles.length === 0) {
+    throw new Error('请将 .md 文件放在所选文件夹的根目录下，不要放在子文件夹中');
+  }
+
+  const md = rootMdFiles[0];
   const mdText = await md.file.text();
 
   const entries: BuildUploadEntry[] = [];
