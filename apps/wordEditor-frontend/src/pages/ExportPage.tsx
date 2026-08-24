@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Button, Select, Space, Checkbox, Input, Tooltip, message } from 'antd';
 import {
   ThunderboltOutlined,
@@ -18,6 +18,11 @@ import { fetchToolsStatus, type ToolsStatus } from '@/kernel/pipeline';
 import { isFileSystemAccessSupported, loadWorkspaceFolder } from '@/services/localFolder';
 import { useAppStore } from '@/store/appStore';
 import { useExportStore } from '@/store/exportStore';
+
+type FolderFile = File & {
+  relativePath?: string;
+  webkitRelativePath?: string;
+};
 
 export const ExportPage: React.FC = () => {
   const config = useAppStore((s) => s.config);
@@ -84,7 +89,7 @@ export const ExportPage: React.FC = () => {
   const hasUpload = uploadEntries.length > 0 && !!uploadMdRelPath;
   const canExport = !disabled && pandocOk && (hasUpload || !!markdown.trim());
 
-  const folderRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement | null>(null);
   const fsAccessSupported = isFileSystemAccessSupported();
 
   const arrayBufferToBase64 = (buf: ArrayBuffer) => {
@@ -97,11 +102,8 @@ export const ExportPage: React.FC = () => {
     return btoa(bin);
   };
 
-  const relOf = (f: File) =>
-    ((f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name).replace(
-      /\\/g,
-      '/',
-    );
+  const relOf = (f: FolderFile) =>
+    (f.relativePath || f.webkitRelativePath || f.name).replace(/\\/g, '/');
 
   const handleFolder = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -114,7 +116,6 @@ export const ExportPage: React.FC = () => {
     const mdFiles = all.filter((f) => /\.md$/i.test(relOf(f)));
     if (mdFiles.length === 0) {
       void message.error('文件夹中未找到 .md');
-      e.target.value = '';
       return;
     }
     // 只选根目录的 MD（路径中没有 / 或 \）
@@ -172,6 +173,14 @@ export const ExportPage: React.FC = () => {
     folderRef.current?.click();
   };
 
+  const setFolderInputRef = useCallback((node: HTMLInputElement | null) => {
+    folderRef.current = node;
+    if (node) {
+      // Vendor attributes preserve directory upload as a fallback where the File System Access API is absent.
+      node.setAttribute('webkitdirectory', '');
+      node.setAttribute('directory', '');
+    }
+  }, []);
   const templateName = useMemo(
     () => config?.templates.find((t) => t.id === templateId)?.name,
     [config, templateId],
@@ -295,12 +304,8 @@ export const ExportPage: React.FC = () => {
               选择本地稿件 <span style={{ color: '#999', fontWeight: 'normal' }}>（可选）</span>
             </label>
             <input
-              ref={folderRef}
+              ref={setFolderInputRef}
               type="file"
-              // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-              // @ts-expect-error webkitdirectory 非标准但 Chromium/Edge/Firefox 均支持
-              webkitdirectory=""
-              directory=""
               multiple
               style={{ display: 'none' }}
               onChange={(e) => void handleFolder(e)}
