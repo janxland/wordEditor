@@ -15,6 +15,7 @@ import json
 import re
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -164,6 +165,20 @@ def main() -> int:
     parser.add_argument("--author", help="文档作者（写入 docProps，产出留痕）")
     parser.add_argument("--remark", help="文档备注（Word 属性「备注」/ dc:description）")
     parser.add_argument("--doc-title", dest="doc_title", help="文档标题属性（dc:title）")
+    parser.add_argument("--header-text", help="页眉文案；支持 {page}/{pages} 或 N/M 动态域")
+    parser.add_argument("--header-align", default="center", choices=("left", "center", "right"))
+    parser.add_argument(
+        "--header-vertical-align",
+        default="center",
+        choices=("top", "center", "bottom"),
+    )
+    parser.add_argument("--footer-text", help="页脚文案；支持 {page}/{pages} 或 N/M 动态域")
+    parser.add_argument("--footer-align", default="center", choices=("left", "center", "right"))
+    parser.add_argument(
+        "--footer-vertical-align",
+        default="center",
+        choices=("top", "center", "bottom"),
+    )
     args = parser.parse_args()
 
     cfg = load_config()
@@ -248,6 +263,25 @@ def main() -> int:
             if rc != 0:
                 print("三线表后处理失败。", file=sys.stderr)
                 return rc
+
+    if args.header_text is not None or args.footer_text is not None:
+        from apply_docx_header_footer import apply_header_footer  # noqa: WPS433
+
+        print("\n[后处理] 写入页眉页脚 …")
+        try:
+            count = apply_header_footer(
+                out,
+                header_text=args.header_text,
+                footer_text=args.footer_text,
+                header_align=args.header_align,
+                header_vertical_align=args.header_vertical_align,
+                footer_align=args.footer_align,
+                footer_vertical_align=args.footer_vertical_align,
+            )
+        except (OSError, ValueError, zipfile.BadZipFile) as exc:
+            print(f"页眉页脚后处理失败: {exc}", file=sys.stderr)
+            return 1
+        print(f"[apply_docx_header_footer] 完成，更新 {count} 个部件")
 
     pwd: str | None = None
     if args.password_env:

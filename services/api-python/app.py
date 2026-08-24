@@ -170,6 +170,17 @@ def _stream_build_events(request_data: dict[str, Any]) -> Generator[bytes, None,
             cmd.append("--no-postprocess")
         if options.get("password"):
             cmd.extend(["--password", str(options.get("password"))])
+        option_flags = (
+            ("headerText", "--header-text"),
+            ("headerAlign", "--header-align"),
+            ("headerVerticalAlign", "--header-vertical-align"),
+            ("footerText", "--footer-text"),
+            ("footerAlign", "--footer-align"),
+            ("footerVerticalAlign", "--footer-vertical-align"),
+        )
+        for key, flag in option_flags:
+            if key in options and options[key] is not None:
+                cmd.extend([flag, str(options[key])])
         if str(provenance.get("author") or "").strip():
             cmd.extend(["--author", str(provenance.get("author")).strip()])
         if str(provenance.get("remark") or "").strip():
