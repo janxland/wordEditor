@@ -9,6 +9,8 @@ import shutil
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 def _iter_pandoc_candidates() -> list[Path]:
     home = Path.home()
@@ -17,8 +19,23 @@ def _iter_pandoc_candidates() -> list[Path]:
         Path(r"C:\Program Files\Pandoc\pandoc.exe"),
         Path(r"C:\Program Files (x86)\Pandoc\pandoc.exe"),
         home / "AppData/Local/Pandoc/pandoc.exe",
+        home / "homebrew/bin/pandoc",
+        home / ".linuxbrew/bin/pandoc",
+        Path("/opt/homebrew/bin/pandoc"),
+        Path("/usr/local/bin/pandoc"),
+        Path("/usr/bin/pandoc"),
     ]
     out: list[Path] = [p for p in fixed if str(p) and str(p) != "."]
+
+    tools_dir = ROOT / ".tools"
+    if tools_dir.is_dir():
+        for pkg in sorted(tools_dir.iterdir()):
+            if not pkg.is_dir():
+                continue
+            if "pandoc" not in pkg.name.lower():
+                continue
+            for rel in ("bin/pandoc", "bin/pandoc.exe", "pandoc", "pandoc.exe"):
+                out.append(pkg / rel)
 
     winget_pkgs = home / "AppData/Local/Microsoft/WinGet/Packages"
     if winget_pkgs.is_dir():
@@ -51,13 +68,18 @@ def find_pandoc() -> str | None:
 
 def get_tools_status() -> dict:
     pandoc = find_pandoc()
+    hint = None
+    if not pandoc:
+        hint = (
+            "brew install pandoc"
+            if sys.platform != "win32"
+            else "winget install --id JohnMacFarlane.Pandoc"
+        )
     return {
         "pandoc": {
             "ok": pandoc is not None,
             "path": pandoc,
-            "hint": None
-            if pandoc
-            else "winget install --id JohnMacFarlane.Pandoc",
+            "hint": hint,
         },
         "python": {
             "ok": True,

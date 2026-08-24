@@ -61,29 +61,60 @@ export interface BuildProvenance {
 
 function spawnEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, PYTHONIOENCODING: 'utf-8' };
-  const pandocDir = findPandocDirForPath();
-  if (pandocDir) {
+  const pandocBin = findPandocBin();
+  if (pandocBin) {
+    const pandocDir = path.dirname(pandocBin);
     env.PATH = `${pandocDir}${path.delimiter}${env.PATH ?? ''}`;
-    if (!env.PANDOC) {
-      env.PANDOC = path.join(pandocDir, 'pandoc.exe');
-    }
+    if (!env.PANDOC) env.PANDOC = pandocBin;
   }
   return env;
 }
 
-/** 将 WinGet 等非常规安装目录加入 PATH，便于子进程与 Pandoc 插件 */
-function findPandocDirForPath(): string | null {
+function findPandocBinInRepoTools(): string | null {
+  const toolsDir = path.join(REPO_ROOT, '.tools');
+  if (!fs.existsSync(toolsDir)) return null;
+  const entries = fs.readdirSync(toolsDir, { withFileTypes: true });
+  const candidates: string[] = [];
+  for (const e of entries) {
+    if (!e.isDirectory()) continue;
+    if (!/pandoc/i.test(e.name)) continue;
+    const base = path.join(toolsDir, e.name);
+    candidates.push(path.join(base, 'bin', process.platform === 'win32' ? 'pandoc.exe' : 'pandoc'));
+    candidates.push(path.join(base, process.platform === 'win32' ? 'pandoc.exe' : 'pandoc'));
+    candidates.push(path.join(base, 'bin', 'pandoc.exe'));
+    candidates.push(path.join(base, 'bin', 'pandoc'));
+  }
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return null;
+}
+
+/** 将 WinGet / Homebrew / 仓库内置工具目录加入 PATH，便于子进程与 Pandoc 插件 */
+function findPandocBin(): string | null {
   const fromEnv = process.env.PANDOC;
   if (fromEnv && fs.existsSync(fromEnv)) {
-    return path.dirname(fromEnv);
+    return fromEnv;
   }
+
+  const repoTool = findPandocBinInRepoTools();
+  if (repoTool) return repoTool;
+
+  if (process.platform !== 'win32') {
+    const fixed = ['/opt/homebrew/bin/pandoc', '/usr/local/bin/pandoc', '/usr/bin/pandoc'];
+    for (const p of fixed) {
+      if (fs.existsSync(p)) return p;
+    }
+    return null;
+  }
+
   const home = process.env.USERPROFILE ?? process.env.HOME ?? '';
   const fixed = [
     path.join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Pandoc', 'pandoc.exe'),
     path.join(home, 'AppData', 'Local', 'Pandoc', 'pandoc.exe'),
   ];
   for (const exe of fixed) {
-    if (fs.existsSync(exe)) return path.dirname(exe);
+    if (fs.existsSync(exe)) return exe;
   }
   const winget = path.join(home, 'AppData', 'Local', 'Microsoft', 'WinGet', 'Packages');
   if (!fs.existsSync(winget)) return null;
@@ -91,7 +122,7 @@ function findPandocDirForPath(): string | null {
     if (!/pandoc/i.test(name)) continue;
     const pkgDir = path.join(winget, name);
     const found = findPandocExeInDir(pkgDir);
-    if (found) return path.dirname(found);
+    if (found) return found;
   }
   return null;
 }
