@@ -7,7 +7,7 @@ import {
   FolderOpenOutlined,
   CloseCircleOutlined,
 } from '@ant-design/icons';
-import type { BuildUploadEntry } from '@/kernel/pipeline';
+import { DEFAULT_FOOTER_TEXT, type BuildUploadEntry } from '@/kernel/pipeline';
 import { LazyMarkdownEditor } from '@/components/code/LazyMarkdownEditor';
 import {
   BuildProgressModal,
@@ -384,6 +384,78 @@ export const ExportPage: React.FC = () => {
               onChange={(e) => setProvenance({ title: e.target.value })}
               allowClear
             />
+          </section>
+
+          <section className="export-rail-block">
+            <label className="export-rail-label">页眉页脚</label>
+            <Tooltip title="支持 {page} / {pages} 动态页码，也兼容 N / M 写法；留空可清除对应区域">
+              <Input
+                size="middle"
+                style={{ marginBottom: 8 }}
+                placeholder="页眉文案（可选）"
+                value={options.headerText ?? ''}
+                onChange={(e) => setOptions({ headerText: e.target.value })}
+                allowClear
+              />
+            </Tooltip>
+            <Space.Compact block style={{ marginBottom: 8 }}>
+              <Select
+                aria-label="页眉水平对齐"
+                value={options.headerAlign ?? 'center'}
+                style={{ width: '50%' }}
+                options={[
+                  { value: 'left', label: '页眉左对齐' },
+                  { value: 'center', label: '页眉水平居中' },
+                  { value: 'right', label: '页眉右对齐' },
+                ]}
+                onChange={(value) => setOptions({ headerAlign: value })}
+              />
+              <Select
+                aria-label="页眉垂直对齐"
+                value={options.headerVerticalAlign ?? 'center'}
+                style={{ width: '50%' }}
+                options={[
+                  { value: 'top', label: '页眉顶部对齐' },
+                  { value: 'center', label: '页眉垂直居中' },
+                  { value: 'bottom', label: '页眉底部对齐' },
+                ]}
+                onChange={(value) => setOptions({ headerVerticalAlign: value })}
+              />
+            </Space.Compact>
+            <Tooltip title="{page} 为当前页，{pages} 为总页数；也可写成 N / M">
+              <Input
+                size="middle"
+                style={{ marginBottom: 8 }}
+                placeholder={DEFAULT_FOOTER_TEXT}
+                value={options.footerText ?? DEFAULT_FOOTER_TEXT}
+                onChange={(e) => setOptions({ footerText: e.target.value })}
+                allowClear
+              />
+            </Tooltip>
+            <Space.Compact block>
+              <Select
+                aria-label="页脚水平对齐"
+                value={options.footerAlign ?? 'center'}
+                style={{ width: '50%' }}
+                options={[
+                  { value: 'left', label: '页脚左对齐' },
+                  { value: 'center', label: '页脚水平居中' },
+                  { value: 'right', label: '页脚右对齐' },
+                ]}
+                onChange={(value) => setOptions({ footerAlign: value })}
+              />
+              <Select
+                aria-label="页脚垂直对齐"
+                value={options.footerVerticalAlign ?? 'center'}
+                style={{ width: '50%' }}
+                options={[
+                  { value: 'top', label: '页脚顶部对齐' },
+                  { value: 'center', label: '页脚垂直居中' },
+                  { value: 'bottom', label: '页脚底部对齐' },
+                ]}
+                onChange={(value) => setOptions({ footerVerticalAlign: value })}
+              />
+            </Space.Compact>
           </section>
 
           <section className="export-rail-block">

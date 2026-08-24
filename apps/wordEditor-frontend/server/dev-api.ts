@@ -45,6 +45,12 @@ export interface BuildApiOptions {
   noPostprocess?: boolean;
   /** Word 「修改密码」（writeProtection），空则不设置 */
   password?: string;
+  headerText?: string;
+  headerAlign?: 'left' | 'center' | 'right';
+  headerVerticalAlign?: 'top' | 'center' | 'bottom';
+  footerText?: string;
+  footerAlign?: 'left' | 'center' | 'right';
+  footerVerticalAlign?: 'top' | 'center' | 'bottom';
 }
 
 export interface BuildProvenance {
@@ -151,6 +157,18 @@ function buildScriptArgs(
   if (options.noHtmlPipe) scriptArgs.push('--no-html-pipe');
   if (options.noPostprocess) scriptArgs.push('--no-postprocess');
   if (options.password) scriptArgs.push('--password-env', 'WORDEDITOR_DOCX_PASSWORD');
+  const optionFlags: Array<[keyof BuildApiOptions, string]> = [
+    ['headerText', '--header-text'],
+    ['headerAlign', '--header-align'],
+    ['headerVerticalAlign', '--header-vertical-align'],
+    ['footerText', '--footer-text'],
+    ['footerAlign', '--footer-align'],
+    ['footerVerticalAlign', '--footer-vertical-align'],
+  ];
+  for (const [key, flag] of optionFlags) {
+    const value = options[key];
+    if (value != null) scriptArgs.push(flag, String(value));
+  }
   if (provenance?.author?.trim()) scriptArgs.push('--author', provenance.author.trim());
   if (provenance?.remark != null && provenance.remark.trim()) {
     scriptArgs.push('--remark', provenance.remark.trim());

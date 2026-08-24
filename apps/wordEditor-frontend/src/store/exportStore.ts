@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { notification } from 'antd';
 import type { BuildOptions, BuildUploadEntry, BuildProvenance } from '@/kernel/pipeline';
-import { DEFAULT_BUILD_PROVENANCE } from '@/kernel/pipeline';
+import { DEFAULT_BUILD_PROVENANCE, DEFAULT_FOOTER_TEXT } from '@/kernel/pipeline';
 import { streamBuild } from '@/kernel/pipeline/streamBuild';
 import type { BuildStreamStepEvent } from '@/kernel/pipeline/streamBuild';
 import {
@@ -260,9 +260,17 @@ export const useExportStore = create<ExportState>((set, get) => ({
       return false;
     }
 
+    const exportOptions: BuildOptions = {
+      ...options,
+      footerText: options.footerText ?? DEFAULT_FOOTER_TEXT,
+      headerAlign: options.headerAlign ?? 'center',
+      headerVerticalAlign: options.headerVerticalAlign ?? 'center',
+      footerAlign: options.footerAlign ?? 'center',
+      footerVerticalAlign: options.footerVerticalAlign ?? 'center',
+    };
     const ac = new AbortController();
     const startedAt = Date.now();
-    const initialSteps = createInitialBuildSteps(options);
+    const initialSteps = createInitialBuildSteps(exportOptions);
     initialSteps[0] = { ...initialSteps[0], status: 'process', message: '校验环境…' };
 
     set({
@@ -289,7 +297,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
           mdRelPath: useUpload ? uploadMdRelPath : undefined,
           templateId,
           fileName,
-          options,
+          options: exportOptions,
           provenance: {
             author: provenance.author?.trim() || DEFAULT_BUILD_PROVENANCE.author,
             remark: provenance.remark?.trim() || DEFAULT_BUILD_PROVENANCE.remark,

@@ -20,7 +20,17 @@ export interface BuildOptions {
   noPostprocess?: boolean;
   /** Word「修改密码」（writeProtection），空值/未设则不加锁 */
   password?: string;
+  /** 页眉文案；支持 {page} / {pages} 或 N / M 动态域，空字符串表示清空 */
+  headerText?: string;
+  headerAlign?: 'left' | 'center' | 'right';
+  headerVerticalAlign?: 'top' | 'center' | 'bottom';
+  /** 页脚文案；支持 {page} / {pages} 或 N / M 动态域，空字符串表示清空 */
+  footerText?: string;
+  footerAlign?: 'left' | 'center' | 'right';
+  footerVerticalAlign?: 'top' | 'center' | 'bottom';
 }
+
+export const DEFAULT_FOOTER_TEXT = '第 {page} 页 / 共 {pages} 页';
 
 export interface BuildUploadEntry {
   /** 相对路径（POSIX 风格），例: 'images/fig1.png' 或 'paper.md' */
