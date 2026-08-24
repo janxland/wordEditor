@@ -58,7 +58,7 @@ export const DocxPreviewDrawer: React.FC<DocxPreviewDrawerProps> = ({
       width="min(920px, 92vw)"
       open={open}
       onClose={onClose}
-      destroyOnClose
+      destroyOnHidden
       className="docx-preview-drawer"
       extra={
         <Space>
@@ -101,7 +101,8 @@ export const DocxPreviewDrawer: React.FC<DocxPreviewDrawerProps> = ({
       <div className="docx-preview-stage">
         {busy && (
           <div className="docx-preview-loading">
-            <Spin tip={loading ? '正在生成预览…' : '正在渲染…'} />
+            <Spin size="large" />
+            <Text type="secondary">{loading ? '正在生成预览…' : '正在渲染…'}</Text>
           </div>
         )}
         <div ref={styleRef} className="docx-preview-style-host" />

@@ -55,7 +55,7 @@ export const ExportResultModal: React.FC<ExportResultModalProps> = ({
       centered
       width={440}
       className="export-result-modal"
-      destroyOnClose
+      destroyOnHidden
     >
       <div className="export-result-card">
         <div className="export-result-icon-wrap">

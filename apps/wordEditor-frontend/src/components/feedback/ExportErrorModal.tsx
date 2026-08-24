@@ -35,7 +35,7 @@ export const ExportErrorModal: React.FC<ExportErrorModalProps> = ({
     centered
     width={520}
     className="export-error-modal"
-    destroyOnClose
+    destroyOnHidden
   >
     <div className="export-error-hero">
       <CloseCircleFilled className="export-error-icon" />

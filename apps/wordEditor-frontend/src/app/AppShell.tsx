@@ -62,7 +62,9 @@ export const AppShell: React.FC = () => {
         <Content className="app-content">
           {loading && (
             <div className="app-loading">
-              <Spin size="large" tip="加载项目资源…" />
+              <Spin size="large" tip="加载项目资源…">
+                <div style={{ minWidth: 220, minHeight: 48 }} />
+              </Spin>
             </div>
           )}
           {error && (

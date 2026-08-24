@@ -84,7 +84,7 @@ export const BuildProgressModal: React.FC<BuildProgressModalProps> = ({
       centered
       width={520}
       className="build-progress-modal"
-      destroyOnClose
+      destroyOnHidden
     >
       <ProgressHero percent={percent} />
       <div className="build-progress-body">

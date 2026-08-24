@@ -111,7 +111,9 @@ export const ImportPage: React.FC = () => {
 
       {busy && (
         <div className="import-busy">
-          <Spin tip="正在解析 DOCX，提取段落 / 图片 / 公式…" />
+          <Spin tip="正在解析 DOCX，提取段落 / 图片 / 公式…">
+            <div style={{ minWidth: 240, minHeight: 48 }} />
+          </Spin>
         </div>
       )}
 
