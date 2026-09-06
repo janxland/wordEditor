@@ -8,7 +8,9 @@
       "heading_numbering": "gongke",
       "reference_doc": "templates/hutb-shared/reference.docx",
       "lua_filter": "templates/hutb-shared/markdown-to-docx.lua",
-      "extra_lua_filters": ["templates/hutb-shared/zhengwen-style.lua"],
+      "extra_lua_filters": [
+        "templates/hutb-shared/zhengwen-style.lua"
+      ],
       "styles_yaml": "templates/hutb-gongke/styles.yaml",
       "three_line_tables": true,
       "source": "user",
@@ -21,7 +23,9 @@
       "heading_numbering": "guanke",
       "reference_doc": "templates/hutb-shared/reference.docx",
       "lua_filter": "templates/hutb-shared/markdown-to-docx.lua",
-      "extra_lua_filters": ["templates/hutb-shared/zhengwen-style.lua"],
+      "extra_lua_filters": [
+        "templates/hutb-shared/zhengwen-style.lua"
+      ],
       "styles_yaml": "templates/hutb-guanke/styles.yaml",
       "three_line_tables": true,
       "source": "user",
@@ -34,7 +38,9 @@
       "heading_numbering": "guanke",
       "reference_doc": "templates/hutb-shared/reference.docx",
       "lua_filter": "templates/hutb-shared/markdown-to-docx.lua",
-      "extra_lua_filters": ["templates/hutb-shared/zhengwen-style.lua"],
+      "extra_lua_filters": [
+        "templates/hutb-shared/zhengwen-style.lua"
+      ],
       "styles_yaml": "templates/hutb-xingce/styles.yaml",
       "three_line_tables": true,
       "source": "user",
@@ -47,7 +53,9 @@
       "heading_numbering": "guanke",
       "reference_doc": "templates/hutb-shared/reference.docx",
       "lua_filter": "templates/hutb-shared/markdown-to-docx.lua",
-      "extra_lua_filters": ["templates/hutb-shared/zhengwen-style.lua"],
+      "extra_lua_filters": [
+        "templates/hutb-shared/zhengwen-style.lua"
+      ],
       "styles_yaml": "templates/hutb-math-modeling/styles.yaml",
       "three_line_tables": true,
       "source": "user",
