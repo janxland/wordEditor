@@ -1,0 +1,54 @@
+#!/Users/Admin1/.workbuddy/binaries/python/envs/default/bin/python
+"""wordEditor CLI —— Markdown → docx 直连导出（不走 web / API）。
+
+用法:
+  we build <md文件|工作区目录> [-t 模板id] [-o 输出docx路径]
+  we templates
+
+示例:
+  we build ~/Downloads/某调查                 # 目录即工作区, 产物 docx 回写该目录
+  we build 报告.md -t hutb-gongke            # 换工科模板
+  we templates                               # 列出全部模板
+"""
+from __future__ import annotations
+
+import argparse
+import sys
+
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[1] / "services" / "api-python"))
+
+from direct import build_to_workspace, list_templates, resolve_md  # noqa: E402
+
+
+def cmd_build(args: argparse.Namespace) -> None:
+    build_to_workspace(args.input, template_id=args.template, output_path=args.output)
+
+
+def cmd_templates(_args: argparse.Namespace) -> None:
+    for t in list_templates():
+        star = " *默认" if t["default"] else ""
+        print(f"{t['id']:<20} {t['name']}{star}")
+        if t["note"]:
+            print(f"{'':<20} {t['note']}")
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(prog="we", description="wordEditor 直连导出 CLI")
+    sub = ap.add_subparsers(dest="command", required=True)
+
+    b = sub.add_parser("build", help="md/目录 → docx（默认回写工作区）")
+    b.add_argument("input", help="md 文件或工作区目录")
+    b.add_argument("-t", "--template", default="hutb-guanke",
+                   help="模板 id，默认 hutb-guanke（湖南工商大学·管科）")
+    b.add_argument("-o", "--output", default=None, help="输出 docx 路径，默认工作区内同名 docx")
+    b.set_defaults(func=cmd_build)
+
+    tp = sub.add_parser("templates", help="列出可用模板")
+    tp.set_defaults(func=cmd_templates)
+
+    args = ap.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()
