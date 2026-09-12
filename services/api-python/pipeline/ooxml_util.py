@@ -65,9 +65,14 @@ def style_id_for_heading_level(level: int, heading_ids: dict[int, str]) -> str:
 
 
 def resolve_heading_style_ids(styles_root: ET.Element) -> dict[int, str]:
-    """按级别解析段落 styleId（兼容 hutb reference：1..5 = heading 1..5）。"""
+    """按级别解析段落 styleId。
+
+    优先按 styleId 数字候选（兼容 hutb reference：1..5 = heading 1..5），
+    但必须核对样式名确实是 heading/标题，否则任意 docx 克隆模板里
+    styleId "1" 可能是 Normal，会导致编号挂到正文样式上。"""
     out: dict[int, str] = {}
     for level in range(1, 6):
+        want = (f"heading {level}", f"\u6807\u9898 {level}", f"\u6807\u9898{level}")
         candidates = [
             str(level),
             f"Heading{level}",
@@ -76,13 +81,14 @@ def resolve_heading_style_ids(styles_root: ET.Element) -> dict[int, str]:
             f"\u6807\u9898 {level}",
         ]
         for sid in candidates:
-            if find_style_by_id(styles_root, sid) is not None:
+            s = find_style_by_id(styles_root, sid)
+            if s is not None and style_name(s).lower() in want:
                 out[level] = sid
                 break
         if level not in out:
             for s in styles_root.findall("w:style", NS):
                 nm = style_name(s).lower()
-                if nm in (f"heading {level}", f"\u6807\u9898 {level}", f"\u6807\u9898{level}"):
+                if nm in want:
                     out[level] = style_id(s)
                     break
     return out
