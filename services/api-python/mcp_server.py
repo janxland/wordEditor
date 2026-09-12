@@ -9,6 +9,8 @@
   - list_styles():              列出已存临时样式
   - save_template(new_id, ...): 固化为派生新模板（只新增）
   - remove_template(new_id):    删除派生模板（仅 source=derived）
+  - analyze_docx(docx):         只读分析 docx（页面/样式/封面范围）
+  - clone_template(src, id):    反向复刻 docx 为新模板（含封面块+尾部评审表块）
 
 spec 由 Agent 从自然语言翻译（映射见 hutb-docx-export 技能 SKILL.md），例:
   {"title":{"font":"宋体","size":"小二","align":"center"}}
@@ -30,6 +32,7 @@ from mcp.server.fastmcp import FastMCP
 
 from direct import build_to_workspace, list_templates
 import style_core
+import clone_core
 
 mcp = FastMCP(
     "wordeditor",

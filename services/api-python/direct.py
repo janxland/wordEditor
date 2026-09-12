@@ -109,6 +109,18 @@ def build_to_workspace(
         produced = job / "output.docx"
         if not produced.is_file():
             raise SystemExit("构建未产出 docx")
+        # 复刻模板：封面块注入开头、尾部评审表块注入末尾
+        entry = next((t for t in json.loads(CONFIG.read_text(encoding="utf-8"))["templates"]
+                      if t["id"] == template_id), {})
+        if entry.get("cover_block") or entry.get("tail_block"):
+            try:
+                from clone_core import inject_cover, inject_tail
+                if entry.get("cover_block"):
+                    inject_cover(produced, (ROOT / entry["cover_block"]).parent)
+                if entry.get("tail_block"):
+                    inject_tail(produced, (ROOT / entry["tail_block"]).parent)
+            except ImportError:
+                print("⚠ clone_core 不可用，跳过封面/评审表注入")
         shutil.copy2(produced, out)
     finally:
         if not keep_job:

@@ -60,6 +60,23 @@
       "three_line_tables": true,
       "source": "user",
       "note": "数学建模：题目黑体小二居中加粗；标题 一、→ 1.1 → 1.1.1；自动三线表；含摘要/关键词/图/图注/参考文献"
+    },
+    {
+      "id": "hutb-gongke-fengmian",
+      "name": "湖南工商大学 · 工科（含封面评分表）",
+      "standalone": true,
+      "heading_numbering": "gongke",
+      "reference_doc": "templates/hutb-gongke-fengmian/reference.docx",
+      "lua_filter": "templates/hutb-shared/markdown-to-docx.lua",
+      "extra_lua_filters": [
+        "templates/hutb-shared/zhengwen-style.lua"
+      ],
+      "styles_yaml": "templates/hutb-gongke-fengmian/styles.yaml",
+      "three_line_tables": true,
+      "source": "derived",
+      "cover_block": "templates/hutb-gongke-fengmian/cover_block.xml",
+      "note": "反向复刻自 移动互联网时代跨境支付内部控制与审计风险调查-hutb-gongke-5000字.docx（封面块 10 元素 + 尾部评审表块 5 元素）",
+      "tail_block": "templates/hutb-gongke-fengmian/tail_block.xml"
     }
   ]
 }

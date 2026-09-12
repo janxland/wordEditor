@@ -1,0 +1,85 @@
+# 由 clone_template 反向复刻生成（内容样式来自 reference.docx，勿手改 overrides）
+template:
+  id: hutb-gongke-fengmian
+  name: 湖南工商大学 · 工科（含封面评分表）
+default_list_style: DecimalList
+use_list_styles:
+- id: DecimalList
+- id: BulletList
+- id: ParenDecimalList
+- id: CircledList
+- id: ChineseList
+multilevel_list:
+  num_id: 2
+  levels:
+  - ilvl: 0
+    heading_style: '2'
+    num_fmt: decimal
+    lvl_text: '%1'
+    suff: space
+    start: 1
+    run:
+      cjk_font: 黑体
+      size_half_pt: 28
+      size_cs_half_pt: 28
+      bold: true
+    paragraph:
+      align: left
+      line_spacing: single
+      first_line_chars: 0
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+  - ilvl: 1
+    heading_style: '3'
+    num_fmt: decimal
+    lvl_text: '%1.%2'
+    suff: space
+    start: 1
+    is_lgl: true
+    run:
+      cjk_font: 宋体
+      size_half_pt: 24
+      size_cs_half_pt: 24
+      bold: true
+    paragraph:
+      align: left
+      line_spacing: single
+      first_line_chars: 2
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+  - ilvl: 2
+    heading_style: '4'
+    num_fmt: decimal
+    lvl_text: '%1.%2.%3'
+    suff: space
+    start: 1
+    is_lgl: true
+    run:
+      cjk_font: 宋体
+      size_half_pt: 24
+      size_cs_half_pt: 24
+      bold: true
+    paragraph:
+      align: left
+      line_spacing: single
+      first_line_chars: 2
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+  - ilvl: 3
+    heading_style: '5'
+    num_fmt: decimal
+    lvl_text: '%1.%2.%3.%4'
+    suff: space
+    start: 1
+    is_lgl: true
+    run:
+      cjk_font: 宋体
+      size_half_pt: 24
+      size_cs_half_pt: 24
+      bold: true
+    paragraph:
+      align: left
+      line_spacing: single
+      first_line_chars: 2
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0

@@ -1,0 +1,7 @@
+{
+ "rId10": {
+  "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+  "target": "media/image1.png",
+  "external": false
+ }
+}
