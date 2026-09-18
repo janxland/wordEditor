@@ -77,6 +77,40 @@
       "cover_block": "templates/hutb-gongke-fengmian/cover_block.xml",
       "note": "反向复刻自 移动互联网时代跨境支付内部控制与审计风险调查-hutb-gongke-5000字.docx（封面块 10 元素 + 尾部评审表块 5 元素）",
       "tail_block": "templates/hutb-gongke-fengmian/tail_block.xml"
+    },
+    {
+      "id": "hutb-guanke-fengmian",
+      "name": "湖南工商大学 · 管科（含封面评分表）",
+      "standalone": true,
+      "heading_numbering": "guanke",
+      "reference_doc": "templates/hutb-shared/reference.docx",
+      "lua_filter": "templates/hutb-shared/markdown-to-docx.lua",
+      "extra_lua_filters": [
+        "templates/hutb-shared/zhengwen-style.lua"
+      ],
+      "styles_yaml": "templates/hutb-guanke-fengmian/styles.yaml",
+      "three_line_tables": true,
+      "source": "derived",
+      "cover_block": "templates/hutb-guanke-fengmian/cover_block.xml",
+      "tail_block": "templates/hutb-guanke-fengmian/tail_block.xml",
+      "note": "管科内容样式（同 hutb-guanke，heading_numbering=guanke）+ 暑假社会调查报告封面块与尾部评审表块（复用自 hutb-gongke-fengmian；评审表内 pStyle 44→ae 以匹配管科样式 id 空间）"
+    },
+    {
+      "id": "hutb-guanke-xuenian",
+      "name": "湖南工商大学 · 管科 · 学年论文（含封面评审表）",
+      "standalone": true,
+      "heading_numbering": "guanke",
+      "reference_doc": "templates/hutb-guanke-xuenian/reference.docx",
+      "lua_filter": "templates/hutb-shared/markdown-to-docx.lua",
+      "extra_lua_filters": [
+        "templates/hutb-shared/zhengwen-style.lua"
+      ],
+      "styles_yaml": "templates/hutb-guanke-xuenian/styles.yaml",
+      "three_line_tables": true,
+      "source": "derived",
+      "cover_block": "templates/hutb-guanke-xuenian/cover_block.xml",
+      "tail_block": "templates/hutb-guanke-xuenian/tail_block.xml",
+      "note": "学年论文专用：封面为「学 年 论 文 + 题目/学生姓名/学号/学院/专业班级/指导教师/职称/年月」，评审表为「湖南工商大学学年论文（课程设计）评审表」；reference.docx 按学校规范改页边距（上30 下25 左30 右20 mm）并加页眉「湖南工商大学学年论文（课程设计）」。编号体系同管科：一、→（一）→①"
     }
   ]
 }
