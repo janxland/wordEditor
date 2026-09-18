@@ -391,14 +391,22 @@ _CN_ABSTRACT_TITLE_RE = _re.compile(
 _EN_ABSTRACT_TITLE_RE = _re.compile(
     r"^\s*\[?Abstract\]?\s*$", _re.IGNORECASE
 )
-_CN_KEYWORDS_RE = _re.compile(r"^\s*\[?关键词\]?\s*[:：]?\s*$")
+# 标签与正文同行的写法（学校式样：`[内容摘要] ×××` / `[ABSTRACT] ×××`）
+# 与"独占一行"的标题写法互斥：标题式正则要求 ] 之后即行尾，这里要求后面还有非空字符。
+_CN_ABSTRACT_INLINE_RE = _re.compile(
+    r"^\s*\[?内容摘要\]?\s*[:：]?\s*\S|^\s*\[?摘\s*要\]?\s*[:：]\s*\S"
+)
+_EN_ABSTRACT_INLINE_RE = _re.compile(
+    r"^\s*\[?abstract\]?\s*[:：]?\s*\S", _re.IGNORECASE
+)
+_CN_KEYWORDS_RE = _re.compile(r"^\s*\[?关键词\]?\s*(?:[:：]|$|\S)")
 _EN_KEYWORDS_RE = _re.compile(
-    r"^\s*\[?Keywords?\]?\s*[:：]?\s*$", _re.IGNORECASE
+    r"^\s*\[?(?:key\s*words?|keywords?)\]?\s*(?:[:：]|$|\S)", _re.IGNORECASE
 )
 # 章节标题（用于终止摘要状态）
 _SECTION_RE = _re.compile(r"^\s*[\u4e00-\u9fff]{1,3}、\s|\A\s*\d+\.\d+\s|\A\s*\d+\s+(?!\d)")
-# 参考文献条目
-_REF_RE = _re.compile(r"\[[\dA-Za-z]+\]")
+# 参考文献条目（必须含数字，避免把 [Abstract] 这类英文标签误判成文献）
+_REF_RE = _re.compile(r"\[(?=[^\]]*\d)[\dA-Za-z]+\]")
 
 
 def _paragraph_text(p: ET.Element) -> str:
@@ -408,6 +416,48 @@ def _paragraph_text(p: ET.Element) -> str:
         if r.text:
             parts.append(r.text)
     return "".join(parts)
+
+
+def _style_id_index(styles_xml: bytes) -> dict[str, str]:
+    """styles.xml 的 w:name → w:styleId 映射。"""
+    try:
+        root = ET.fromstring(styles_xml)
+    except ET.ParseError:
+        return {}
+    idx: dict[str, str] = {}
+    for st in root.findall("w:style", NS):
+        sid = st.get(_q("styleId"))
+        nm = st.find("w:name", NS)
+        if sid and nm is not None and nm.get(_q("val")):
+            idx.setdefault(nm.get(_q("val")), sid)
+    return idx
+
+
+def _resolve_style_id(styles_xml: bytes, wanted: str,
+                      alias_name: str | None = None) -> str:
+    """把 DSL 里的 style id 解析成 styles.xml 中真实存在的 styleId。
+
+    有些 reference.docx 自带同名样式且 styleId 是中文（如「摘要标题」「摘要」），
+    此时 DSL 的 id（ZhaiYaoTitle）在文档里并不存在；若直接写进 pStyle，
+    Word 会退回 Normal，摘要排版就丢了。
+    """
+    if not wanted:
+        return wanted
+    try:
+        root = ET.fromstring(styles_xml)
+    except ET.ParseError:
+        return wanted
+    ids = {st.get(_q("styleId")) for st in root.findall("w:style", NS)}
+    if wanted in ids:
+        return wanted
+    for cand in (alias_name, wanted):
+        if cand and cand in ids:
+            return cand
+    idx = _style_id_index(styles_xml)
+    for cand in (alias_name, wanted):
+        if cand and cand in idx:
+            return idx[cand]
+    return wanted
 
 
 def _set_paragraph_style_by_id(p: ET.Element, style_id: str) -> None:
@@ -438,6 +488,7 @@ def apply_abstract_styles(
     en_abstract_title_style_id: str = "ae",
     keywords_style_id: str = "KeyWordsZh",
     en_keywords_style_id: str = "ae",
+    custom_styles: "list[dict] | None" = None,
 ) -> tuple[bytes, int]:
     """识别中文摘要 / Abstract / 关键词段落并注入对应样式。
 
@@ -452,6 +503,21 @@ def apply_abstract_styles(
     body = root.find("w:body", NS)
     if body is None:
         body = root
+
+    # DSL custom_styles 的 id → name，用于把 id 解析成文档里真实的 styleId
+    _alias = {c.get("id"): c.get("name") for c in (custom_styles or []) if c.get("id")}
+    abstract_style_id = _resolve_style_id(
+        styles_xml, abstract_style_id, _alias.get(abstract_style_id))
+    abstract_title_style_id = _resolve_style_id(
+        styles_xml, abstract_title_style_id, _alias.get(abstract_title_style_id))
+    en_abstract_style_id = _resolve_style_id(
+        styles_xml, en_abstract_style_id, _alias.get(en_abstract_style_id))
+    en_abstract_title_style_id = _resolve_style_id(
+        styles_xml, en_abstract_title_style_id, _alias.get(en_abstract_title_style_id))
+    keywords_style_id = _resolve_style_id(
+        styles_xml, keywords_style_id, _alias.get(keywords_style_id))
+    en_keywords_style_id = _resolve_style_id(
+        styles_xml, en_keywords_style_id, _alias.get(en_keywords_style_id))
 
     in_cn_abstract = False
     in_en_abstract = False
@@ -491,6 +557,22 @@ def apply_abstract_styles(
             in_en_abstract = True
             in_cn_abstract = False
             _set_paragraph_style_by_id(child, en_abstract_title_style_id)
+            changed += 1
+            continue
+
+        # 中文摘要（标签与正文同行）
+        if _CN_ABSTRACT_INLINE_RE.match(text):
+            in_cn_abstract = False
+            in_en_abstract = False
+            _set_paragraph_style_by_id(child, abstract_style_id)
+            changed += 1
+            continue
+
+        # 英文摘要（标签与正文同行）：其后仍可能有纯英文摘要正文段，保持状态
+        if _EN_ABSTRACT_INLINE_RE.match(text):
+            in_cn_abstract = False
+            in_en_abstract = True
+            _set_paragraph_style_by_id(child, en_abstract_style_id)
             changed += 1
             continue
 
@@ -554,7 +636,8 @@ def patch_docx(path: Path, dsl: dict[str, Any]) -> None:
     doc_xml = original_doc
     abstract_changed = 0
     if dsl.get("custom_styles"):
-        doc_xml, abstract_changed = apply_abstract_styles(original_doc, new_styles)
+        doc_xml, abstract_changed = apply_abstract_styles(
+            original_doc, new_styles, custom_styles=dsl.get("custom_styles"))
         if abstract_changed:
             print(f"[postprocess_abstract] 注入摘要/关键词样式 {abstract_changed} 段")
 

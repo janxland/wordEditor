@@ -263,6 +263,13 @@ def main() -> int:
             if rc != 0:
                 print("三线表后处理失败。", file=sys.stderr)
                 return rc
+            print("\n[后处理] 附录代码块 → 三线表 …")
+            rc = subprocess.call(
+                [sys.executable, str(SCRIPT_DIR / "ooxml_verbatim_table.py"), str(out)]
+            )
+            if rc != 0:
+                print("代码块表格化失败。", file=sys.stderr)
+                return rc
 
     if args.header_text is not None or args.footer_text is not None:
         from apply_docx_header_footer import apply_header_footer  # noqa: WPS433

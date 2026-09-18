@@ -255,7 +255,14 @@ def append_text_run(p: ET.Element, text: str, rpr: ET.Element | None = None) -> 
     t.text = text
 
 
-def append_ref_field(p: ET.Element, bookmark: str, display: str, rpr: ET.Element) -> None:
+def append_ref_field(
+    p: ET.Element,
+    bookmark: str,
+    display: str,
+    rpr: ET.Element,
+    wrap: bool = True,
+) -> None:
+    """插入 REF 交叉引用域。wrap=False 时域结果只显示编号本体，方括号由调用方自行补齐。"""
     def add_run(build: Callable[[ET.Element], None]) -> None:
         r = ET.SubElement(p, q("r"))
         r.append(ET.fromstring(ET.tostring(rpr)))
@@ -272,7 +279,7 @@ def append_ref_field(p: ET.Element, bookmark: str, display: str, rpr: ET.Element
 
     def _result(r: ET.Element) -> None:
         t = ET.SubElement(r, q("t"))
-        t.text = f"[{display}]"
+        t.text = f"[{display}]" if wrap else display
 
     add_run(_result)
     add_run(lambda r: ET.SubElement(r, q("fldChar"), {q("fldCharType"): "end"}))

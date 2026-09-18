@@ -35,9 +35,25 @@ from ooxml_util import (  # noqa: E402
     style_id_for_heading_level,
 )
 
-REF_IN_TEXT = re.compile(r"\[(\d+)\]")
+REF_IN_TEXT = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
 TABLE_CAPTION_FALLBACK = re.compile(r"^\s*表(?:格)?\s*\d+[\s．.：:、　]*\S")
 TABLE_CAPTION_STYLE_ID = "表注"  # 与 hutb-base.yaml custom_styles.id / Pandoc custom-style 一致
+CODE_STYLE_IDS = {"SourceCode", "VerbatimChar"}
+
+
+def _is_verbatim_paragraph(p: ET.Element) -> bool:
+    """代码/含硬换行的段落不参与“重排 run”的改写。
+
+    paragraph_plain_text 只取 w:t，rebuild_paragraph_content 又会清空全部子元素后
+    按纯文本重排，因此 w:br / w:tab 会被整批丢弃——代码附录（如形如 x[:, 1] 的下标
+    恰好命中 [1] 与 Ref1 书签）会被压成一整段。代码段一律跳过，保持原样。
+    """
+    ppr = p.find("w:pPr", NS)
+    if ppr is not None:
+        ps = ppr.find("w:pStyle", NS)
+        if ps is not None and ps.get(q("val")) in CODE_STYLE_IDS:
+            return True
+    return any(el.tag in (q("br"), q("tab")) for el in p.iter())
 
 
 def apply_headings(
@@ -89,6 +105,8 @@ def apply_headings(
 
 
 def _patch_paragraph_refs(p: ET.Element, doc_bookmarks: set[str]) -> bool:
+    if _is_verbatim_paragraph(p):
+        return False
     text = paragraph_plain_text(p)
     if "[" not in text:
         return False
@@ -98,26 +116,26 @@ def _patch_paragraph_refs(p: ET.Element, doc_bookmarks: set[str]) -> bool:
     if not matches:
         return False
 
-    valid: list[tuple[int, int, str]] = []
+    valid: list[tuple[int, int, list[str]]] = []
     for m in matches:
-        num = m.group(1)
-        name = f"Ref{num}"
-        if name not in doc_bookmarks:
+        nums = [n.strip() for n in m.group(1).split(",")]
+        # 组内任一编号在文献表中查不到时整组保持原样，避免漏掉未列出的编号
+        if any(f"Ref{n}" not in doc_bookmarks for n in nums):
             continue
-        if name in bmk and abs(bmk[name] - m.start()) <= 1:
+        if any(f"Ref{n}" in bmk and abs(bmk[f"Ref{n}"] - m.start()) <= 1 for n in nums):
             continue
-        valid.append((m.start(), m.end(), num))
+        valid.append((m.start(), m.end(), nums))
 
     if not valid:
         return False
 
     rpr = copy_rpr_superscript()
     pos = 0
-    segments: list[tuple[str, str]] = []
-    for start, end, num in valid:
+    segments: list[tuple[str, object]] = []
+    for start, end, nums in valid:
         if start > pos:
             segments.append(("text", text[pos:start]))
-        segments.append(("ref", num))
+        segments.append(("ref", nums))
         pos = end
     if pos < len(text):
         segments.append(("text", text[pos:]))
@@ -125,9 +143,19 @@ def _patch_paragraph_refs(p: ET.Element, doc_bookmarks: set[str]) -> bool:
     def build(p_el: ET.Element) -> None:
         for kind, payload in segments:
             if kind == "text":
-                append_text_run(p_el, payload)
-            else:
-                append_ref_field(p_el, f"Ref{payload}", payload, rpr)
+                append_text_run(p_el, payload)  # type: ignore[arg-type]
+                continue
+            nums = payload  # type: ignore[assignment]
+            if len(nums) == 1:
+                append_ref_field(p_el, f"Ref{nums[0]}", nums[0], rpr)
+                continue
+            # 多个编号共用一对方括号：方括号与逗号随上标走，编号本体各挂一个 REF 域
+            append_text_run(p_el, "[", rpr)
+            for k, num in enumerate(nums):
+                if k:
+                    append_text_run(p_el, ",", rpr)
+                append_ref_field(p_el, f"Ref{num}", num, rpr, wrap=False)
+            append_text_run(p_el, "]", rpr)
 
     rebuild_paragraph_content(p, build)
     return True

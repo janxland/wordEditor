@@ -27,7 +27,8 @@ def q(t: str) -> str:
     return f"{{{W}}}{t}"
 
 
-_LINE = {"val": "single", "sz": "6", "space": "0", "color": "auto"}
+_LINE = {"val": "single", "sz": "6", "space": "0", "color": "auto"}       # 栏目线 0.75pt
+_THICK = {"val": "single", "sz": "12", "space": "0", "color": "auto"}      # 顶/底线 1.5pt
 _NIL = {"val": "nil"}
 
 
@@ -62,8 +63,8 @@ def _patch_table(tbl: ET.Element) -> None:
     borders = _ensure_borders(tbl_pr, "tblBorders")
     for child in list(borders):
         borders.remove(child)
-    _set_border(borders, "top", _LINE)
-    _set_border(borders, "bottom", _LINE)
+    _set_border(borders, "top", _THICK)
+    _set_border(borders, "bottom", _THICK)
     _set_border(borders, "left", _NIL)
     _set_border(borders, "right", _NIL)
     _set_border(borders, "insideH", _NIL)
@@ -81,10 +82,13 @@ def _patch_table(tbl: ET.Element) -> None:
         tc_borders = _ensure_borders(tc_pr, "tcBorders")
         _set_border(tc_borders, "bottom", _LINE)
 
-    # 所有单元格段落水平居中（覆盖 pandoc 默认左对齐）
+    # 所有单元格段落水平居中（覆盖 pandoc 默认左对齐）；代码表格保持左对齐
     for tc in tbl.iter(q("tc")):
         for p in tc.findall("w:p", NS):
             ppr = p.find("w:pPr", NS)
+            ps = ppr.find("w:pStyle", NS) if ppr is not None else None
+            if ps is not None and ps.get(q("val")) in ("SourceCode", "VerbatimChar"):
+                continue
             if ppr is None:
                 ppr = ET.Element(q("pPr"))
                 p.insert(0, ppr)
