@@ -111,6 +111,18 @@
       "cover_block": "templates/hutb-guanke-xuenian/cover_block.xml",
       "tail_block": "templates/hutb-guanke-xuenian/tail_block.xml",
       "note": "学年论文专用：封面为「学 年 论 文 + 题目/学生姓名/学号/学院/专业班级/指导教师/职称/年月」，评审表为「湖南工商大学学年论文（课程设计）评审表」；reference.docx 按学校规范改页边距（上30 下25 左30 右20 mm）并加页眉「湖南工商大学学年论文（课程设计）」。编号体系同管科：一、→（一）→①"
+    },
+    {
+      "id": "apa7",
+      "name": "APA 7th edition（英文论文 / 文章评述）",
+      "standalone": true,
+      "heading_numbering": "guanke",
+      "reference_doc": "templates/apa7/reference.docx",
+      "lua_filter": "templates/apa7/apa7-style.lua",
+      "styles_yaml": "templates/apa7/styles.yaml",
+      "three_line_tables": false,
+      "source": "derived",
+      "note": "APA 7 学生论文：Letter、页边距 1 英寸、Calibri 11pt、双倍行距、段前段后 0、页脚居中页码。Markdown 中用 <div class=\"pagebreak\"></div> 分页，<div class=\"cs-XXX\"></div> 指定段样式（APATitle/APACenter/References）。reference.docx 由 templates/apa7/build_reference.py 生成"
     }
   ]
 }

@@ -11,6 +11,7 @@ Markdown → Word（湖南工商大学 · 碳中和模板）。
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import re
 import subprocess
@@ -30,6 +31,49 @@ CONFIG_PATH = ROOT / "config" / "templates.json"
 DEFAULT_INPUT = ROOT / "input" / "carbon-neutral-renewable.md"
 DEFAULT_OUTPUT_DIR = ROOT / "output"
 DEFAULT_TEMPLATE_ID = "hutb-guanke"
+
+
+def restore_image_paths(html: str, md_dir: Path) -> str:
+    """把 `--embed-resources` 内联的 base64 图片还原为本地文件路径引用。
+
+    `--embed-resources` 会把 <img src> 变成 data URI，随后的 HTML→DOCX 阶段
+    无法把它转成真正的 OOXML 图片关系，Word 里只留下一个空 drawing 框
+    （descr 里塞着整段 base64）。这里按 base64 内容反查原始文件，
+    把 src 换回本地路径，pandoc 即可正常嵌入（配合 --resource-path）。
+    """
+    data_uri_re = re.compile(
+        r'src="data:image/[^;]+;base64,([A-Za-z0-9+/=]+)"')
+
+    def b64_map(root: Path) -> dict:
+        table = {}
+        if not root.exists():
+            return table
+        for p in sorted(root.rglob("*")):
+            if p.is_file() and p.suffix.lower() in {
+                    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg", ".webp"}:
+                try:
+                    table[base64.b64encode(p.read_bytes()).decode()] = str(p)
+                except OSError:
+                    continue
+        return table
+
+    table = b64_map(md_dir)
+    if not table:
+        return html
+
+    restored = [0]
+
+    def repl(m):
+        path = table.get(m.group(1))
+        if not path:
+            return m.group(0)
+        restored[0] += 1
+        return f'src="{path}"'
+
+    html = data_uri_re.sub(repl, html)
+    if restored[0]:
+        print(f"[图片] 已还原 {restored[0]} 张内联图片为本地文件引用")
+    return html
 
 
 def load_config() -> dict:
@@ -127,6 +171,7 @@ def run_pandoc(
             count=1,
             flags=re.DOTALL | re.IGNORECASE,
         )
+        html = restore_image_paths(html, input_md.parent)
         subprocess.run(cmd2, input=html, text=True, check=True, encoding="utf-8")
     else:
         cmd = [

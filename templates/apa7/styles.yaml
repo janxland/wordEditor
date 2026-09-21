@@ -1,0 +1,40 @@
+template:
+  id: "apa7"
+  name: "APA 7th edition（英文论文 / 文章评述）"
+
+# 全局西文字体；APA 认可 Calibri / Arial / Times New Roman 11pt
+fonts:
+  latin: Calibri
+  cjk: null
+
+# 说明
+# ----
+# APA 的版式（Letter、页边距 1 英寸、Calibri 11pt、双倍行距、段前段后 0、
+# 页脚居中页码、参考文献悬挂缩进 0.5 英寸）全部固化在 reference.docx 里，
+# 由 templates/apa7/build_reference.py 生成。
+#
+# 这里**刻意不写 custom_styles**：DSL 的 hanging_indent_chars / indent_clear
+# 是中文版式单位（字符），重建 APATitle / APACenter / References 会把
+# reference.docx 里按英寸写好的缩进覆盖掉。只做“不许改坏”的收口。
+
+overrides:
+  - match: { kind: body }
+    paragraph:
+      line_spacing: "double"
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+      word_wrap_break_latin: true
+    run:
+      latin_font: Calibri
+      size_half_pt: 22
+
+  - match: { kind: heading }
+    paragraph:
+      line_spacing: "double"
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+      clear_indent: true
+      word_wrap_break_latin: true
+    run:
+      latin_font: Calibri
+      size_half_pt: 22
