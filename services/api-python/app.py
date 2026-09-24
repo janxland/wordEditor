@@ -52,6 +52,21 @@ def _sanitize_import_name(name: str) -> str:
     return cleaned
 
 
+def _anchor_extends(text: str, base_dir: Path) -> str:
+    """styles.yaml 存进任务目录后，顶层相对 extends 会失去基准，先按模板目录解析成绝对路径。"""
+    try:
+        import yaml
+
+        dsl = yaml.safe_load(text)
+    except Exception:
+        return text  # 语法错误交给下游报错，文案与不锚定时一致
+    rel = dsl.get("extends") if isinstance(dsl, dict) else None
+    if not isinstance(rel, str) or not rel or Path(rel).is_absolute():
+        return text
+    dsl["extends"] = str((base_dir / rel).resolve())
+    return yaml.safe_dump(dsl, allow_unicode=True, sort_keys=False)
+
+
 def _slugify(name: str) -> str:
     s = re.sub(r"\.docx$", "", name, flags=re.IGNORECASE).strip()
     s = re.sub(r"[\s\\/]+", "-", s)
@@ -332,7 +347,9 @@ async def preview_styles(request: Request) -> dict[str, str]:
     work_dir = CACHE_DIR / job_id
     work_dir.mkdir(parents=True, exist_ok=True)
     styles_path = work_dir / "styles.yaml"
-    styles_path.write_text(styles_yaml, encoding="utf-8")
+    styles_path.write_text(
+        _anchor_extends(styles_yaml, ROOT / "templates" / template_id), encoding="utf-8"
+    )
     output_docx = work_dir / "output.docx"
 
     code, out, err = _run_cmd(

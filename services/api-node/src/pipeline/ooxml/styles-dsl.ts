@@ -381,6 +381,9 @@ const PAGE_FRAME_STYLE_MARKERS = [
   'mso-position-vertical-relative:page',
 ];
 
+const WPS_SHAPE_NS = 'http://schemas.microsoft.com/office/word/2010/wordprocessingShape';
+const SHAPE_FILLS = ['solidFill', 'gradFill', 'pattFill', 'grpFill'];
+
 /** VML 整页描边矩形（WPS 页面边框回退形状）。 */
 function looksLikePageFrameRect(el: XEl): boolean {
   if (localOf(el) !== 'rect') return false;
@@ -392,22 +395,67 @@ function looksLikePageFrameRect(el: XEl): boolean {
   );
 }
 
+/** 按页面定位、无填充、带描边的矩形（DrawingML 侧的页面边框）。 */
+function isStrokedPageRect(wsp: XEl): boolean {
+  const spPr = childEls(wsp).find((el) => localOf(el) === 'spPr');
+  if (!spPr) return false;
+  const ln = childEls(spPr).find((el) => localOf(el) === 'ln');
+  return (
+    attr(childEls(spPr).find((el) => localOf(el) === 'prstGeom'), 'prst') === 'rect' &&
+    childEls(spPr).some((el) => localOf(el) === 'noFill') &&
+    !!ln &&
+    childEls(ln).some((el) => SHAPE_FILLS.includes(localOf(el)))
+  );
+}
+
+function isPageFrameShape(el: XEl): boolean {
+  if (localOf(el) === 'pict') {
+    return [el, ...allDescendants(el)].some(looksLikePageFrameRect);
+  }
+  if (localOf(el) !== 'drawing') return false;
+  const anchor = childEls(el)[0];
+  if (!anchor || localOf(anchor) !== 'anchor') return false;
+  const pageAnchored = ['positionH', 'positionV'].every(
+    (tag) => attr(childEls(anchor).find((c) => localOf(c) === tag), 'relativeFrom') === 'page',
+  );
+  if (!pageAnchored) return false;
+  return allDescendants(anchor).some(
+    (el2) => el2.namespaceURI === WPS_SHAPE_NS && localOf(el2) === 'wsp' && isStrokedPageRect(el2),
+  );
+}
+
+/** 整段 AlternateContent 的每个分支都只有黑框形状时，连回退分支一起删。 */
+function isPageFrameNode(el: XEl): boolean {
+  if (localOf(el) === 'AlternateContent') {
+    return childEls(el).every((branch) => childEls(branch).every(isPageFrameShape));
+  }
+  return isPageFrameShape(el);
+}
+
 /**
- * 移除页眉/页脚中的整页描边矩形（WPS/Word 兼容回退形状），避免导出文档出现黑框。
+ * 移除页眉/页脚中的整页描边矩形，避免导出文档出现黑框。
+ *
+ * 同一个黑框有两种序列化：`mc:Choice Requires="wps"` 里的 wps 形状（Word/WPS 优先用）
+ * 和 `mc:Fallback` 里的 VML 回退形状，只删一边仍会画出来，所以整段 AlternateContent 一起删。
  * 返回 null 表示无需改动，调用方保留原文。
  */
 export function stripPageFrameShapes(xml: string): { xml: string; removed: number } | null {
   const root = parseXml(xml).documentElement;
-  let removed = 0;
 
-  for (const parent of [root, ...allDescendants(root)]) {
-    for (const pict of childEls(parent).filter((el) => localOf(el) === 'pict')) {
-      if ([pict, ...allDescendants(pict)].some(looksLikePageFrameRect)) {
-        parent.removeChild(pict);
+  const stripFrom = (el: XEl): number => {
+    let removed = 0;
+    for (const child of childEls(el)) {
+      if (isPageFrameNode(child)) {
+        el.removeChild(child);
         removed += 1;
+        continue;
       }
+      removed += stripFrom(child);
     }
-  }
+    return removed;
+  };
+
+  const removed = stripFrom(root);
   if (!removed) return null;
   return { xml: serializeEl(root), removed };
 }

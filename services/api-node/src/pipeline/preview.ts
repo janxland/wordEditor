@@ -9,6 +9,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import YAML from 'yaml';
+
 import { findPandoc } from '../config.js';
 import { createJob } from '../jobs/workspace.js';
 import type { PipelineEvent } from './types.js';
@@ -24,6 +26,23 @@ import {
 } from './templates.js';
 
 const SHARED_PREVIEW_MD = 'templates/hutb-shared/preview-styles.md';
+
+/**
+ * 传入的是编辑器里的模板 styles.yaml 文本，落到任务目录后顶层相对 extends
+ * （`../_shared/hutb-base.yaml`）就以 `.cache/<job>/` 为基准而找不到，先锚定到模板目录。
+ */
+function anchorExtends(text: string, baseDir: string): string {
+  let dsl: { extends?: unknown } | null;
+  try {
+    dsl = YAML.parse(text);
+  } catch {
+    // 语法错误留给下游的 YAML 读取报错，错误文案与不锚定时一致。
+    return text;
+  }
+  const rel = dsl?.extends;
+  if (typeof rel !== 'string' || !rel || path.isAbsolute(rel)) return text;
+  return YAML.stringify({ ...dsl, extends: path.resolve(baseDir, rel) });
+}
 
 export interface StylePreviewResult {
   jobId: string;
@@ -54,7 +73,7 @@ export async function runStylePreview(options: {
 
   const job = createJob(options.cacheDir);
   const stylesPath = path.join(job.dir, 'styles.yaml');
-  fs.writeFileSync(stylesPath, options.stylesYaml, 'utf-8');
+  fs.writeFileSync(stylesPath, anchorExtends(options.stylesYaml, path.dirname(ownSample)), 'utf-8');
 
   // 主路径先把 CDN 图落到任务目录（preview_styles.py 的做法）；
   // 回退路径直接把样例稿交给构建链路，让 Pandoc 按 HTML 管道自行内联。

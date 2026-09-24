@@ -38,6 +38,8 @@ def _q(t: str) -> str:
 
 
 _HEADER_FOOTER_PART_RE = re.compile(r"^word/(header|footer)\d+\.xml$")
+_ML_SHAPE_NS = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+_SHAPE_FILLS = {"solidFill", "gradFill", "pattFill", "grpFill"}
 
 
 def _local_name(tag: str) -> str:
@@ -56,17 +58,63 @@ def _looks_like_page_frame_rect(el: ET.Element) -> bool:
     )
 
 
+def _is_stroked_page_rect(wsp: ET.Element) -> bool:
+    """DrawingML 侧的页面边框：无填充 + 带描边的矩形。"""
+    sp_pr = next((c for c in wsp if _local_name(c.tag) == "spPr"), None)
+    if sp_pr is None:
+        return False
+    ln = next((c for c in sp_pr if _local_name(c.tag) == "ln"), None)
+    geom = next((c for c in sp_pr if _local_name(c.tag) == "prstGeom"), None)
+    return (
+        geom is not None
+        and geom.get("prst") == "rect"
+        and any(_local_name(c.tag) == "noFill" for c in sp_pr)
+        and ln is not None
+        and any(_local_name(c.tag) in _SHAPE_FILLS for c in ln)
+    )
+
+
+def _is_page_frame_shape(el: ET.Element) -> bool:
+    local = _local_name(el.tag)
+    if local == "pict":
+        return any(_looks_like_page_frame_rect(desc) for desc in el.iter())
+    if local != "drawing":
+        return False
+    anchor = next(iter(el), None)
+    if anchor is None or _local_name(anchor.tag) != "anchor":
+        return False
+
+    def anchored_to_page(tag: str) -> bool:
+        child = next((c for c in anchor if _local_name(c.tag) == tag), None)
+        return child is not None and child.get("relativeFrom") == "page"
+
+    if not (anchored_to_page("positionH") and anchored_to_page("positionV")):
+        return False
+    return any(
+        desc.tag == f"{{{_ML_SHAPE_NS}}}wsp" and _is_stroked_page_rect(desc)
+        for desc in anchor.iter()
+    )
+
+
 def _strip_page_frame_shapes(xml_bytes: bytes) -> tuple[bytes, int]:
-    """移除页眉/页脚中的整页描边矩形（WPS/Word 兼容回退形状），避免导出文档出现黑框。"""
+    """移除页眉/页脚中的整页描边矩形，避免导出文档出现黑框。
+
+    同一个黑框有两种序列化：mc:Choice Requires="wps" 里的 wps 形状（Word/WPS 优先用）
+    和 mc:Fallback 里的 VML 回退形状，只删一边仍会画出来，所以整段 AlternateContent 一起删。
+    """
     root = ET.fromstring(xml_bytes)
     removed = 0
 
     for parent in root.iter():
         for child in list(parent):
-            if _local_name(child.tag) != "pict":
-                continue
-            has_frame_rect = any(_looks_like_page_frame_rect(desc) for desc in child.iter())
-            if has_frame_rect:
+            if _local_name(child.tag) == "AlternateContent":
+                is_frame = all(
+                    all(_is_page_frame_shape(grand) for grand in branch)
+                    for branch in child
+                )
+            else:
+                is_frame = _is_page_frame_shape(child)
+            if is_frame:
                 parent.remove(child)
                 removed += 1
 
