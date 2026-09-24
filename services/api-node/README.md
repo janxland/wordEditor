@@ -57,9 +57,12 @@ Optional env:
 ## 已核对的回归范围
 
 - 完整链路 `parity full`：8 个模板产物语义一致。
+- `POST /api/preview/styles`：8 个模板（把模板自己的 styles.yaml 原样回传）产物语义一致。
+  请求里的 styles.yaml 是文本，落进任务目录前顶层相对 `extends` 会按 `templates/<templateId>/`
+  锚定成绝对路径，两引擎同一处理。
 - `/api/build/stream` 选项矩阵 13 例（`noHtmlPipe` / `noPostprocess` / `password` / 页眉页脚对齐组合 /
   `provenance` / 中文与非法字符文件名 / 别名模板 / entries 上传带图 / 三线表+公式）：产物与 `done` 负载一致，
   日志行逐字一致。`password` 的 `w:hash`/`w:salt` 是随机盐，哈希算法本身已与 `_hash_password` 同盐核对过。
-- 其余端点 36 项（含 5 个模板的 `/api/preview/styles` 产物、`/api/import/docx` 含公式与图片的 docx、
+- 其余端点 41 项（含 `/api/import/docx` 含公式与图片的 docx、
   各错误分支、并发 4 任务的作业目录隔离）：除上表所列，响应一致。
 

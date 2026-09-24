@@ -6,75 +6,118 @@ import JSZip from 'jszip';
 /** 入参为该部件原文（部件不存在时为 null）；返回 null 表示不改动该部件。 */
 export type PartPatch = (source: string | null) => string | null;
 
-async function loadZip(docxPath: string): Promise<JSZip> {
-  return JSZip.loadAsync(fs.readFileSync(docxPath));
+/**
+ * 一次构建共用一个已载入的包：部件读改写全在内存里，磁盘只在 flush 时写一次。
+ * 旧写法是每个阶段各自 load→改→DEFLATE 整包，一次构建要读 13 遍、重压缩 7 遍
+ * （word/media 跟着白压 7 次），实测每多一个阶段峰值 RSS 就多 11~15 MB。
+ */
+export interface DocxSession {
+  listParts(): Promise<string[]>;
+  readPart(part: string): Promise<string | null>;
+  /** 一次读取多个部件；不存在的部件为 null。 */
+  readParts(parts: string[]): Promise<Map<string, string | null>>;
+  /** 一次读取多个二进制部件（word/media/*）；不存在的部件为 null。 */
+  readPartsBytes(parts: string[]): Promise<Map<string, Buffer | null>>;
+  /** 一次性改写多个部件；新部件（如缺失的 numbering.xml）会被创建。 */
+  patch(patches: Record<string, PartPatch>): Promise<void>;
+  /** 有改动才落盘；无改动时连读入都省掉。 */
+  flush(): Promise<void>;
 }
 
-/** 部件名清单，用于页眉/页脚这类动态命名的部件。 */
+export async function openDocxSession(docxPath: string): Promise<DocxSession> {
+  let zip: JSZip | null = null;
+  let dirty = false;
+  const open = async (): Promise<JSZip> => (zip ??= await JSZip.loadAsync(fs.readFileSync(docxPath)));
+
+  const readParts = async (parts: string[]): Promise<Map<string, string | null>> => {
+    const z = await open();
+    const out = new Map<string, string | null>();
+    for (const part of parts) {
+      const file = z.file(part);
+      out.set(part, file ? await file.async('string') : null);
+    }
+    return out;
+  };
+
+  const session: DocxSession = {
+    async listParts() {
+      const names: string[] = [];
+      const z = await open();
+      z.forEach((name) => names.push(name));
+      return names;
+    },
+
+    async readPart(part) {
+      return (await readParts([part])).get(part) ?? null;
+    },
+
+    readParts,
+
+    async readPartsBytes(parts) {
+      const z = await open();
+      const out = new Map<string, Buffer | null>();
+      for (const part of parts) {
+        const file = z.file(part);
+        out.set(part, file && !file.dir ? Buffer.from(await file.async('nodebuffer')) : null);
+      }
+      return out;
+    },
+
+    async patch(patches) {
+      const z = await open();
+      for (const [part, patch] of Object.entries(patches)) {
+        const file = z.file(part);
+        const source = file ? await file.async('string') : null;
+        const next = patch(source);
+        if (next === null || next === undefined) continue;
+        if (next === source) continue;
+        z.file(part, next);
+        dirty = true;
+      }
+    },
+
+    async flush() {
+      if (!dirty || !zip) return;
+      dirty = false;
+      const buffer = await zip.generateAsync({
+        type: 'nodebuffer',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 },
+      });
+      fs.writeFileSync(docxPath, buffer);
+    },
+  };
+  return session;
+}
+
+/** 以下一次性入口保持原契约：自行开关会话，供单次读写的调用方（extract / reference-styles）使用。 */
 export async function listParts(docxPath: string): Promise<string[]> {
-  const names: string[] = [];
-  const zip = await loadZip(docxPath);
-  zip.forEach((name) => {
-    names.push(name);
-  });
-  return names;
+  return openDocxSession(docxPath).then((s) => s.listParts());
 }
 
-/** 一次打开读取多个部件；不存在的部件为 null。 */
 export async function readParts(
   docxPath: string,
   parts: string[],
 ): Promise<Map<string, string | null>> {
-  const zip = await loadZip(docxPath);
-  const out = new Map<string, string | null>();
-  for (const part of parts) {
-    const file = zip.file(part);
-    out.set(part, file ? await file.async('string') : null);
-  }
-  return out;
+  return openDocxSession(docxPath).then((s) => s.readParts(parts));
 }
 
 export async function readPart(docxPath: string, part: string): Promise<string | null> {
   return (await readParts(docxPath, [part])).get(part) ?? null;
 }
 
-/** 一次打开读取多个二进制部件（word/media/*）；不存在的部件为 null。 */
 export async function readPartsBytes(
   docxPath: string,
   parts: string[],
 ): Promise<Map<string, Buffer | null>> {
-  const zip = await loadZip(docxPath);
-  const out = new Map<string, Buffer | null>();
-  for (const part of parts) {
-    const file = zip.file(part);
-    out.set(part, file && !file.dir ? Buffer.from(await file.async('nodebuffer')) : null);
-  }
-  return out;
+  return openDocxSession(docxPath).then((s) => s.readPartsBytes(parts));
 }
 
-/** 一次性改写多个部件；新部件（如缺失的 numbering.xml）会被创建。 */
 export async function patchDocxParts(
   docxPath: string,
   patches: Record<string, PartPatch>,
 ): Promise<void> {
-  const zip = await loadZip(docxPath);
-  let touched = false;
-
-  for (const [part, patch] of Object.entries(patches)) {
-    const file = zip.file(part);
-    const source = file ? await file.async('string') : null;
-    const next = patch(source);
-    if (next === null || next === undefined) continue;
-    if (next === source) continue;
-    zip.file(part, next);
-    touched = true;
-  }
-
-  if (!touched) return;
-  const buffer = await zip.generateAsync({
-    type: 'nodebuffer',
-    compression: 'DEFLATE',
-    compressionOptions: { level: 6 },
-  });
-  fs.writeFileSync(docxPath, buffer);
+  const session = await openDocxSession(docxPath);
+  await session.patch(patches);
+  await session.flush();
 }

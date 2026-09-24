@@ -7,8 +7,8 @@
 import crypto from 'node:crypto';
 
 import { parseXml, serializeEl } from '../ooxml/xml.js';
-import { patchDocxParts } from '../ooxml/zip.js';
-import type { StageContext } from './context.js';
+import type { DocxSession } from '../ooxml/zip.js';
+import type { StageRun } from './context.js';
 
 const SETTINGS_PART = 'word/settings.xml';
 const SPIN_COUNT = 100_000;
@@ -26,8 +26,8 @@ export function hashPassword(password: string, salt: Buffer): Buffer {
   return h;
 }
 
-export async function applyPassword(docxPath: string, password: string | null): Promise<void> {
-  await patchDocxParts(docxPath, {
+export async function applyPassword(zip: DocxSession, password: string | null): Promise<void> {
+  await zip.patch({
     [SETTINGS_PART]: (source) => {
       if (source === null) return null;
       const doc = parseXml(source);
@@ -52,10 +52,10 @@ export async function applyPassword(docxPath: string, password: string | null): 
   });
 }
 
-export async function applyPasswordStage(ctx: StageContext): Promise<void> {
+export async function applyPasswordStage(ctx: StageRun): Promise<void> {
   const password = ctx.options.password;
   if (!password) return;
   ctx.log('[后处理] 设置修改密码 …');
-  await applyPassword(ctx.docxPath, password);
+  await applyPassword(ctx.zip, password);
   ctx.log('[apply_password] 已设置修改密码');
 }

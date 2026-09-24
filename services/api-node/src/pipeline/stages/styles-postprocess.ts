@@ -19,8 +19,8 @@ import {
   type StylesDsl,
 } from '../ooxml/styles-dsl.js';
 import { parseXml, serializeEl, type XEl } from '../ooxml/xml.js';
-import { listParts, patchDocxParts, readParts, type PartPatch } from '../ooxml/zip.js';
-import type { StageContext } from './context.js';
+import type { DocxSession, PartPatch } from '../ooxml/zip.js';
+import type { StageContext, StageRun } from './context.js';
 
 const HEADER_FOOTER_PART_RE = /^word\/(header|footer)\d+\.xml$/;
 
@@ -45,11 +45,11 @@ function defaultListStyleId(dsl: StylesDsl): string | undefined {
   return typeof first === 'string' ? first : first.id;
 }
 
-async function patchDocx(docxPath: string, dsl: StylesDsl, log: (line: string) => void): Promise<void> {
-  const names = await listParts(docxPath);
+async function patchDocx(zip: DocxSession, dsl: StylesDsl, log: (line: string) => void): Promise<void> {
+  const names = await zip.listParts();
   const wanted = [STYLE_PART, NUMBERING_PART, DOCUMENT_PART];
   const headerFooterParts = names.filter((name) => HEADER_FOOTER_PART_RE.test(name));
-  const sources = await readParts(docxPath, [...wanted, ...headerFooterParts]);
+  const sources = await zip.readParts([...wanted, ...headerFooterParts]);
 
   const stylesSource = sources.get(STYLE_PART);
   const documentSource = sources.get(DOCUMENT_PART);
@@ -137,20 +137,20 @@ async function patchDocx(docxPath: string, dsl: StylesDsl, log: (line: string) =
     };
   }
 
-  await patchDocxParts(docxPath, patches);
+  await zip.patch(patches);
   if (removedPageFrames) {
     log(`[postprocess_styles] 已移除页眉/页脚页面黑框 ${removedPageFrames} 处`);
   }
 }
 
-export async function applyStylesStage(ctx: StageContext): Promise<void> {
+export async function applyStylesStage(ctx: StageRun): Promise<void> {
   const stylesYaml = resolveStylesYaml(ctx);
   if (!stylesYaml) return;
 
   ctx.step('ooxml', 'process', '注入 styles.yaml…');
   ctx.log('[后处理] 注入 OOXML 样式 …');
   ctx.log(`[postprocess_styles] ${ctx.docxPath}  <- DSL: ${stylesYaml}`);
-  await patchDocx(ctx.docxPath, loadStylesDsl(stylesYaml), (line) => ctx.log(line));
+  await patchDocx(ctx.zip, loadStylesDsl(stylesYaml), (line) => ctx.log(line));
   ctx.log('[postprocess_styles] 完成');
   ctx.step('ooxml', 'finish');
 }

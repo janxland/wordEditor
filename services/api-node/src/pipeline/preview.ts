@@ -17,6 +17,7 @@ import type { PipelineEvent } from './types.js';
 import { sanitizeDownloadName } from './naming.js';
 import { runBuild } from './build.js';
 import { materializeMarkdownImages } from './preview-images.js';
+import { openDocxSession } from './ooxml/zip.js';
 import { applyStylesStage } from './stages/styles-postprocess.js';
 import {
   findTemplate,
@@ -101,6 +102,7 @@ export async function runStylePreview(options: {
   });
 
   if (!hasOwnSample) {
+    const zip = await openDocxSession(job.outputDocx);
     await applyStylesStage({
       repoRoot: options.repoRoot,
       docxPath: job.outputDocx,
@@ -109,7 +111,9 @@ export async function runStylePreview(options: {
       stylesYaml: stylesPath,
       log: (line) => options.onEvent({ type: 'log', line, stream: 'stdout' }),
       step: () => undefined,
+      zip,
     });
+    await zip.flush();
   }
 
   return {

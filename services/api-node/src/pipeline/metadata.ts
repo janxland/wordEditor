@@ -1,6 +1,6 @@
 /** 文档属性写入：等价于 pipeline/apply_docx_metadata.py。 */
 import { parseXml, serializeEl, ensureEl, setAttr, setText, child, addEl, type XEl } from './ooxml/xml.js';
-import { patchDocxParts } from './ooxml/zip.js';
+import type { DocxSession } from './ooxml/zip.js';
 
 export interface DocxProvenance {
   author?: string;
@@ -53,8 +53,8 @@ function patchApp(source: string | null): string | null {
   return serializeEl(root);
 }
 
-export async function applyDocxMetadata(docxPath: string, p: DocxProvenance): Promise<void> {
-  await patchDocxParts(docxPath, {
+export async function applyDocxMetadata(zip: DocxSession, p: DocxProvenance): Promise<void> {
+  await zip.patch({
     'docProps/core.xml': (source) => patchCore(source, p),
     'docProps/app.xml': patchApp,
   });
