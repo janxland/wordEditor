@@ -47,7 +47,9 @@ export async function runBuild(ctx: BuildContext): Promise<void> {
   log(`输入: ${ctx.inputMd}`);
   log(`输出: ${ctx.outputDocx}`);
   if (template.luaFilters.length) {
-    log(`Lua: ${template.luaFilters.map((f) => path.relative(ctx.repoRoot, f)).join(', ')}`);
+    // Python 侧打印的是 list 的 repr，逐字对齐。
+    const lua = template.luaFilters.map((f) => `'${path.relative(ctx.repoRoot, f)}'`).join(', ');
+    log(`Lua: [${lua}]`);
   }
   emit({ type: 'step', id: 'pandoc', status: 'process', message: 'Pandoc 转换中…' });
 

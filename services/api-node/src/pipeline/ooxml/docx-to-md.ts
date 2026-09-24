@@ -5,7 +5,7 @@
  * 落盘交给调用方。与 Python 一样按「样式 + 内容」双重识别标题/摘要/图注/表注，
  * 而不是把导入的 docx 直接丢给 Pandoc——学校模板里样式名才是结构的权威来源。
  */
-import { attr, child, childEls, descendants, qName, textOf, type XEl } from './xml.js';
+import { allDescendants, attr, child, childEls, descendants, qName, textOf, type XEl } from './xml.js';
 
 export interface ExtractStats {
   headings: number;
@@ -225,14 +225,26 @@ export function docxToMarkdown(input: {
 
 /**
  * 段落文本：w:t 直取，w:tab/w:br 留白；oMath 块内的 m:t 合并成 `$…$` 占位，便于人工修 LaTeX。
+ *
+ * 数学元素只能按命名空间 URI 判定：本仓库产出的 docx 里 OMML 前缀会被改写成 ns1，
+ * 用户把导出件再导回来时按 `m:` 匹配就会整块丢失公式。
  */
+const MATH_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math';
+
+function isMathTag(el: XEl, local: string): boolean {
+  return el.namespaceURI === MATH_NS && el.localName === local;
+}
+
 function collectText(el: XEl): string {
   const parts: string[] = [];
 
   const walk = (node: XEl): void => {
     const tag = qName(node);
-    if (tag === 'm:oMath' || tag === 'm:oMathPara') {
-      const inner = descendants(node, 'm:t').map((t) => textOf(t)).join('');
+    if (isMathTag(node, 'oMath') || isMathTag(node, 'oMathPara')) {
+      const inner = allDescendants(node)
+        .filter((d) => isMathTag(d, 't'))
+        .map((t) => textOf(t))
+        .join('');
       if (inner.trim()) parts.push(` $${inner}$ `);
       return;
     }

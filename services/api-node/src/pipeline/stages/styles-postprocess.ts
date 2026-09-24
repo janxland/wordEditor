@@ -148,7 +148,8 @@ export async function applyStylesStage(ctx: StageContext): Promise<void> {
   if (!stylesYaml) return;
 
   ctx.step('ooxml', 'process', '注入 styles.yaml…');
-  ctx.log(`[后处理] 注入 OOXML 样式 … ${path.relative(ctx.repoRoot, stylesYaml)}`);
+  ctx.log('[后处理] 注入 OOXML 样式 …');
+  ctx.log(`[postprocess_styles] ${ctx.docxPath}  <- DSL: ${stylesYaml}`);
   await patchDocx(ctx.docxPath, loadStylesDsl(stylesYaml), (line) => ctx.log(line));
   ctx.log('[postprocess_styles] 完成');
   ctx.step('ooxml', 'finish');
