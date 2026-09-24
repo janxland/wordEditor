@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Generator
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
 ROOT = Path(__file__).resolve().parents[2]
 PIPELINE = ROOT / "services" / "api-python" / "pipeline"
@@ -23,7 +23,13 @@ DEFAULT_PORT = int(
     or "8787"
 )
 
-app = FastAPI(title="wordEditor api-python", version="0.1.0")
+# 接口契约改由 contracts/openapi.json 单一来源提供（见下方 /openapi.json），
+# 因此关掉 FastAPI 自动生成的那套：它只认函数签名，请求体一律是裸 Request，导出的 schema 是空的。
+app = FastAPI(title="wordEditor api-python", version="0.1.0", openapi_url=None, docs_url=None, redoc_url=None)
+
+
+def _contract(name: str) -> bytes:
+    return (ROOT / "contracts" / name).read_bytes()
 
 
 def _safe_resolve(rel_path: str) -> Path | None:
@@ -514,6 +520,17 @@ async def import_docx(request: Request) -> JSONResponse:
     )
 
 
+@app.get("/openapi.json", include_in_schema=False)
+def openapi() -> Response:
+    """与 api-node 逐字节同发同一份契约：Agent / Swagger UI 只需要这一个地址。"""
+    return Response(_contract("openapi.json"), media_type="application/json")
+
+
+@app.get("/docs", include_in_schema=False)
+def docs() -> Response:
+    return Response(_contract("api-docs.html"), media_type="text/html; charset=utf-8")
+
+
 @app.get("/")
 def root_info() -> dict[str, Any]:
     return {
@@ -521,4 +538,5 @@ def root_info() -> dict[str, Any]:
         "service": "api-python",
         "port": DEFAULT_PORT,
         "hint": "Run: py -m uvicorn app:app --app-dir services/api-python --reload --port 8787",
+        "openapi": "/openapi.json",
     }

@@ -1,0 +1,575 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "wordEditor 论文排版 API",
+    "version": "0.1.0",
+    "description": "Markdown ↔ docx 双向排版服务：Markdown 经 Pandoc + OOXML 后处理管线产出符合模板版式的 Word 文档，docx 可反向提取为带图片资源的 Markdown 文件夹。\n\n同一套契约由两个引擎实现，产物按命名空间归一后的 XML 逐部件等价：\n- api-node（Fastify，默认）：`pnpm --filter wordeditor-api-node dev`\n- api-python（FastAPI，备用）：`python -m uvicorn app:app --app-dir services/api-python`\n\n两端响应头、状态码、错误体 `{\"detail\": msg}` 与 SSE 帧格式逐字节一致；仅框架自身产生的差异（404/405、非法 JSON 的 500、`python.path` 路径写法、`/` 的 hint 文案）除外。",
+    "x-ai": {
+      "engines": ["api-node", "api-python"],
+      "defaultBaseUrl": "http://localhost:8787",
+      "auth": "none（本机服务，无鉴权；对外暴露请自行加反代鉴权）",
+      "typicalFlow": [
+        "GET /api/templates 取 templateId",
+        "POST /api/build/stream（SSE）构建，done 事件给出 downloadUrl",
+        "GET downloadUrl 下载 docx"
+      ],
+      "constraints": {
+        "requestBodyLimit": "96MB（上传整个文件夹时按条目 base64 传入）",
+        "uploadEntryLimit": "单条目 base64 长度上限 ≈ 27.4MB（原始约 20MB），超出即跳过并在 log 事件里回报",
+        "heavyTaskConcurrency": "重任务（构建 / 预览 / 导入）有并发闸门，槽满排队，SSE 里回报 `[排队] …（第 N 位）`；可用 WORDEDITOR_MAX_CONCURRENCY 调整",
+        "jobTtl": "任务目录默认 6 小时后回收（WORDEDITOR_JOB_TTL_MINUTES），downloadUrl 随之失效",
+        "pathGuard": "/api/file 与 entries[].relPath 均限定在仓库根 / 任务目录内，越界条目被跳过或 404"
+      },
+      "streamingNotes": "SSE 每 15 秒发一次注释帧 `:ping`；错误以 event:error 帧承载且 HTTP 状态仍为 200，因此必须读流判断成败，不能只看状态码。"
+    }
+  },
+  "servers": [
+    { "url": "http://localhost:8787", "description": "默认端口（两端共用 WORDEDITOR_PORT）" }
+  ],
+  "tags": [
+    { "name": "system", "description": "服务与运行环境自检" },
+    { "name": "templates", "description": "模板注册表与参考样式" },
+    { "name": "files", "description": "仓库内 Markdown / 文本文件读写" },
+    { "name": "build", "description": "Markdown → docx 构建与下载" },
+    { "name": "import", "description": "docx → Markdown 提取" }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "tags": ["system"],
+        "operationId": "rootInfo",
+        "summary": "服务标识与契约入口",
+        "responses": {
+          "200": {
+            "description": "引擎名、端口、启动提示与 OpenAPI 契约地址",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RootInfo" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": ["system"],
+        "operationId": "health",
+        "summary": "存活探针",
+        "x-curl": "curl -s localhost:8787/api/health",
+        "responses": {
+          "200": {
+            "description": "始终 200；service 字段区分引擎",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Health" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tools": {
+      "get": {
+        "tags": ["system"],
+        "operationId": "tools",
+        "summary": "外部工具探测（Pandoc / Python）",
+        "description": "构建前先看 `pandoc.ok`；为 false 时按 hint 安装或设置 PANDOC 环境变量。`python.path` 反映备用引擎是否可起。",
+        "x-curl": "curl -s localhost:8787/api/tools",
+        "responses": {
+          "200": {
+            "description": "各工具的可用性、路径与安装提示",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Tools" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/templates": {
+      "get": {
+        "tags": ["templates"],
+        "operationId": "templates",
+        "summary": "模板注册表",
+        "description": "config/templates.json 原文，外加每条 `reference_exists`（参考 docx 是否就位）。构建入参的 templateId 取这里的 id。",
+        "x-curl": "curl -s localhost:8787/api/templates | jq '.templates[].id'",
+        "responses": {
+          "200": {
+            "description": "模板列表",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Templates" }
+              }
+            }
+          },
+          "404": { "description": "路由未命中（框架级 404）" },
+          "500": {
+            "description": "config/templates.json 不存在",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+          }
+        },
+        "x-errors": [{ "status": 500, "detail": "config/templates.json 不存在" }]
+      }
+    },
+    "/api/templates/reference-styles": {
+      "get": {
+        "tags": ["templates"],
+        "operationId": "referenceStyles",
+        "summary": "参考 docx 的样式清单（styles.yaml DSL 的输入）",
+        "description": "列出某模板 reference.docx 里的段落 / 字符样式，用于编写或校对 styles.yaml。",
+        "x-curl": "curl -s 'localhost:8787/api/templates/reference-styles?template=hutb-guanke' | jq .count",
+        "parameters": [
+          {
+            "name": "template",
+            "in": "query",
+            "required": true,
+            "description": "模板 id，须匹配 ^[\\w-]+$",
+            "schema": { "type": "string", "pattern": "^[\\w-]+$", "example": "hutb-guanke" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "样式清单",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ReferenceStyles" }
+              }
+            }
+          },
+          "400": { "description": "template 缺失或含非法字符" },
+          "500": { "description": "读取参考样式失败" }
+        },
+        "x-errors": [
+          { "status": 400, "detail": "template 参数缺失或非法" },
+          { "status": 500, "detail": "读取 reference styles 失败" }
+        ]
+      }
+    },
+    "/api/docs": {
+      "get": {
+        "tags": ["files"],
+        "operationId": "readDoc",
+        "summary": "读取 docs/ 下的 Markdown",
+        "description": "只开放 docs/ 目录内的单层 .md 文件。",
+        "x-curl": "curl -s 'localhost:8787/api/docs?name=xxx.md' | jq -r .content",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "description": "文件名，须匹配 ^[\\w-]+\\.md$",
+            "schema": { "type": "string", "pattern": "^[\\w-]+\\.md$" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "文件内容",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FileContent" } } }
+          },
+          "400": { "description": "invalid doc name" },
+          "404": { "description": "doc not found" }
+        },
+        "x-errors": [
+          { "status": 400, "detail": "invalid doc name" },
+          { "status": 404, "detail": "doc not found" }
+        ]
+      }
+    },
+    "/api/file": {
+      "get": {
+        "tags": ["files"],
+        "operationId": "readFile",
+        "summary": "读取仓库内任意文本文件",
+        "description": "path 为仓库根相对路径；越界（../ 或绝对路径）一律 404。",
+        "x-curl": "curl -s 'localhost:8787/api/file?path=input/生态法典校园实践.md'",
+        "parameters": [{ "$ref": "#/components/parameters/PathParam" }],
+        "responses": {
+          "200": {
+            "description": "文件内容",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FileContent" } } }
+          },
+          "404": { "description": "file not found（含越界）" }
+        },
+        "x-errors": [{ "status": 404, "detail": "file not found" }]
+      },
+      "put": {
+        "tags": ["files"],
+        "operationId": "writeFile",
+        "summary": "写入仓库内文本文件（自动建目录）",
+        "description": "内容走请求体，路径走查询参数。写入不限于 docs/，请只用于自己工作区。",
+        "x-curl": "curl -s -X PUT 'localhost:8787/api/file?path=output/note.md' -H 'Content-Type: application/json' -d '{\"content\":\"# hi\\n\"}'",
+        "parameters": [{ "$ref": "#/components/parameters/PathParam" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/FileWriteRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "写入成功",
+            "content": {
+              "application/json": { "schema": { "type": "object", "properties": { "ok": { "type": "boolean" } }, "required": ["ok"] } }
+            }
+          },
+          "400": { "description": "invalid path / content required" }
+        },
+        "x-errors": [
+          { "status": 400, "detail": "invalid path" },
+          { "status": 400, "detail": "content required" }
+        ]
+      }
+    },
+    "/api/build/stream": {
+      "post": {
+        "tags": ["build"],
+        "operationId": "buildStream",
+        "summary": "Markdown → docx 构建（SSE 实时进度）",
+        "description": "返回 text/event-stream。事件序列：step(prepare) → log* → step(pandoc/structure/ooxml)* → done | error。\n- `step`：`{id: prepare|pandoc|structure|ooxml, status: wait|process|finish, message?}`\n- `log`：`{line, stream: stdout|stderr}`（Pandoc 与后处理的原样输出）\n- `done`：`{jobId, fileName, downloadUrl}`\n- `error`：`{error}`，出现即构建失败\n每 15 秒一条注释帧 `:ping`（防反代 read timeout），非事件，解析器应忽略。失败也以 HTTP 200 + error 帧回报。",
+        "x-curl": "curl -Ns localhost:8787/api/build/stream -H 'Content-Type: application/json' -d '{\"templateId\":\"hutb-guanke\",\"markdown\":\"# T\\n\\n正文\"}'",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BuildRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "SSE 事件流",
+            "content": { "text/event-stream": { "schema": { "type": "string" } } }
+          }
+        },
+        "x-errors-in-band": true,
+        "x-errors": [
+          { "event": "error", "when": "templateId 为空", "error": "templateId is required" },
+          { "event": "error", "when": "markdown 与 entries 都为空", "error": "markdown 或 entries 必填" },
+          { "event": "error", "when": "未安装 Pandoc", "error": "未检测到 Pandoc：brew install pandoc …" },
+          { "event": "error", "when": "mdRelPath 不在上传清单里", "error": "mdRelPath 未在上传列表中: …" },
+          { "event": "error", "when": "Pandoc 或后处理失败", "error": "build failed: <exit code>" }
+        ]
+      }
+    },
+    "/api/build/download": {
+      "get": {
+        "tags": ["build"],
+        "operationId": "buildDownload",
+        "summary": "下载构建产物 docx",
+        "description": "jobId 来自 done 事件；任务目录超 TTL 后返回 404。文件名为 UTF-8 编码的 Content-Disposition。",
+        "x-curl": "curl -NsOJ 'localhost:8787/api/build/download?jobId=<uuid>&fileName=out.docx'",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "query",
+            "required": true,
+            "description": "done 事件里的 jobId，须匹配 ^[\\w-]+$",
+            "schema": { "type": "string", "pattern": "^[\\w-]+$" }
+          },
+          {
+            "name": "fileName",
+            "in": "query",
+            "required": false,
+            "description": "下载文件名，缺省 export.docx；会被净化为 [\\w.()-空格中文]",
+            "schema": { "type": "string", "default": "export.docx" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "docx 二进制",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "400": { "description": "invalid jobId" },
+          "404": { "description": "file not found or expired" }
+        },
+        "x-errors": [
+          { "status": 400, "detail": "invalid jobId" },
+          { "status": 404, "detail": "file not found or expired" }
+        ]
+      }
+    },
+    "/api/preview/styles": {
+      "post": {
+        "tags": ["build"],
+        "operationId": "previewStyles",
+        "summary": "用一段 styles.yaml 即时套版（非流式）",
+        "description": "把请求里的 stylesYaml 覆盖到模板上，跑完整后处理，同步返回与 done 事件同形的载荷。适合边改 DSL 边看效果。",
+        "x-curl": "curl -s localhost:8787/api/preview/styles -H 'Content-Type: application/json' -d '{\"templateId\":\"hutb-guanke\",\"stylesYaml\":\"heading1:\\n  size: 16\\n\"}'",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PreviewStylesRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "产物载荷，用 downloadUrl 下载",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/DownloadPayload" } }
+            }
+          },
+          "400": { "description": "templateId is required / stylesYaml is required" },
+          "500": { "description": "style preview failed" }
+        },
+        "x-errors": [
+          { "status": 400, "detail": "templateId is required" },
+          { "status": 400, "detail": "stylesYaml is required" },
+          { "status": 500, "detail": "style preview failed\n<构建输出>" }
+        ]
+      }
+    },
+    "/api/import/docx": {
+      "post": {
+        "tags": ["import"],
+        "operationId": "importDocx",
+        "summary": "docx → Markdown + 图片资源",
+        "description": "同步返回主 Markdown 与全部附属文件（含 images/）的 base64，可直接作为 /api/build/stream 的 entries 回灌，形成 docx → md → docx 闭环。",
+        "x-curl": "curl -s localhost:8787/api/import/docx -H 'Content-Type: application/json' -d '{\"filename\":\"a.docx\",\"contentBase64\":\"<base64>\"}'",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ImportRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "提取结果",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportResult" } }
+            }
+          },
+          "400": { "description": "contentBase64 is required" },
+          "500": { "description": "extract failed" }
+        },
+        "x-errors": [
+          { "status": 400, "detail": "contentBase64 is required" },
+          { "status": 500, "detail": "extract failed\n<提取输出>" }
+        ]
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "PathParam": {
+        "name": "path",
+        "in": "query",
+        "required": true,
+        "description": "仓库根相对路径；越界一律按未找到处理",
+        "schema": { "type": "string", "example": "config/templates.json" }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "description": "所有非流式错误的统一响应体（与 FastAPI HTTPException 同构）",
+        "properties": { "detail": { "type": "string" } },
+        "required": ["detail"]
+      },
+      "RootInfo": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "const": true },
+          "service": { "type": "string", "enum": ["api-node", "api-python"] },
+          "port": { "type": "integer" },
+          "hint": { "type": "string", "description": "该引擎的启动命令" },
+          "openapi": { "type": "string", "const": "/openapi.json" }
+        },
+        "required": ["ok", "service", "port", "hint", "openapi"]
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "const": true },
+          "service": { "type": "string", "enum": ["api-node", "api-python"] },
+          "repo": { "type": "string", "description": "仓库根绝对路径" }
+        },
+        "required": ["ok", "service", "repo"]
+      },
+      "ToolProbe": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean" },
+          "path": { "type": ["string", "null"] },
+          "hint": { "type": ["string", "null"] }
+        },
+        "required": ["ok"]
+      },
+      "Tools": {
+        "type": "object",
+        "properties": {
+          "pandoc": { "$ref": "#/components/schemas/ToolProbe" },
+          "python": { "$ref": "#/components/schemas/ToolProbe" }
+        },
+        "required": ["pandoc", "python"]
+      },
+      "Template": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "example": "hutb-guanke" },
+          "name": { "type": "string" },
+          "reference_doc": { "type": "string", "description": "仓库根相对的 reference.docx" },
+          "reference_exists": { "type": "boolean", "description": "服务端附带" },
+          "styles_yaml": { "type": "string" },
+          "lua_filter": { "type": "string" },
+          "heading_numbering": { "type": "string", "enum": ["gongke", "guanke"] },
+          "three_line_tables": { "type": "boolean" },
+          "cover_block": { "type": "string" },
+          "tail_block": { "type": "string" },
+          "note": { "type": "string" }
+        },
+        "required": ["id", "name", "reference_doc"]
+      },
+      "Templates": {
+        "type": "object",
+        "properties": {
+          "default_template": { "type": "string" },
+          "templates": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Template" }
+          }
+        },
+        "required": ["templates"]
+      },
+      "ReferenceStyle": {
+        "type": "object",
+        "description": "reference.docx 里的一条样式",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "type": { "type": "string", "enum": ["paragraph", "character", "table", "numbering"] },
+          "based_on": { "type": ["string", "null"] },
+          "next": { "type": ["string", "null"] },
+          "outline_lvl": { "type": ["integer", "null"] },
+          "font": { "type": ["string", "null"] },
+          "size_pt": { "type": ["number", "null"] },
+          "bold": { "type": ["boolean", "null"] },
+          "align": { "type": ["string", "null"] },
+          "line_spacing": { "type": ["number", "null"] }
+        }
+      },
+      "ReferenceStyles": {
+        "type": "object",
+        "properties": {
+          "docx": { "type": "string", "description": "仓库根相对的 reference.docx" },
+          "count": { "type": "integer" },
+          "styles": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ReferenceStyle" }
+          }
+        },
+        "required": ["docx", "count", "styles"]
+      },
+      "FileContent": {
+        "type": "object",
+        "properties": { "content": { "type": "string" } },
+        "required": ["content"]
+      },
+      "FileWriteRequest": {
+        "type": "object",
+        "properties": { "content": { "type": "string", "description": "整文件覆写内容" } },
+        "required": ["content"]
+      },
+      "BuildOptions": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "版式覆写项，全部可选；见 docs/styles-dsl.md",
+        "properties": {
+          "noHtmlPipe": { "type": "boolean", "description": "跳过 md→html→docx 两段管道，更快但 HTML 片段支持弱" },
+          "noPostprocess": { "type": "boolean", "description": "跳过结构类后处理（document/styles/三线表/逐字表），页眉页脚与密码仍按入参执行" },
+          "password": { "type": "string", "description": "Word「修改密码」writeProtection，空则不设置" },
+          "headerText": { "type": "string", "description": "页眉文案，支持 <page>/<pages>/{page}/{pages}" },
+          "headerAlign": { "type": "string", "enum": ["left", "center", "right", "both", "distribute"], "default": "center" },
+          "headerVerticalAlign": { "type": "string", "enum": ["top", "center", "baseline", "bottom", "auto"], "default": "center" },
+          "footerText": { "type": "string" },
+          "footerAlign": { "type": "string", "enum": ["left", "center", "right", "both", "distribute"], "default": "center" },
+          "footerVerticalAlign": { "type": "string", "enum": ["top", "center", "baseline", "bottom", "auto"], "default": "center" }
+        }
+      },
+      "DocxProvenance": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "写入 docProps 的文档属性",
+        "properties": {
+          "author": { "type": "string" },
+          "remark": { "type": "string", "description": "对应 docProps 的 comments" },
+          "title": { "type": "string", "description": "覆盖文档标题" }
+        }
+      },
+      "UploadEntry": {
+        "type": "object",
+        "description": "上传文件夹里的一个条目（图片、被引用的 .md、bib 等）",
+        "properties": {
+          "relPath": { "type": "string", "description": "任务目录相对路径，越界条目会被跳过" },
+          "contentBase64": { "type": "string", "description": "文件内容 base64" }
+        },
+        "required": ["relPath", "contentBase64"]
+      },
+      "BuildRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "两种输入模式：单文件传 markdown；整个文件夹传 entries + mdRelPath。",
+        "properties": {
+          "templateId": { "type": "string", "description": "GET /api/templates 的 id；hutb-shared 是 hutb-guanke 的别名", "example": "hutb-guanke" },
+          "markdown": { "type": "string", "description": "主 Markdown 原文（与 entries 二选一）" },
+          "entries": { "type": "array", "items": { "$ref": "#/components/schemas/UploadEntry" } },
+          "mdRelPath": { "type": "string", "description": "entries 模式下主 md 的相对路径，如 论文/正文.md" },
+          "fileName": { "type": "string", "description": "下载文件名，缺省取模板名 + 标题；会被净化" },
+          "options": { "$ref": "#/components/schemas/BuildOptions" },
+          "provenance": { "$ref": "#/components/schemas/DocxProvenance" }
+        },
+        "required": ["templateId"]
+      },
+      "PreviewStylesRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "templateId": { "type": "string", "example": "hutb-guanke" },
+          "stylesYaml": { "type": "string", "description": "临时覆写的 styles.yaml DSL，见 docs/styles-dsl.md" }
+        },
+        "required": ["templateId", "stylesYaml"]
+      },
+      "ImportRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "filename": { "type": "string", "description": "原始文件名，缺省 input.docx；决定输出 md 的 stem", "default": "input.docx" },
+          "contentBase64": { "type": "string", "description": "docx 内容 base64" },
+          "imageSlug": { "type": "string", "description": "图片目录名 images/<slug>，缺省由文件名 slug 化" }
+        },
+        "required": ["contentBase64"]
+      },
+      "ImportResult": {
+        "type": "object",
+        "properties": {
+          "jobId": { "type": "string", "format": "uuid" },
+          "fileName": { "type": "string", "description": "主 Markdown 文件名" },
+          "mdRelPath": { "type": "string", "description": "直接用作 /api/build/stream 的 mdRelPath" },
+          "markdown": { "type": "string" },
+          "entries": {
+            "type": "array",
+            "description": "回灌构建时直接作为 entries 传入（size 为附带信息）",
+            "items": {
+              "allOf": [{ "$ref": "#/components/schemas/UploadEntry" }],
+              "type": "object",
+              "properties": { "size": { "type": "integer", "description": "原始字节数" } }
+            }
+          },
+          "log": { "type": "string", "description": "提取器输出尾部 4000 字符" }
+        },
+        "required": ["jobId", "fileName", "mdRelPath", "markdown", "entries", "log"]
+      },
+      "DownloadPayload": {
+        "type": "object",
+        "description": "产物定位载荷",
+        "properties": {
+          "jobId": { "type": "string", "format": "uuid" },
+          "fileName": { "type": "string" },
+          "downloadUrl": { "type": "string", "example": "/api/build/download?jobId=…&fileName=….docx" }
+        },
+        "required": ["jobId", "fileName", "downloadUrl"]
+      }
+    }
+  }
+}

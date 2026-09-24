@@ -12,6 +12,7 @@ import { runStylePreview } from '../../pipeline/preview.js';
 import { sanitizeDownloadName } from '../../pipeline/naming.js';
 import { findTemplate, loadTemplatesConfig, resolveTemplate } from '../../pipeline/templates.js';
 import type { AppContext } from '../context.js';
+import { requiredSchema } from '../contract.js';
 import { errorMessage, fail } from '../respond.js';
 import { beginSse, writeSse } from '../sse.js';
 import type { BuildRequestBody, DownloadPayload, PreviewStylesRequestBody } from '../types.js';
@@ -32,6 +33,8 @@ function sseEmitter(reply: FastifyReply) {
 }
 
 export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void {
+  // 该端点的入参错误按契约以 SSE error 帧回吐（HTTP 恒 200），所以不注册请求体 schema，
+  // 否则框架会在进处理函数之前就抛 400，前端只能看到一个无详情的连接错误。
   app.post('/api/build/stream', async (req, reply) => {
     const body = (req.body ?? {}) as BuildRequestBody;
     const options = body.options ?? {};
@@ -112,26 +115,30 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
       .send(fs.createReadStream(docx));
   });
 
-  app.post('/api/preview/styles', async (req, reply) => {
-    const body = (req.body ?? {}) as PreviewStylesRequestBody;
-    const templateId = String(body.templateId ?? '').trim();
-    if (!templateId) return fail(reply, 400, 'templateId is required');
-    if (!body.stylesYaml?.trim()) return fail(reply, 400, 'stylesYaml is required');
-    const stylesYaml = body.stylesYaml;
+  app.post(
+    '/api/preview/styles',
+    { schema: { body: requiredSchema(ctx.repoRoot, 'PreviewStylesRequest') } },
+    async (req, reply) => {
+      const body = (req.body ?? {}) as PreviewStylesRequestBody;
+      const templateId = String(body.templateId ?? '').trim();
+      if (!templateId) return fail(reply, 400, 'templateId is required');
+      if (!body.stylesYaml?.trim()) return fail(reply, 400, 'stylesYaml is required');
+      const stylesYaml = body.stylesYaml;
 
-    try {
-      const result = await withSlot(() =>
-        runStylePreview({
-          repoRoot: ctx.repoRoot,
-          cacheDir: ctx.cacheDir,
-          templateId,
-          stylesYaml,
-          onEvent: () => undefined,
-        }),
-      );
-      return payload(result.jobId, result.fileName);
-    } catch (e) {
-      return fail(reply, 500, `style preview failed\n${errorMessage(e)}`.trim());
-    }
-  });
+      try {
+        const result = await withSlot(() =>
+          runStylePreview({
+            repoRoot: ctx.repoRoot,
+            cacheDir: ctx.cacheDir,
+            templateId,
+            stylesYaml,
+            onEvent: () => undefined,
+          }),
+        );
+        return payload(result.jobId, result.fileName);
+      } catch (e) {
+        return fail(reply, 500, `style preview failed\n${errorMessage(e)}`.trim());
+      }
+    },
+  );
 }

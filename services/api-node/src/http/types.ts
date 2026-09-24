@@ -1,4 +1,7 @@
-/** /api/* 请求体契约（与 app.py 一致）。 */
+/**
+ * /api/* 请求体的编译期视图。
+ * 运行时契约与对外文档以 contracts/openapi.json 为准（两端共用那份）；这里只给处理函数做类型提示。
+ */
 import type { DocxProvenance } from '../pipeline/metadata.js';
 import type { BuildOptions } from '../pipeline/types.js';
 

@@ -19,6 +19,9 @@ export function createServer(ctx: AppContext) {
 
   app.setErrorHandler((err, _req, reply) => {
     if (reply.raw.headersSent) return;
+    // ajv 的「缺必填字段」翻译成与 api-python 手写检查同字的 detail。
+    const missing = err.validation?.find((v) => v.keyword === 'required');
+    if (missing) return void fail(reply, 400, `${missing.params.missingProperty} is required`);
     void fail(reply, err.statusCode ?? 500, err.message || 'internal error');
   });
 

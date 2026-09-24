@@ -1,0 +1,113 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>wordEditor API 契约</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0 auto; padding: 24px 20px 64px; max-width: 980px; font: 14px/1.6 ui-sans-serif, system-ui, sans-serif; background: #fbfbfa; color: #1b1b1a; }
+  @media (prefers-color-scheme: dark) { body { background: #17171a; color: #e6e6e4; } .op, .row { background: #1f1f23; border-color: #2e2e34; } code, pre { background: #101012; } .props { background: #101012; } }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 32px 0 10px; text-transform: uppercase; letter-spacing: .06em; opacity: .65; }
+  p.desc { white-space: pre-wrap; opacity: .85; margin: 6px 0 0; }
+  .op { border: 1px solid #e3e3df; border-radius: 8px; padding: 12px 14px; margin: 0 0 10px; background: #fff; }
+  .head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .m { font-weight: 700; font-size: 12px; padding: 2px 7px; border-radius: 4px; color: #fff; background: #2f6f4f; }
+  .m.post { background: #9a6b1f; } .m.put { background: #2f5f9a; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; background: #f1f1ee; border-radius: 4px; }
+  code { padding: 1px 5px; } pre { padding: 10px 12px; overflow-x: auto; white-space: pre-wrap; }
+  .row { border-top: 1px dashed #ddd; margin-top: 10px; padding-top: 8px; }
+  .props { list-style: none; margin: 6px 0 0; padding: 8px 10px; border-radius: 6px; background: #f1f1ee; }
+  .props li { margin: 2px 0; }
+  .req { color: #b3261e; font-weight: 600; }
+  .ty { opacity: .6; }
+  a { color: #2f5f9a; }
+</style>
+<h1>wordEditor API 契约</h1>
+<p class="desc" id="info"></p>
+<p><a href="./openapi.json">openapi.json</a>（本页与校验规则同源，两个引擎逐字节同发）</p>
+<div id="out">载入中…</div>
+<script>
+  const SCHEMA = location.href.replace(/\/docs\/?$/, '') + '/openapi.json';
+  const el = (tag, cls, text) => Object.assign(document.createElement(tag), { className: cls ?? '', textContent: text ?? '' });
+  const typeName = (s) => (s ? (Array.isArray(s.type) ? s.type.join('|') : s.type) : 'any');
+
+  function props(schema, required) {
+    const ul = el('ul', 'props');
+    for (const [name, def] of Object.entries(schema?.properties ?? {})) {
+      const li = el('li');
+      const req = (schema.required ?? []).includes(name);
+      li.append(el('span', req ? 'req' : '', (req ? '● ' : '· ') + name + ' '));
+      li.append(el('span', 'ty', typeName(def.type ?? def.$ref) + (def.enum ? ' = ' + def.enum.join('/') : '')));
+      if (def.description) li.append(el('span', '', ' — ' + def.description));
+      ul.append(li);
+    }
+    if (!ul.children.length && required) ul.append(el('li', '', '（无字段）'));
+    return ul;
+  }
+
+  function operation(method, path, op) {
+    const box = el('div', 'op');
+    const head = el('div', 'head');
+    head.append(el('span', 'm ' + method, method.toUpperCase()));
+    head.append(el('code', '', path));
+    head.append(el('strong', '', ' ' + (op.summary ?? '')));
+    box.append(head);
+    if (op.description) box.append(el('p', 'desc', op.description));
+
+    const params = (op.parameters ?? []).map((p) => resolve(p));
+    if (params.length) {
+      const row = el('div', 'row');
+      row.append(el('strong', '', '查询参数'));
+      row.append(props({ properties: Object.fromEntries(params.map((p) => [p.name, p.schema])), required: params.filter((p) => p.required).map((p) => p.name) }));
+      row.append(el('p', 'desc', params.map((p) => p.description).filter(Boolean).join('；')));
+      box.append(row);
+    }
+    const bodyRef = op.requestBody?.content?.['application/json']?.schema;
+    if (bodyRef) {
+      const body = resolve(bodyRef);
+      const row = el('div', 'row');
+      row.append(el('strong', '', '请求体 ' + (op.requestBody.required ? '（必填）' : '')));
+      row.append(props(body));
+      if (body.description) row.append(el('p', 'desc', body.description));
+      box.append(row);
+    }
+    if (op['x-errors']?.length) {
+      const row = el('div', 'row');
+      row.append(el('strong', '', '错误'));
+      row.append(el('pre', '', op['x-errors'].map((e) => (e.status ? `${e.status} ${e.detail}` : `${e.event}: ${e.when} → ${e.error}`)).join('\n')));
+      box.append(row);
+    }
+    if (op['x-curl']) {
+      const row = el('div', 'row');
+      row.append(el('strong', '', '试试'));
+      row.append(el('pre', '', op['x-curl']));
+      box.append(row);
+    }
+    return box;
+  }
+
+  function resolve(ref) {
+    // '#/components/schemas/X' → doc.components.schemas.X
+    return ref?.$ref ? ref.$ref.split('/').slice(1).reduce((o, k) => o?.[k], doc) : ref;
+  }
+
+  let doc;
+  fetch(SCHEMA)
+    .then((r) => r.json())
+    .then((spec) => {
+      doc = spec;
+      const out = document.getElementById('out');
+      out.textContent = '';
+      document.getElementById('info').textContent = spec.info.description;
+      for (const tag of spec.tags ?? []) {
+        out.append(el('h2', '', tag.name + ' — ' + tag.description));
+        for (const [path, item] of Object.entries(spec.paths)) {
+          for (const method of ['get', 'post', 'put']) {
+            if (item[method]?.tags?.includes(tag.name)) out.append(operation(method, path, item[method]));
+          }
+        }
+      }
+    })
+    .catch((e) => {
+      document.getElementById('out').textContent = '读取 openapi.json 失败：' + e;
+    });
+</script>

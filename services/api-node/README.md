@@ -26,6 +26,23 @@ Optional env:
 - `PANDOC` (optional explicit pandoc executable path)
 - `WORDEDITOR_MAX_CONCURRENCY` (重任务并发上限，默认按物理内存推出 1~8)
 - `WORDEDITOR_JOB_TTL_MINUTES` (任务目录保留时长，默认 360 分钟)
+- `WORDEDITOR_LOG_LEVEL` (pino 访问日志级别，默认 `info`，静音用 `warn`)
+
+## 接口契约
+
+`contracts/openapi.json` 是唯一的接口来源，两个引擎按原始字节同发：
+
+- `GET /openapi.json` — 12 个操作的请求体 schema、字段说明、错误文案（`x-errors`）、
+  可直接执行的 `x-curl`；`info.x-ai` 里写清双引擎、并发闸门、任务 TTL 与
+  「失败也是 HTTP 200 + SSE `error` 帧」这条最容易踩的约定。
+- `GET /docs` — 配套的离线阅读页（无 CDN、无新依赖），同样两端同源。
+- 请求体的必填项由 Fastify 内置 ajv 从同一份契约取，校验失败经 `setErrorHandler`
+  翻译成与 Python 手写检查同字的 `{"detail": "… is required"}`；只借必填、不借类型，
+  避免 Fastify 默认的 `coerceTypes` 把数字塞成字符串而改变语义。
+- `/api/build/stream` 有意不注册 schema：它的入参错误按契约走 SSE `error` 帧，
+  框架先抛 400 会让前端只看到一个无详情的连接错误。
+
+改接口时的顺序是：先改 `contracts/openapi.json`（含校验用的 `required`），再改处理函数。
 
 ## 部署与内存
 
@@ -92,10 +109,13 @@ NODE_OPTIONS=--max-old-space-size=512 node dist/main.js
 - 上传模式里越界/超大的条目：两边都静默跳过该条目，Node 额外给一行告警日志。
 - `PUT /api/file?path=`（空路径）：Python 试图写仓库根返回 500，Node 返回 400 `invalid path`。
 - 请求体上限 `MAX_BODY_BYTES` 96 MB（超限 413）：Python 无上限，Node 保留护栏。
+- 样式预览样例稿 `templates/hutb-shared/preview-styles.md` 里有两张 jsdelivr 远端图，
+  两引擎各自让 Pandoc 现取现嵌：网络抖动会让某一侧少嵌 2 张图，产物大小与 media 数随之不同。
+  比对预览产物前先确认两边 `word/media` 数量相同，别把它当成引擎差异。
 
 ## 已核对的回归范围
 
-- 完整链路 `parity full`：8 个模板产物语义一致。
+- 完整链路 `parity full`：9 例（含 `input/数学建模2013A题` 那篇带「注：」正文的长文）产物语义一致。
 - `POST /api/preview/styles`：8 个模板（把模板自己的 styles.yaml 原样回传）产物语义一致。
   请求里的 styles.yaml 是文本，落进任务目录前顶层相对 `extends` 会按 `templates/<templateId>/`
   锚定成绝对路径，两引擎同一处理。
@@ -104,6 +124,11 @@ NODE_OPTIONS=--max-old-space-size=512 node dist/main.js
   日志行逐字一致。`password` 的 `w:hash`/`w:salt` 是随机盐，哈希算法本身已与 `_hash_password` 同盐核对过。
 - 其余端点 41 项（含 `/api/import/docx` 含公式与图片的 docx、
   各错误分支、并发 4 任务的作业目录隔离）：除上表所列，响应一致。
+- SSE 心跳：两端每 15 秒发同一条 `:ping\n\n` 注释帧，响应头（`Content-Type` 带 charset、
+  `Cache-Control`、`X-Accel-Buffering`）也已对齐；把间隔临时调到亚秒实测 node ping=7、
+  python ping=15，`step` / `log` / `done` 计数与改造前相同。
+- 契约发布：`GET /openapi.json` 与 `GET /docs` 两端字节相同，且等于仓库内的
+  `contracts/openapi.json`；缺必填字段时两端同为 `{"detail":"… is required"}`。
 - 内存改造（zip 单次会话 / 配置缓存 / 并发闸门 / TTL 回收）后上述四项全部重跑通过；
   另把改造前后的产物逐部件 sha1 对比，除 `docProps/core.xml` 的生成时间戳外全部相同。
 
