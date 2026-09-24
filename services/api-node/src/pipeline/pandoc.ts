@@ -4,6 +4,7 @@
  * 默认走 HTML 管道（md → standalone html → docx），因为 Markdown 里的 HTML 片段
  * 只有经 HTML 解析才能保留；直连模式更快但 HTML 支持较弱。
  */
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -30,28 +31,35 @@ function listFilesRecursive(root: string): string[] {
  * `--embed-resources` 会把 <img src> 变成 data URI，HTML→DOCX 阶段无法把它转成
  * 真正的 OOXML 图片关系（Word 里只剩一个空 drawing 框）。按 base64 反查原始文件，
  * 把 src 换回本地路径，配合 --resource-path 即可正常嵌入。
+ *
+ * 索引键用内容摘要而不是 base64 本身：后者要把每张图片编码后整表常驻，
+ * 峰值内存 ≈ 图片目录总体积 ×1.37；逐张「读 → 哈希 → 释放」后只剩最大一张的体积。
  */
 export function restoreImagePaths(
   html: string,
   mdDir: string,
   onLog?: (line: string) => void,
 ): string {
-  const byBase64 = new Map<string, string>();
+  // 探测用非全局正则：与下面的替换式共享 lastIndex，混用会漏匹配。
+  if (!/src="data:image\/[^;]+;base64,[A-Za-z0-9+/=]+"/.test(html)) return html;
+
+  const digest = (buf: Buffer): string => createHash('sha256').update(buf).digest('hex');
+  const byDigest = new Map<string, string>();
   for (const file of listFilesRecursive(mdDir)) {
     if (!IMAGE_EXT.test(file)) continue;
     try {
-      byBase64.set(fs.readFileSync(file).toString('base64'), file);
+      byDigest.set(digest(fs.readFileSync(file)), file);
     } catch {
       /* 读不到的文件跳过 */
     }
   }
-  if (byBase64.size === 0) return html;
+  if (byDigest.size === 0) return html;
 
   let restored = 0;
   const next = html.replace(
     /src="data:image\/[^;]+;base64,([A-Za-z0-9+/=]+)"/g,
     (whole, encoded: string) => {
-      const target = byBase64.get(encoded);
+      const target = byDigest.get(digest(Buffer.from(encoded, 'base64')));
       if (!target) return whole;
       restored += 1;
       return `src="${target}"`;
