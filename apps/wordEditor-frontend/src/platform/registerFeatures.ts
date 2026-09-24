@@ -40,4 +40,13 @@ export function registerAppFeatures(): void {
     order: 30,
     lazy: lazy(() => import('@/pages/DocsPage').then((m) => ({ default: m.DocsPage }))),
   });
+
+  registerFeature({
+    id: 'about',
+    path: '/about',
+    label: '关于',
+    icon: 'about',
+    order: 40,
+    lazy: lazy(() => import('@/pages/AboutPage').then((m) => ({ default: m.AboutPage }))),
+  });
 }

@@ -3,6 +3,7 @@ import {
   BookOutlined,
   ExportOutlined,
   ImportOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 
@@ -11,6 +12,7 @@ const ICONS: Record<string, ReactNode> = {
   import: <ImportOutlined />,
   templates: <AppstoreOutlined />,
   docs: <BookOutlined />,
+  about: <InfoCircleOutlined />,
 };
 
 export function resolveFeatureIcon(name: string): ReactNode {
