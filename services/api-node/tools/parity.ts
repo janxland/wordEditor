@@ -5,6 +5,7 @@
  *   npx tsx tools/parity.ts pandoc -i input/x.md -t hutb-guanke
  *   npx tsx tools/parity.ts stage --upto document -i input/x.md -t hutb-guanke
  *   npx tsx tools/parity.ts full    -i input/x.md -t hutb-guanke
+ *   npx tsx tools/parity.ts docx    -a .cache/a.docx -b .cache/b.docx
  *
  * pandoc：两边都只跑 Pandoc，隔离出管道差异。
  * stage ：两边都只跑到指定后处理阶段（document|styles|threeLine|verbatim），
@@ -245,6 +246,14 @@ const templateId = opt('-t', 'hutb-guanke');
 const pyDocx = path.join(outDir, 'python.docx');
 const nodeDocx = path.join(outDir, 'node.docx');
 
+/** docx 模式：比较两份已有产物（走 HTTP 端点生成的预览/导出件时用）。 */
+if (mode === 'docx') {
+  const [a, b] = [opt('-a'), opt('-b')];
+  if (!a || !b) throw new Error('docx 模式需要 -a <file> -b <file>');
+  console.log(`对比 ${path.relative(repoRoot, a)} vs ${path.relative(repoRoot, b)}`);
+  process.exit((await compare(a, b)) ? 0 : 1);
+}
+
 if (!fs.existsSync(inputMd)) throw new Error(`输入不存在: ${inputMd}`);
 
 const cfg = loadTemplatesConfig(repoRoot);
@@ -288,6 +297,7 @@ switch (mode) {
     break;
   default:
     console.log('用法: parity.ts pandoc|stage --upto <stage>|full -i <md> -t <template>');
+    console.log('      parity.ts docx -a <file> -b <file>   # 直接比较两份产物');
     process.exit(0);
 }
 

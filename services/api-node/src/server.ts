@@ -4,14 +4,18 @@ import Fastify from 'fastify';
 import { MAX_BODY_BYTES } from './config.js';
 import { registerApiRoutes } from './http/routes/index.js';
 import type { AppContext } from './http/context.js';
+import { fail } from './http/respond.js';
 
 export function createServer(ctx: AppContext) {
   const app = Fastify({ logger: false, bodyLimit: MAX_BODY_BYTES });
 
   app.setErrorHandler((err, _req, reply) => {
     if (reply.raw.headersSent) return;
-    const status = err.statusCode ?? 500;
-    void reply.status(status).send({ error: err.message || 'internal error' });
+    void fail(reply, err.statusCode ?? 500, err.message || 'internal error');
+  });
+
+  app.setNotFoundHandler((_req, reply) => {
+    void fail(reply, 404, 'Not Found');
   });
 
   registerApiRoutes(app, ctx);

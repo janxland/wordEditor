@@ -11,6 +11,7 @@ import { runStylePreview } from '../../pipeline/preview.js';
 import { sanitizeDownloadName } from '../../pipeline/naming.js';
 import { findTemplate, loadTemplatesConfig, resolveTemplate } from '../../pipeline/templates.js';
 import type { AppContext } from '../context.js';
+import { errorMessage, fail } from '../respond.js';
 import { beginSse, writeSse } from '../sse.js';
 import type { BuildRequestBody, DownloadPayload, PreviewStylesRequestBody } from '../types.js';
 
@@ -36,17 +37,18 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
   app.post('/api/build/stream', async (req, reply) => {
     const body = (req.body ?? {}) as BuildRequestBody;
     const options = body.options ?? {};
-    const entries = Array.isArray(body.entries) && body.entries.length > 0 ? body.entries : null;
+    const templateId = String(body.templateId ?? '').trim();
+    const mdRelPath = String(body.mdRelPath ?? '').trim();
+    const upload = Array.isArray(body.entries) && body.entries.length > 0 && mdRelPath ? body.entries : null;
 
     beginSse(reply);
     const emit = sseEmitter(reply);
     const step = (status: 'process' | 'finish', message?: string): void =>
       emit({ type: 'step', id: 'prepare', status, message });
 
-    let jobId: string | undefined;
     try {
-      if (!body.templateId) throw new Error('templateId is required');
-      if (!entries && !body.markdown?.trim()) throw new Error('markdown 或 entries 必填');
+      if (!templateId) throw new Error('templateId is required');
+      if (!upload && !body.markdown?.trim()) throw new Error('markdown 或 entries 必填');
 
       const pandoc = findPandoc(ctx.repoRoot);
       if (!pandoc) {
@@ -56,15 +58,13 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
         );
       }
 
-      const def = findTemplate(loadTemplatesConfig(ctx.repoRoot), body.templateId);
-      const template = resolveTemplate(ctx.repoRoot, def);
+      const template = resolveTemplate(ctx.repoRoot, findTemplate(loadTemplatesConfig(ctx.repoRoot), templateId));
       const job = createJob(ctx.cacheDir);
-      jobId = job.id;
 
-      step('process', entries ? `写入 ${entries.length} 个文件…` : '写入 Markdown…');
-      const input = entries
-        ? writeUploadEntries(job, entries, String(body.mdRelPath ?? ''), def.id)
-        : writeMarkdown(job, String(body.markdown ?? ''), def.id);
+      step('process', upload ? `写入 ${upload.length} 个文件…` : '写入 Markdown…');
+      const input = upload
+        ? writeUploadEntries(job, upload, mdRelPath, templateId)
+        : writeMarkdown(job, String(body.markdown ?? ''), templateId);
       if (input.skipped) {
         emit({ type: 'log', line: `已跳过 ${input.skipped} 个越界或超大条目`, stream: 'stderr' });
       }
@@ -84,11 +84,7 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
 
       writeSse(reply, 'done', payload(job.id, fileName));
     } catch (e) {
-      writeSse(reply, 'error', {
-        error: 'build failed',
-        detail: e instanceof Error ? e.message : String(e),
-        ...(jobId ? { jobId } : {}),
-      });
+      writeSse(reply, 'error', { error: errorMessage(e) });
     } finally {
       reply.raw.end();
     }
@@ -97,10 +93,10 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
   app.get('/api/build/download', async (req, reply) => {
     const query = req.query as { jobId?: string; fileName?: string };
     const jobId = String(query.jobId ?? '');
-    if (!/^[\w-]+$/.test(jobId)) return reply.status(400).send({ error: 'invalid jobId' });
+    if (!/^[\w-]+$/.test(jobId)) return fail(reply, 400, 'invalid jobId');
 
     const docx = jobDocxPath(ctx.cacheDir, jobId);
-    if (!fs.existsSync(docx)) return reply.status(404).send({ error: 'file not found or expired' });
+    if (!fs.existsSync(docx)) return fail(reply, 404, 'file not found or expired');
 
     const fileName = sanitizeDownloadName(query.fileName ?? 'export.docx');
     return reply
@@ -115,8 +111,8 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
   app.post('/api/preview/styles', async (req, reply) => {
     const body = (req.body ?? {}) as PreviewStylesRequestBody;
     const templateId = String(body.templateId ?? '').trim();
-    if (!templateId) return reply.status(400).send({ error: 'templateId is required' });
-    if (!body.stylesYaml?.trim()) return reply.status(400).send({ error: 'stylesYaml is required' });
+    if (!templateId) return fail(reply, 400, 'templateId is required');
+    if (!body.stylesYaml?.trim()) return fail(reply, 400, 'stylesYaml is required');
 
     try {
       const result = await runStylePreview({
@@ -128,10 +124,7 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
       });
       return payload(result.jobId, result.fileName);
     } catch (e) {
-      return reply.status(500).send({
-        error: 'style preview failed',
-        detail: e instanceof Error ? e.message : String(e),
-      });
+      return fail(reply, 500, `style preview failed\n${errorMessage(e)}`.trim());
     }
   });
 }

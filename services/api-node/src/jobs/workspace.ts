@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { MAX_ENTRY_B64_CHARS } from '../config.js';
+import { isFile, MAX_ENTRY_B64_CHARS } from '../config.js';
 import { sanitizeDownloadName } from '../pipeline/naming.js';
 
 export interface Job {
@@ -50,7 +50,6 @@ export function writeUploadEntries(
   templateId: string,
 ): MaterializedInput {
   const rel = mdRelPath.replace(/\\/g, '/').replace(/^\/+/, '');
-  if (!/\.md$/i.test(rel)) throw new Error('mdRelPath 必须指向 .md');
 
   let skipped = 0;
   for (const entry of entries) {
@@ -65,7 +64,7 @@ export function writeUploadEntries(
   }
 
   const inputMd = insideWorkDir(job.dir, rel);
-  if (!inputMd || !fs.existsSync(inputMd)) {
+  if (!inputMd || !isFile(inputMd)) {
     throw new Error(`mdRelPath 未在上传列表中: ${mdRelPath}`);
   }
   const stem = path.basename(inputMd, path.extname(inputMd));

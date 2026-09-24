@@ -37,7 +37,8 @@ export function resolveCacheDir(repoRoot: string): string {
   return path.join(repoRoot, '.cache', 'wordeditor-api-node');
 }
 
-function isFile(p: string): boolean {
+/** 存在且是普通文件（Python 侧 `Path.is_file()` 口径，目录不算命中）。 */
+export function isFile(p: string): boolean {
   try {
     return fs.statSync(p).isFile();
   } catch {

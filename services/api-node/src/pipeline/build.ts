@@ -24,7 +24,7 @@ export interface BuildContext {
   /** 样式预览用：改用传入的 styles.yaml 而非模板自带的。 */
   stylesYaml?: string | null;
   skipRefs?: boolean;
-  /** 仅 parity 工具用：只跑到某个后处理阶段。 */
+  /** 只跑到某个后处理阶段：parity 工具逐阶段定位、样式预览主路径都在用。 */
   uptoStage?: StageName;
 }
 
@@ -42,13 +42,14 @@ export async function runBuild(ctx: BuildContext): Promise<void> {
     throw new BuildError(`找不到输入文件: ${ctx.inputMd}`);
   }
 
-  emit({ type: 'step', id: 'pandoc', status: 'process', message: 'Pandoc 转换中…' });
+  emit({ type: 'step', id: 'pandoc', status: 'process', message: '启动 Pandoc…' });
   log(`模板: ${template.def.name} (${template.def.id})`);
   log(`输入: ${ctx.inputMd}`);
   log(`输出: ${ctx.outputDocx}`);
   if (template.luaFilters.length) {
     log(`Lua: ${template.luaFilters.map((f) => path.relative(ctx.repoRoot, f)).join(', ')}`);
   }
+  emit({ type: 'step', id: 'pandoc', status: 'process', message: 'Pandoc 转换中…' });
 
   const result = await markdownToDocx({
     repoRoot: ctx.repoRoot,
@@ -63,8 +64,9 @@ export async function runBuild(ctx: BuildContext): Promise<void> {
   if (result.code !== 0 || !fs.existsSync(ctx.outputDocx)) {
     throw new BuildError(result.stderr.trim() || `Pandoc 执行失败: ${result.code}`);
   }
-  emit({ type: 'step', id: 'pandoc', status: 'finish', message: 'DOCX 已生成' });
   log('完成。');
+  emit({ type: 'step', id: 'pandoc', status: 'finish', message: 'DOCX 已生成' });
+  emit({ type: 'step', id: 'structure', status: 'wait' });
 
   const stageCtx: StageContext = {
     repoRoot: ctx.repoRoot,

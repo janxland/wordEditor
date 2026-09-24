@@ -4,8 +4,8 @@ import type { IStorageAdapter } from './types';
 async function apiGet<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) {
-    const err = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(err.error ?? `HTTP ${res.status}`);
+    const err = (await res.json().catch(() => ({}))) as { detail?: string; error?: string };
+    throw new Error(err.detail ?? err.error ?? `HTTP ${res.status}`);
   }
   return res.json() as Promise<T>;
 }
@@ -17,8 +17,8 @@ async function apiPut(url: string, body: unknown): Promise<void> {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const err = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(err.error ?? `HTTP ${res.status}`);
+    const err = (await res.json().catch(() => ({}))) as { detail?: string; error?: string };
+    throw new Error(err.detail ?? err.error ?? `HTTP ${res.status}`);
   }
 }
 

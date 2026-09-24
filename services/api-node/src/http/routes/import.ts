@@ -6,12 +6,13 @@ import type { FastifyInstance } from 'fastify';
 import { createJob } from '../../jobs/workspace.js';
 import { extractDocxToMarkdown } from '../../pipeline/extract.js';
 import type { AppContext } from '../context.js';
+import { errorMessage, fail } from '../respond.js';
 import type { ImportDocxRequestBody } from '../types.js';
 
 export function registerImportRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.post('/api/import/docx', async (req, reply) => {
     const body = (req.body ?? {}) as ImportDocxRequestBody;
-    if (!body.contentBase64) return reply.status(400).send({ error: 'contentBase64 is required' });
+    if (!body.contentBase64) return fail(reply, 400, 'contentBase64 is required');
 
     const job = createJob(ctx.cacheDir);
     try {
@@ -34,11 +35,7 @@ export function registerImportRoutes(app: FastifyInstance, ctx: AppContext): voi
         log: result.log,
       };
     } catch (e) {
-      return reply.status(500).send({
-        error: 'extract failed',
-        detail: e instanceof Error ? e.message : String(e),
-        jobId: job.id,
-      });
+      return fail(reply, 500, `extract failed\n${errorMessage(e)}`.trim());
     }
   });
 }

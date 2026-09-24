@@ -2,6 +2,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { isFile } from '../config.js';
+
 /** 与模板目录同级的历史别名。 */
 const TEMPLATE_ALIASES: Record<string, string> = {
   'hutb-shared': 'hutb-guanke',
@@ -82,7 +84,7 @@ export function withTemplateStatus(repoRoot: string, cfg: TemplatesConfig): Temp
     ...cfg,
     templates: cfg.templates.map((t) => ({
       ...t,
-      reference_exists: fs.existsSync(path.join(repoRoot, t.reference_doc)),
+      reference_exists: isFile(path.join(repoRoot, t.reference_doc ?? '')),
     })),
   };
 }

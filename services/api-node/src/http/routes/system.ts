@@ -17,18 +17,18 @@ export function registerSystemRoutes(app: FastifyInstance, ctx: AppContext): voi
   /** 与 api-python 同构：python 项反映「备用引擎」是否可用，Node 引擎本身不依赖它。 */
   app.get('/api/tools', async () => {
     const pandoc = findPandoc(ctx.repoRoot);
-    const python = process.env.WORDEDITOR_PYTHON || which('python3') || which('python');
+    const python = process.env.WORDEDITOR_PYTHON || which('python3') || which('python') || null;
     return {
       pandoc: {
         ok: Boolean(pandoc),
-        path: pandoc,
-        hint: pandoc ? null : 'brew install pandoc',
+        path: pandoc ?? null,
+        hint: pandoc
+          ? null
+          : process.platform === 'win32'
+            ? 'winget install --id JohnMacFarlane.Pandoc'
+            : 'brew install pandoc',
       },
-      python: {
-        ok: Boolean(python),
-        path: python ?? null,
-        hint: python ? null : '仅备用引擎需要，Node 主链路不依赖 Python',
-      },
+      python: { ok: Boolean(python), path: python },
     };
   });
 }

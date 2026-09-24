@@ -44,8 +44,8 @@ export async function extractDocxToMarkdown(options: {
   const { workDir } = options;
   const filename = sanitizeImportName(options.filename || 'input.docx');
   const stem = filename.replace(/\.docx$/i, '') || 'document';
-  const slug =
-    options.imageSlug && /^[\w一-鿿-]+$/.test(options.imageSlug) ? options.imageSlug : slugify(stem);
+  const requestedSlug = String(options.imageSlug ?? '').trim();
+  const slug = /^[\w一-鿿-]+$/.test(requestedSlug) ? requestedSlug : slugify(stem);
 
   const docxPath = path.join(workDir, filename);
   fs.writeFileSync(docxPath, Buffer.from(options.contentBase64, 'base64'));

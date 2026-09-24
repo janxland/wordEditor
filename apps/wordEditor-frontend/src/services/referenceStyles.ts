@@ -61,9 +61,9 @@ export async function fetchReferenceStyles(
   const res = await fetch(
     `${baseUrl}/templates/reference-styles?template=${encodeURIComponent(templateId)}`,
   );
-  const data = (await res.json()) as ReferenceStylesResponse & { error?: string };
+  const data = (await res.json()) as ReferenceStylesResponse & { detail?: string; error?: string };
   if (!res.ok) {
-    throw new Error(data.error ?? `HTTP ${res.status}`);
+    throw new Error(data.detail ?? data.error ?? `HTTP ${res.status}`);
   }
   return data;
 }
