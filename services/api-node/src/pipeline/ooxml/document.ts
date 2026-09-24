@@ -88,7 +88,8 @@ interface RefSegment {
 /** 定位本段可替换的引用：组内任一编号缺书签则整组保持原样。 */
 function collectRefSegments(text: string, docBookmarks: Set<string>, bmk: Map<string, number>): RefSegment[] {
   const out: RefSegment[] = [];
-  for (const m of text.matchAll(new RegExp(REF_IN_TEXT.source, 'g'))) {
+  // matchAll 规范上会克隆共享 /g 正则，lastIndex 不会被串台，不必每段重建。
+  for (const m of text.matchAll(REF_IN_TEXT)) {
     const nums = m[1]!.split(',').map((n) => n.trim());
     if (nums.some((n) => !docBookmarks.has(`Ref${n}`))) continue;
     if (nums.some((n) => bmk.has(`Ref${n}`) && Math.abs((bmk.get(`Ref${n}`) ?? 0) - m.index!) <= 1)) {
@@ -105,9 +106,10 @@ export function applyRefs(documentRoot: XEl): number {
 
   let changed = 0;
   for (const p of descendants(documentRoot, 'w:p')) {
-    if (isVerbatimParagraph(p)) continue;
+    // 先过便宜的文本关：绝大多数段落没有「[」，不值得为它做全树 verbatim 扫描。
     const text = paragraphPlainText(p);
     if (!text.includes('[')) continue;
+    if (isVerbatimParagraph(p)) continue;
     const segments = collectRefSegments(text, docBookmarks, bookmarkStartsInParagraph(p));
     if (!segments.length) continue;
 
