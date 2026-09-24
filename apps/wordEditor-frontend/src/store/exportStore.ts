@@ -11,6 +11,7 @@ import {
 import { downloadBlob, fetchAsBlob } from '@/services/download';
 import { saveBlobToWorkspaceFolder } from '@/services/localFolder';
 import type { TemplatesConfig } from '@/core/types';
+import { apiBase, engineUrl } from '@/core/engine';
 
 const SAMPLE_MD = `<!-- 导出页示例：完整稿见 input/carbon-neutral-renewable.md -->
 
@@ -290,7 +291,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
 
     try {
       const result = await streamBuild(
-        '/api',
+        apiBase(),
         {
           markdown: useUpload ? undefined : markdown,
           entries: useUpload ? uploadEntries : undefined,
@@ -330,7 +331,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
         building: false,
         progressOpen: false,
         resultOpen: true,
-        downloadUrl: result.downloadUrl,
+        downloadUrl: result.downloadUrl ? engineUrl(result.downloadUrl) : null,
         fileName: result.fileName || fileName,
         buildSteps: finalSteps,
         buildFinishedAt: Date.now(),

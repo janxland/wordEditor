@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const apiTarget = env.VITE_API_TARGET || 'http://localhost:8787';
+  const pyApiTarget = env.VITE_PY_API_TARGET || 'http://localhost:8788';
 
   return {
     plugins: [react()],
@@ -30,6 +31,12 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: apiTarget,
           changeOrigin: true,
+        },
+        // 调试用 python 引擎：/py-api/* → 8788 的 /api/*
+        '/py-api': {
+          target: pyApiTarget,
+          changeOrigin: true,
+          rewrite: (p) => p.replace(/^\/py-api/, '/api'),
         },
       },
     },

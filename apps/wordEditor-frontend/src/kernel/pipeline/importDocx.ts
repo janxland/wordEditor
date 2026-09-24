@@ -1,5 +1,7 @@
 /** DOCX → Markdown 还原管线（对接 /api/import/docx） */
 
+import { apiBase } from '@/core/engine';
+
 export interface ImportDocxRequest {
   filename: string;
   /** docx 文件二进制 base64（不含 data: 前缀） */
@@ -33,7 +35,7 @@ export interface ImportDocxResult {
 
 export async function importDocx(
   request: ImportDocxRequest,
-  baseUrl = '/api',
+  baseUrl = apiBase(),
 ): Promise<ImportDocxResult> {
   const res = await fetch(`${baseUrl}/import/docx`, {
     method: 'POST',

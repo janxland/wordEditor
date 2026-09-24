@@ -16,6 +16,16 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '2026-09 · 引擎可选切换',
+    date: '2026-09-25',
+    summary: '前端可在设置里于 Node / Python 两引擎间切换，产物闭环等价。',
+    items: [
+      { kind: 'feat', text: '新增引擎切换：默认 Node（/api→8787），可切 Python（/py-api→8788），选择存 localStorage 并即时重载' },
+      { kind: 'feat', text: '设置面板实时探测两引擎健康状态，未启动时给出启动命令' },
+      { kind: 'refactor', text: '所有服务端调用与后端返回的下载链接统一走引擎代理前缀，Node/Python 产物逐部件比对语义一致' },
+    ],
+  },
+  {
     version: '2026-09 · 稳定性与内存收口',
     date: '2026-09-24',
     summary: '进程/任务层缺陷清零，构建期内存热点逐点压平。',

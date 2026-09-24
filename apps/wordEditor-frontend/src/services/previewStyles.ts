@@ -1,3 +1,4 @@
+import { apiBase, engineUrl } from '@/core/engine';
 import { fetchAsBlob } from './download';
 
 export interface StylePreviewRequest {
@@ -13,7 +14,7 @@ interface StylePreviewMeta {
 
 async function requestStylePreview(
   req: StylePreviewRequest,
-  baseUrl = '/api',
+  baseUrl = apiBase(),
 ): Promise<StylePreviewMeta> {
   const res = await fetch(`${baseUrl}/preview/styles`, {
     method: 'POST',
@@ -30,9 +31,10 @@ async function requestStylePreview(
 /** 生成样式预览 docx 并返回二进制（供在线渲染） */
 export async function fetchStylePreviewBlob(
   req: StylePreviewRequest,
-  baseUrl = '/api',
+  baseUrl = apiBase(),
 ): Promise<{ blob: Blob; fileName: string; downloadUrl: string }> {
   const meta = await requestStylePreview(req, baseUrl);
-  const blob = await fetchAsBlob(meta.downloadUrl);
-  return { blob, fileName: meta.fileName, downloadUrl: meta.downloadUrl };
+  const downloadUrl = engineUrl(meta.downloadUrl);
+  const blob = await fetchAsBlob(downloadUrl);
+  return { blob, fileName: meta.fileName, downloadUrl };
 }

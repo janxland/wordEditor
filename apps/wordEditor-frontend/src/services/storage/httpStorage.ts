@@ -1,4 +1,5 @@
 import type { TemplatesConfig } from '@/core/types';
+import { apiBase } from '@/core/engine';
 import type { IStorageAdapter } from './types';
 
 async function apiGet<T>(url: string): Promise<T> {
@@ -26,7 +27,7 @@ async function apiPut(url: string, body: unknown): Promise<void> {
 export class HttpStorageAdapter implements IStorageAdapter {
   readonly id = 'http';
 
-  constructor(private base = '/api') {}
+  constructor(private base = apiBase()) {}
 
   getTemplatesConfig(): Promise<TemplatesConfig> {
     return apiGet(`${this.base}/templates`);

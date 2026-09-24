@@ -4,6 +4,7 @@ import { FileTextOutlined } from '@ant-design/icons';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { getNavFeatures, getFeatureByPath } from '@/platform/registry';
 import { resolveFeatureIcon } from '@/platform/iconMap';
+import { EngineSwitch } from '@/components/settings/EngineSwitch';
 import { useAppStore } from '@/store/appStore';
 import { useEditorStore } from '@/store/editorStore';
 
@@ -58,6 +59,9 @@ export const AppShell: React.FC = () => {
           {dirtyCount > 0 && (
             <Badge count={dirtyCount} style={{ marginLeft: 12 }} title="未保存文件" />
           )}
+          <span style={{ marginLeft: 'auto' }}>
+            <EngineSwitch />
+          </span>
         </Header>
         <Content className="app-content">
           {loading && (

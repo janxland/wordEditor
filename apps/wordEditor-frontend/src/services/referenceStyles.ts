@@ -1,3 +1,5 @@
+import { apiBase } from '@/core/engine';
+
 export interface ReferenceStyleFonts {
   ascii?: string;
   hAnsi?: string;
@@ -56,7 +58,7 @@ export interface ReferenceStylesResponse {
 
 export async function fetchReferenceStyles(
   templateId: string,
-  baseUrl = '/api',
+  baseUrl = apiBase(),
 ): Promise<ReferenceStylesResponse> {
   const res = await fetch(
     `${baseUrl}/templates/reference-styles?template=${encodeURIComponent(templateId)}`,
