@@ -1,14 +1,15 @@
 /**
- * docx → Markdown：对应 pipeline/extract_docx_to_md.py。
+ * docx → Markdown 导入：对应 build 之外的 pipeline/extract_docx_to_md.py。
  *
- * 当前走 Pandoc --extract-media 的直连路径；正文样式回填、三线表转 Markdown 表格、
- * 图题回写等结构还原随导入阶段移植。
+ * 走自建结构还原（样式驱动），而不是 Pandoc 直转——学校模板里样式名才是结构的权威来源。
  */
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { docxToMarkdown, parseRelations, planImages } from './ooxml/docx-to-md.js';
+import { parseXml } from './ooxml/xml.js';
+import { readParts, readPartsBytes } from './ooxml/zip.js';
 import { sanitizeImportName, slugify } from './naming.js';
-import { run } from './process.js';
 
 export interface ImportedDocx {
   markdown: string;
@@ -35,64 +36,69 @@ function walk(dir: string): string[] {
 }
 
 export async function extractDocxToMarkdown(options: {
-  repoRoot: string;
-  pandoc: string;
   workDir: string;
   filename: string;
   contentBase64: string;
   imageSlug?: string;
 }): Promise<ImportedDocx> {
-  const { repoRoot, pandoc, workDir } = options;
+  const { workDir } = options;
   const filename = sanitizeImportName(options.filename || 'input.docx');
   const stem = filename.replace(/\.docx$/i, '') || 'document';
   const slug =
-    options.imageSlug && /^[\w一-鿿-]+$/.test(options.imageSlug)
-      ? options.imageSlug
-      : slugify(stem);
+    options.imageSlug && /^[\w一-鿿-]+$/.test(options.imageSlug) ? options.imageSlug : slugify(stem);
 
   const docxPath = path.join(workDir, filename);
   fs.writeFileSync(docxPath, Buffer.from(options.contentBase64, 'base64'));
 
   const mdPath = path.join(workDir, `${stem}.md`);
-  const extractRoot = path.join(workDir, 'pandoc-media');
   const imageDir = path.join(workDir, 'images', slug);
+  const imageRel = `images/${slug}`;
 
-  const result = await run(
-    pandoc,
-    [
-      docxPath,
-      '-f',
-      'docx',
-      '-t',
-      'markdown+tex_math_dollars+tex_math_single_backslash',
-      '--wrap=none',
-      '--extract-media',
-      extractRoot,
-      '-o',
-      mdPath,
-    ],
-    { cwd: repoRoot },
+  const sources = await readParts(docxPath, [
+    'word/document.xml',
+    'word/styles.xml',
+    'word/_rels/document.xml.rels',
+  ]);
+  const documentSource = sources.get('word/document.xml');
+  const stylesSource = sources.get('word/styles.xml');
+  if (!documentSource || !stylesSource) {
+    throw new Error('extract failed: 不是有效的 docx（缺少 word/document.xml 或 word/styles.xml）');
+  }
+
+  const relsRoot = parseXml(sources.get('word/_rels/document.xml.rels') ?? '<Relationships/>')
+    .documentElement;
+  const rels = parseRelations(relsRoot);
+  const plans = planImages(rels);
+  const media = await readPartsBytes(
+    docxPath,
+    plans.map((p) => p.source),
   );
-  if (result.code !== 0 || !fs.existsSync(mdPath)) {
-    throw new Error(result.stderr.trim() || `extract failed: ${result.code}`);
+  fs.mkdirSync(imageDir, { recursive: true });
+  for (const plan of plans) {
+    const bytes = media.get(plan.source);
+    if (bytes) fs.writeFileSync(path.join(imageDir, plan.name), bytes);
   }
 
-  const mediaDir = path.join(extractRoot, 'media');
-  for (const source of walk(mediaDir)) {
-    const dest = path.join(imageDir, path.relative(mediaDir, source));
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    fs.copyFileSync(source, dest);
-  }
+  const result = docxToMarkdown({
+    documentRoot: parseXml(documentSource).documentElement,
+    stylesRoot: parseXml(stylesSource).documentElement,
+    rels,
+    titleFallback: stem,
+    imageRel,
+  });
+  fs.writeFileSync(mdPath, result.markdown, 'utf-8');
 
-  const rewritten = fs
-    .readFileSync(mdPath, 'utf-8')
-    .replace(/\((?:[^)]*?)media\/(.*?)\)/g, `(${`images/${slug}`}/$1)`);
-  fs.writeFileSync(mdPath, rewritten, 'utf-8');
+  const { headings, paragraphs, lists, images, tables } = result.stats;
+  const log = [
+    `[extract] 写入 ${mdPath}`,
+    `[extract] 标题: ${result.title ?? 'None'}`,
+    `[extract] 标题段 ${headings} | 段落 ${paragraphs} | 列表 ${lists} | 图 ${images} | 表 ${tables}`,
+  ].join('\n');
 
   return {
-    markdown: rewritten,
+    markdown: result.markdown,
     stem,
-    imageRelDir: `images/${slug}`,
+    imageRelDir: imageRel,
     files: [
       { relPath: `${stem}.md`, absPath: mdPath },
       ...walk(imageDir).map((abs) => ({
@@ -100,6 +106,6 @@ export async function extractDocxToMarkdown(options: {
         absPath: abs,
       })),
     ],
-    log: (result.stdout + result.stderr).trim().slice(-4000),
+    log,
   };
 }

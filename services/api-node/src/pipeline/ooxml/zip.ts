@@ -38,6 +38,20 @@ export async function readPart(docxPath: string, part: string): Promise<string |
   return (await readParts(docxPath, [part])).get(part) ?? null;
 }
 
+/** 一次打开读取多个二进制部件（word/media/*）；不存在的部件为 null。 */
+export async function readPartsBytes(
+  docxPath: string,
+  parts: string[],
+): Promise<Map<string, Buffer | null>> {
+  const zip = await loadZip(docxPath);
+  const out = new Map<string, Buffer | null>();
+  for (const part of parts) {
+    const file = zip.file(part);
+    out.set(part, file && !file.dir ? Buffer.from(await file.async('nodebuffer')) : null);
+  }
+  return out;
+}
+
 /** 一次性改写多个部件；新部件（如缺失的 numbering.xml）会被创建。 */
 export async function patchDocxParts(
   docxPath: string,

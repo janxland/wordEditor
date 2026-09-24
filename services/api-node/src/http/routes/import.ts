@@ -3,7 +3,6 @@ import fs from 'node:fs';
 
 import type { FastifyInstance } from 'fastify';
 
-import { findPandoc } from '../../config.js';
 import { createJob } from '../../jobs/workspace.js';
 import { extractDocxToMarkdown } from '../../pipeline/extract.js';
 import type { AppContext } from '../context.js';
@@ -14,14 +13,9 @@ export function registerImportRoutes(app: FastifyInstance, ctx: AppContext): voi
     const body = (req.body ?? {}) as ImportDocxRequestBody;
     if (!body.contentBase64) return reply.status(400).send({ error: 'contentBase64 is required' });
 
-    const pandoc = findPandoc(ctx.repoRoot);
-    if (!pandoc) return reply.status(500).send({ error: '未检测到 Pandoc' });
-
     const job = createJob(ctx.cacheDir);
     try {
       const result = await extractDocxToMarkdown({
-        repoRoot: ctx.repoRoot,
-        pandoc,
         workDir: job.dir,
         filename: String(body.filename ?? 'input.docx'),
         contentBase64: body.contentBase64,
