@@ -10,6 +10,8 @@ import path from 'node:path';
 
 import YAML from 'yaml';
 
+import { parseCached } from '../file-cache.js';
+
 import {
   addEl,
   allDescendants,
@@ -151,15 +153,21 @@ function deepMerge(base: DslObject, over: DslObject): DslObject {
   return out;
 }
 
-/** 读取 styles.yaml，沿 extends 递归合并；循环引用直接报错。 */
+/**
+ * 读取 styles.yaml，沿 extends 递归合并；循环引用直接报错。
+ * 每个文件的 YAML.parse 走 parseCached（共享 base / 列表库被多个模板反复引入），
+ * 浅拷贝解构 extends 保证缓存对象不被 `delete dsl.extends` 污染；
+ * 下游 list-styles 用 deepCopy、mergeDict 只写新对象，嵌套引用无人改写。
+ */
 export function loadStylesDsl(stylesPath: string, seen: Set<string> = new Set()): StylesDsl {
   const resolved = path.resolve(stylesPath);
   if (seen.has(resolved)) throw new Error(`styles extends 循环: ${resolved}`);
   seen.add(resolved);
 
-  const dsl = (YAML.parse(fs.readFileSync(resolved, 'utf-8')) as DslObject | null) ?? {};
-  const parentRel = dsl.extends;
-  delete dsl.extends;
+  const { extends: parentRel, ...dsl } = parseCached(
+    resolved,
+    (f) => (YAML.parse(fs.readFileSync(f, 'utf-8')) as DslObject | null) ?? {},
+  );
   if (typeof parentRel === 'string' && parentRel) {
     const base = loadStylesDsl(path.resolve(path.dirname(resolved), parentRel), seen);
     return deepMerge(base as DslObject, dsl) as StylesDsl;

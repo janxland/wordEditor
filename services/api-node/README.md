@@ -125,6 +125,9 @@ NODE_OPTIONS=--max-old-space-size=512 node dist/main.js
 - 样式预览样例稿 `templates/hutb-shared/preview-styles.md` 里有两张 jsdelivr 远端图，
   两引擎各自让 Pandoc 现取现嵌：网络抖动会让某一侧少嵌 2 张图，产物大小与 media 数随之不同。
   比对预览产物前先确认两边 `word/media` 数量相同，别把它当成引擎差异。
+  media 数相同也可能抖出另一种形态：Pandoc 第一阶段（md→html 的 `--embed-resources`）
+  对同一 URL 时而下载内联、时而原样留链，产物里该图的 `descr` 就在 base64 与 CDN 直链间
+  摇摆，rels 编号随之平移——同一次抖动，两端都会出现，多跑几轮即可见齐。
 
 ## 已核对的回归范围
 

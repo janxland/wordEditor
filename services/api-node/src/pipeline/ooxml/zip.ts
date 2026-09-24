@@ -1,5 +1,6 @@
 /** docx 部件级改写：等价于 pipeline/ooxml_util.py:patch_docx_parts。 */
 import fs from 'node:fs';
+import { pipeline } from 'node:stream/promises';
 
 import type JSZip from 'jszip';
 
@@ -27,10 +28,13 @@ export interface DocxSession {
   readPart(part: string): Promise<string | null>;
   /** 一次读取多个部件；不存在的部件为 null。 */
   readParts(parts: string[]): Promise<Map<string, string | null>>;
-  /** 一次读取多个二进制部件（word/media/*）；不存在的部件为 null。 */
-  readPartsBytes(parts: string[]): Promise<Map<string, Buffer | null>>;
-  /** 一次性改写多个部件；新部件（如缺失的 numbering.xml）会被创建。 */
+  /** 一次改写多个部件；新部件（如缺失的 numbering.xml）会被创建。 */
   patch(patches: Record<string, PartPatch>): Promise<void>;
+  /**
+   * 单张读取二进制部件（word/media/*）：不缓存——调用方都是「读一张落一张」，
+   * 批量版会把全部媒体原始字节同时按住到函数结束，峰值 = 媒体总体积。
+   */
+  readPartBytes(part: string): Promise<Buffer | null>;
   /** 有改动才落盘；无改动时连读入都省掉。 */
   flush(): Promise<void>;
 }
@@ -38,6 +42,12 @@ export interface DocxSession {
 export async function openDocxSession(docxPath: string): Promise<DocxSession> {
   let loading: Promise<JSZip> | null = null;
   let dirty = false;
+  /**
+   * 文本部件解码缓存：document.xml 在一次构建里被 4 个阶段读、又被 patch 为做
+   * 「改没改」比较回读同样多次，旧写法每个版本都要重新 inflate + utf8 解码整段。
+   * patch 写入时同步作废/更新，读到的永远是当前版本；媒体二进制不走这里（一张一次，缓存只会占内存）。
+   */
+  const textCache = new Map<string, string>();
   /** 惰性载入 + 只载一次：并发调用共享同一个载入 Promise，不会各解一遍整包。 */
   const open = (): Promise<JSZip> =>
     (loading ??= jszip().then((ctor) => ctor.loadAsync(fs.readFileSync(docxPath))));
@@ -46,8 +56,14 @@ export async function openDocxSession(docxPath: string): Promise<DocxSession> {
     const z = await open();
     const out = new Map<string, string | null>();
     for (const part of parts) {
+      if (textCache.has(part)) {
+        out.set(part, textCache.get(part)!);
+        continue;
+      }
       const file = z.file(part);
-      out.set(part, file ? await file.async('string') : null);
+      const value: string | null = file ? await file.async('string') : null;
+      if (value !== null) textCache.set(part, value);
+      out.set(part, value);
     }
     return out;
   };
@@ -66,25 +82,23 @@ export async function openDocxSession(docxPath: string): Promise<DocxSession> {
 
     readParts,
 
-    async readPartsBytes(parts) {
+    async readPartBytes(part) {
       const z = await open();
-      const out = new Map<string, Buffer | null>();
-      for (const part of parts) {
-        const file = z.file(part);
-        out.set(part, file && !file.dir ? Buffer.from(await file.async('nodebuffer')) : null);
-      }
-      return out;
+      const file = z.file(part);
+      // async('nodebuffer') 本身就产出新 Buffer，无需再 Buffer.from 复制一张。
+      return file && !file.dir ? file.async('nodebuffer') : null;
     },
 
     async patch(patches) {
       const z = await open();
+      const sources = await readParts(Object.keys(patches));
       for (const [part, patch] of Object.entries(patches)) {
-        const file = z.file(part);
-        const source = file ? await file.async('string') : null;
+        const source = sources.get(part) ?? null;
         const next = patch(source);
         if (next === null || next === undefined) continue;
         if (next === source) continue;
         z.file(part, next);
+        textCache.set(part, next);
         dirty = true;
       }
     },
@@ -93,12 +107,18 @@ export async function openDocxSession(docxPath: string): Promise<DocxSession> {
       if (!dirty || !loading) return;
       dirty = false;
       const zip = await loading;
-      const buffer = await zip.generateAsync({
-        type: 'nodebuffer',
-        compression: 'DEFLATE',
-        compressionOptions: { level: 6 },
-      });
-      fs.writeFileSync(docxPath, buffer);
+      // 流式落盘：generateAsync 会先把整包（含全部媒体）物化成一个大 buffer 再写盘，
+      // streamFiles:false 的节点流按部件产出，峰值只剩最大单个部件。
+      // 两者的字节输出实测逐字节相同（同输入 sha1 比对过）。
+      await pipeline(
+        zip.generateNodeStream({
+          type: 'nodebuffer',
+          streamFiles: false,
+          compression: 'DEFLATE',
+          compressionOptions: { level: 6 },
+        }),
+        fs.createWriteStream(docxPath),
+      );
     },
   };
   return session;

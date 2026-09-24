@@ -57,12 +57,10 @@ export async function extractDocxToMarkdown(options: {
     .documentElement;
   const rels = parseRelations(relsRoot);
   const plans = planImages(rels);
-  const media = await zip.readPartsBytes(
-    plans.map((p) => p.source),
-  );
   fs.mkdirSync(imageDir, { recursive: true });
+  // 逐张「解→落盘→释放」：整包媒体一次性物化会让峰值等于图片总大小。
   for (const plan of plans) {
-    const bytes = media.get(plan.source);
+    const bytes = await zip.readPartBytes(plan.source);
     if (bytes) fs.writeFileSync(path.join(imageDir, plan.name), bytes);
   }
 

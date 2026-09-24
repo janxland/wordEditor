@@ -21,14 +21,7 @@ const IMAGE_EXT = /\.(png|jpe?g|gif|bmp|svg|webp)$/i;
  * 索引键用 sha256 而不是 base64：后者要让整目录的图片编码后常驻（峰值 ≈ 体积 ×1.37），
  * 逐张「读→哈希→释放」后只剩最大一张的体积。
  */
-export function restoreImagePaths(
-  html: string,
-  mdDir: string,
-  onLog?: (line: string) => void,
-): string {
-  // 探测用非全局正则：与下面的替换式共享 lastIndex，混用会漏匹配。
-  if (!/src="data:image\/[^;]+;base64,[A-Za-z0-9+/=]+"/.test(html)) return html;
-
+function digestIndex(mdDir: string): Map<string, string> {
   const digest = (buf: Buffer): string => createHash('sha256').update(buf).digest('hex');
   const byDigest = new Map<string, string>();
   for (const file of walkFiles(mdDir)) {
@@ -39,28 +32,53 @@ export function restoreImagePaths(
       /* 读不到的文件跳过 */
     }
   }
-  if (byDigest.size === 0) return html;
-
-  let restored = 0;
-  const next = html.replace(
-    /src="data:image\/[^;]+;base64,([A-Za-z0-9+/=]+)"/g,
-    (whole, encoded: string) => {
-      const target = byDigest.get(digest(Buffer.from(encoded, 'base64')));
-      if (!target) return whole;
-      restored += 1;
-      return `src="${target}"`;
-    },
-  );
-  if (restored) onLog?.(`[图片] 已还原 ${restored} 张内联图片为本地文件引用`);
-  return next;
+  return byDigest;
 }
 
-/** standalone HTML 的 <header id="title-block-header"> 会与 <head><title> 一起被读入，产生两次 Title 段。 */
-export function stripTitleBlockHeader(html: string): string {
-  return html.replace(
-    /<header[^>]*id=["']title-block-header["'][^>]*>[\s\S]*?<\/header>/i,
-    '',
-  );
+/** 按分支复刻 Python 的大小写口径：header 用 IGNORECASE，data-uri 严格小写（pandoc 输出恒定）。 */
+const anyCase = (literal: string): string =>
+  literal
+    .split('')
+    .map((c) => (/[a-z]/i.test(c) ? `[${c.toLowerCase()}${c.toUpperCase()}]` : c))
+    .join('');
+
+const DATA_URI_SRC = 'src="data:image/[^;]+;base64,([A-Za-z0-9+/=]+)"';
+const TITLE_HEADER_RE = new RegExp(
+  `${anyCase('<header')}[^>]*${anyCase('id')}=["']${anyCase('title-block-header')}["'][^>]*>` +
+    `[\\s\\S]*?<\\/${anyCase('header')}>` +
+    `|${DATA_URI_SRC}`,
+  'g',
+);
+const DATA_URI_PROBE = /src="data:image\/[^;]+;base64,[A-Za-z0-9+/=]+"/;
+
+/**
+ * standalone HTML 的两处修正合成单趟替换：title-block header（与 <head><title> 重复，须删）
+ * 与 data-URI 图片还原。两个分支互不重叠，合成一趟少产生一次全尺寸中间串——
+ * 带图文档的 HTML 里内嵌 base64，可达几十 MB。
+ * header 只删第一个（对齐 Python count=1）；图片索引没有可还原对象时整趟自然 no-op。
+ */
+export function normalizeStandaloneHtml(
+  html: string,
+  mdDir: string,
+  onLog?: (line: string) => void,
+): string {
+  const byDigest = DATA_URI_PROBE.test(html) ? digestIndex(mdDir) : null;
+  const digestOf = (buf: Buffer): string => createHash('sha256').update(buf).digest('hex');
+  let headerRemoved = false;
+  let restored = 0;
+  const next = html.replace(TITLE_HEADER_RE, (whole, encoded?: string) => {
+    if (encoded === undefined) {
+      if (headerRemoved) return whole;
+      headerRemoved = true;
+      return '';
+    }
+    const target = byDigest?.get(digestOf(Buffer.from(encoded, 'base64')));
+    if (!target) return whole;
+    restored += 1;
+    return `src="${target}"`;
+  });
+  if (restored) onLog?.(`[图片] 已还原 ${restored} 张内联图片为本地文件引用`);
+  return next;
 }
 
 export interface PandocRunInput {
@@ -122,7 +140,7 @@ export async function markdownToDocx(input: PandocRunInput): Promise<{ code: num
   );
   if (html.code !== 0) return { code: html.code, stderr: html.stderr };
 
-  const body = restoreImagePaths(stripTitleBlockHeader(html.stdout), mdDir, (line) =>
+  const body = normalizeStandaloneHtml(html.stdout, mdDir, (line) =>
     input.onLine?.('stdout', line),
   );
 
