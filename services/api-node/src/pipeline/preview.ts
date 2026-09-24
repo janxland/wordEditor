@@ -12,7 +12,7 @@ import path from 'node:path';
 import YAML from 'yaml';
 
 import { findPandoc } from '../config.js';
-import { createJob } from '../jobs/workspace.js';
+import { createJob, dropJob } from '../jobs/workspace.js';
 import type { PipelineEvent } from './types.js';
 import { sanitizeDownloadName } from './naming.js';
 import { runBuild } from './build.js';
@@ -60,54 +60,59 @@ export async function runStylePreview(options: {
     throw new Error(`模板文件不存在: ${template.referenceDoc}`);
   }
 
-  // 样例稿按请求原样给出的 id 查找，别名只用于解析模板定义。
-  const ownSample = path.join(options.repoRoot, 'templates', options.templateId, 'preview-styles.md');
-  const hasOwnSample = fs.existsSync(ownSample);
-  const sourceMd = hasOwnSample ? ownSample : path.join(options.repoRoot, SHARED_PREVIEW_MD);
-
   const job = createJob(options.cacheDir);
-  const stylesPath = path.join(job.dir, 'styles.yaml');
-  fs.writeFileSync(stylesPath, anchorExtends(options.stylesYaml, path.dirname(ownSample)), 'utf-8');
+  try {
+    // 样例稿按请求原样给出的 id 查找，别名只用于解析模板定义。
+    const ownSample = path.join(options.repoRoot, 'templates', options.templateId, 'preview-styles.md');
+    const hasOwnSample = fs.existsSync(ownSample);
+    const sourceMd = hasOwnSample ? ownSample : path.join(options.repoRoot, SHARED_PREVIEW_MD);
 
-  // 主路径先把 CDN 图落到任务目录（preview_styles.py 的做法）；
-  // 回退路径直接把样例稿交给构建链路，让 Pandoc 按 HTML 管道自行内联。
-  let inputMd = sourceMd;
-  if (hasOwnSample) {
-    const mdText = await materializeMarkdownImages(
-      options.repoRoot,
-      fs.readFileSync(sourceMd, 'utf-8'),
-      job.dir,
-    );
-    inputMd = path.join(job.dir, 'preview-input.md');
-    fs.writeFileSync(inputMd, mdText, 'utf-8');
-  }
+    const stylesPath = path.join(job.dir, 'styles.yaml');
+    fs.writeFileSync(stylesPath, anchorExtends(options.stylesYaml, path.dirname(ownSample)), 'utf-8');
 
-  await runBuild({
-    repoRoot: options.repoRoot,
-    pandoc,
-    template,
-    inputMd,
-    outputDocx: job.outputDocx,
-    options: {},
-    stylesYaml: hasOwnSample ? stylesPath : undefined,
-    uptoStage: hasOwnSample ? 'styles' : undefined,
-    emit: options.onEvent,
-  });
+    // 主路径先把 CDN 图落到任务目录（preview_styles.py 的做法）；
+    // 回退路径直接把样例稿交给构建链路，让 Pandoc 按 HTML 管道自行内联。
+    let inputMd = sourceMd;
+    if (hasOwnSample) {
+      const mdText = await materializeMarkdownImages(
+        options.repoRoot,
+        fs.readFileSync(sourceMd, 'utf-8'),
+        job.dir,
+      );
+      inputMd = path.join(job.dir, 'preview-input.md');
+      fs.writeFileSync(inputMd, mdText, 'utf-8');
+    }
 
-  if (!hasOwnSample) {
-    const zip = await openDocxSession(job.outputDocx);
-    await applyStylesStage({
+    await runBuild({
       repoRoot: options.repoRoot,
-      docxPath: job.outputDocx,
+      pandoc,
       template,
+      inputMd,
+      outputDocx: job.outputDocx,
       options: {},
-      stylesYaml: stylesPath,
-      log: (line) => options.onEvent({ type: 'log', line, stream: 'stdout' }),
-      step: () => undefined,
-      zip,
+      stylesYaml: hasOwnSample ? stylesPath : undefined,
+      uptoStage: hasOwnSample ? 'styles' : undefined,
+      emit: options.onEvent,
     });
-    await zip.flush();
-  }
 
-  return { jobId: job.id, fileName: sanitizeDownloadName(`style-preview-${options.templateId}.docx`) };
+    if (!hasOwnSample) {
+      const zip = await openDocxSession(job.outputDocx);
+      await applyStylesStage({
+        repoRoot: options.repoRoot,
+        docxPath: job.outputDocx,
+        template,
+        options: {},
+        stylesYaml: stylesPath,
+        log: (line) => options.onEvent({ type: 'log', line, stream: 'stdout' }),
+        step: () => undefined,
+        zip,
+      });
+      await zip.flush();
+    }
+
+    return { jobId: job.id, fileName: sanitizeDownloadName(`style-preview-${options.templateId}.docx`) };
+  } catch (e) {
+    dropJob(job); // 预览失败没有下载方，目录不必占着 TTL
+    throw e;
+  }
 }

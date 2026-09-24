@@ -39,6 +39,11 @@ export function openSse(reply: FastifyReply): SseChannel {
     reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
 
+  // 客户端断开后 socket 已死：心跳照发就是每 15s 一次无效写（Node 对坏管道
+  // 每次报一个 ERR_STREAM_WRITE_AFTER_END 进日志）。构建本身的语义不动——
+  // Python 生成器同样会把产物做完，这里只止住纯粹的僵尸心跳。
+  reply.raw.on('close', () => clearInterval(timer));
+
   return {
     emit: (event) =>
       event.type === 'step'

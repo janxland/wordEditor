@@ -53,6 +53,9 @@ export async function run(
       resolve({ code: code ?? 1, stdout: text.stdout, stderr: text.stderr });
     });
 
+    // 子进程提前退出后再写 stdin 会抛 EPIPE：'error' 无人监听会升级成 uncaughtException，
+    // 整个服务随一次坏请求陪葬。退出原因已由 stderr/exit code 口径带回，这里吞掉写错误。
+    child.stdin.on('error', () => {});
     if (options.stdin !== undefined) child.stdin.end(options.stdin);
     else child.stdin.end();
   });

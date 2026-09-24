@@ -24,6 +24,14 @@ export function jobDocxPath(cacheDir: string, jobId: string): string {
   return path.join(cacheDir, jobId, 'output.docx');
 }
 
+/**
+ * 请求失败即回收：jobId/产物从未回给调用方，目录（含已落盘的上传内容）
+ * 留到 6 小时 TTL 纯属垃圾，坏请求一多 .cache 就线性膨胀。
+ */
+export function dropJob(job: Job): void {
+  fs.rmSync(job.dir, { recursive: true, force: true });
+}
+
 /** 任务目录从最后一次写入起保留多久（分钟）；下载链接指向盘上的 output.docx，不能即用即删。 */
 const JOB_TTL_MINUTES = Number.parseInt(process.env.WORDEDITOR_JOB_TTL_MINUTES ?? '', 10) || 360;
 
@@ -37,9 +45,15 @@ export function pruneJobs(cacheDir: string, now = Date.now()): number {
   for (const entry of fs.readdirSync(cacheDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const dir = path.join(cacheDir, entry.name);
-    if (now - fs.statSync(dir).mtimeMs < ttlMs) continue;
-    fs.rmSync(dir, { recursive: true, force: true });
-    removed += 1;
+    // 逐条目容错：单个目录抛错（权限、双实例并发的删除竞态）不能中断整轮，
+    // 否则 readdir 序里排在它后面的过期目录永远清不掉。
+    try {
+      if (now - fs.statSync(dir).mtimeMs < ttlMs) continue;
+      fs.rmSync(dir, { recursive: true, force: true });
+      removed += 1;
+    } catch {
+      /* 坏条目留给下一轮或人工处置 */
+    }
   }
   return removed;
 }

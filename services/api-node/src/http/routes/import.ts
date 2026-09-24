@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import type { FastifyInstance } from 'fastify';
 
 import { withSlot } from '../../jobs/gate.js';
-import { createJob } from '../../jobs/workspace.js';
+import { createJob, dropJob } from '../../jobs/workspace.js';
 import { extractDocxToMarkdown } from '../../pipeline/extract.js';
 import type { AppContext } from '../context.js';
 import { requiredSchema } from '../contract.js';
@@ -45,6 +45,7 @@ export function registerImportRoutes(app: FastifyInstance, ctx: AppContext): voi
           log: result.log,
         };
       } catch (e) {
+        dropJob(job); // jobId 从未回给调用方，落盘的上传件别留到 TTL
         throw serverError('extract failed', e);
       }
     },

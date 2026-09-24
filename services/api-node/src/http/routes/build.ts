@@ -7,9 +7,11 @@ import { findPandoc, isFile } from '../../config.js';
 import { withSlot } from '../../jobs/gate.js';
 import {
   createJob,
+  dropJob,
   jobDocxPath,
   writeMarkdown,
   writeUploadEntries,
+  type Job,
   type UploadEntry,
 } from '../../jobs/workspace.js';
 import { runBuild } from '../../pipeline/build.js';
@@ -40,6 +42,7 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
     const step = (status: 'process' | 'finish', message?: string): void =>
       ch.step('prepare', status, message);
 
+    let created: Job | undefined; // 失败时回收；成功路径不登记
     try {
       const templateId = mustTrim(body, 'templateId');
       const markdown = strOf(body, 'markdown');
@@ -60,6 +63,7 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
 
       const template = templateById(ctx.repoRoot, templateId);
       const job = createJob(ctx.cacheDir);
+      created = job;
 
       step('process', upload ? `写入 ${upload.length} 个文件…` : '写入 Markdown…');
       const input = upload
@@ -90,6 +94,7 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
 
       ch.done(payload(job.id, fileName));
     } catch (e) {
+      if (created) dropJob(created);
       ch.fail(errorMessage(e));
     } finally {
       close();
