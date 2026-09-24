@@ -71,7 +71,7 @@ function walkFor(dir: string, fileName: RegExp): string | null {
 }
 
 /** 与 pipeline/tool_paths.py 等价的 Pandoc 定位。 */
-export function findPandoc(repoRoot: string): string | null {
+function probePandoc(repoRoot: string): string | null {
   const envPath = process.env.PANDOC;
   if (envPath && isFile(envPath)) return envPath;
 
@@ -133,4 +133,14 @@ export function childEnv(repoRoot: string): NodeJS.ProcessEnv {
     env.PANDOC ||= pandoc;
   }
   return env;
+}
+
+let pandocHit: string | null = null;
+
+/** 探测是 `which` + 文件系统遍历，每次构建跑一遍纯属浪费；命中即记住。 */
+export function findPandoc(repoRoot: string): string | null {
+  if (pandocHit && isFile(pandocHit)) return pandocHit;
+  const found = probePandoc(repoRoot);
+  if (found) pandocHit = found;
+  return found;
 }

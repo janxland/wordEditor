@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { isFile } from '../config.js';
+import { parseCached } from './file-cache.js';
 
 /** 与模板目录同级的历史别名。 */
 const TEMPLATE_ALIASES: Record<string, string> = {
@@ -45,7 +46,7 @@ export interface ResolvedTemplate {
 
 export function loadTemplatesConfig(repoRoot: string): TemplatesConfig {
   const file = path.join(repoRoot, 'config', 'templates.json');
-  return JSON.parse(fs.readFileSync(file, 'utf-8')) as TemplatesConfig;
+  return parseCached(file, (f) => JSON.parse(fs.readFileSync(f, 'utf-8')) as TemplatesConfig);
 }
 
 export function templateIdFor(cfg: TemplatesConfig, templateId?: string): string {

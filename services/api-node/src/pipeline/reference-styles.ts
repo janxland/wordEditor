@@ -8,6 +8,7 @@
 import { attr, child, childEls, parseXml, type XEl } from './ooxml/xml.js';
 import { pythonInt } from './ooxml/util.js';
 import { readPart } from './ooxml/zip.js';
+import { parseCached } from './file-cache.js';
 
 export interface StyleFonts {
   ascii?: string;
@@ -84,7 +85,12 @@ const INDENT_ATTRS = [
   'firstLine', 'firstLineChars', 'hanging', 'hangingChars', 'left', 'leftChars', 'right',
 ] as const;
 
-export async function extractReferenceStyles(referenceDocx: string): Promise<ReferenceStyle[]> {
+/** 同一份 reference.docx 只解析一次：按 mtime 判新，端点每次命中都省掉整包载入。 */
+export function extractReferenceStyles(referenceDocx: string): Promise<ReferenceStyle[]> {
+  return parseCached(referenceDocx, readReferenceStyles);
+}
+
+async function readReferenceStyles(referenceDocx: string): Promise<ReferenceStyle[]> {
   const stylesXml = await readPart(referenceDocx, 'word/styles.xml');
   if (!stylesXml) throw new Error('reference.docx 缺少 word/styles.xml');
   const root = parseXml(stylesXml).documentElement;

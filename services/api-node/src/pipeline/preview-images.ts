@@ -5,6 +5,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { parseCached } from './file-cache.js';
+
 const IMG_MD_RE = /!\[([^\]]*)\]\(([^)]+)\)/g;
 
 interface CdnConfig {
@@ -15,7 +17,7 @@ interface CdnConfig {
 function loadCdnConfig(repoRoot: string): CdnConfig {
   const file = path.join(repoRoot, 'config', 'preview-cdn.json');
   let cfg: CdnConfig = { cdn_base: '', images: {} };
-  if (fs.existsSync(file)) cfg = JSON.parse(fs.readFileSync(file, 'utf-8')) as CdnConfig;
+  if (fs.existsSync(file)) cfg = parseCached(file, (f) => JSON.parse(fs.readFileSync(f, 'utf-8')) as CdnConfig);
   const override = (process.env.WORDEDITOR_PREVIEW_CDN ?? '').trim().replace(/\/+$/, '');
   if (override) cfg.cdn_base = override;
   return cfg;
