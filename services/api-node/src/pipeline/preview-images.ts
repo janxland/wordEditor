@@ -16,11 +16,15 @@ interface CdnConfig {
 
 function loadCdnConfig(repoRoot: string): CdnConfig {
   const file = path.join(repoRoot, 'config', 'preview-cdn.json');
-  let cfg: CdnConfig = { cdn_base: '', images: {} };
-  if (fs.existsSync(file)) cfg = parseCached(file, (f) => JSON.parse(fs.readFileSync(f, 'utf-8')) as CdnConfig);
-  const override = (process.env.WORDEDITOR_PREVIEW_CDN ?? '').trim().replace(/\/+$/, '');
-  if (override) cfg.cdn_base = override;
-  return cfg;
+  if (!fs.existsSync(file)) return { cdn_base: envCdnBase(), images: {} };
+  const cfg = parseCached(file, (f) => JSON.parse(fs.readFileSync(f, 'utf-8')) as CdnConfig);
+  // 覆盖写在副本上：缓存里那份是共享对象，改它就等于把进程环境烧进缓存。
+  const override = envCdnBase();
+  return override ? { ...cfg, cdn_base: override } : cfg;
+}
+
+function envCdnBase(): string {
+  return (process.env.WORDEDITOR_PREVIEW_CDN ?? '').trim().replace(/\/+$/, '');
 }
 
 /** CDN 基址拼相对路径；无基址时原样返回。 */
