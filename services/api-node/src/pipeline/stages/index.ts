@@ -31,8 +31,6 @@ const STAGES: Stage[] = [
   { name: 'metadata', structural: false, run: applyMetadataStage },
 ];
 
-export const STAGE_NAMES = STAGES.map((s) => s.name);
-
 export async function runPostprocess(ctx: StageContext, upto?: StageName): Promise<void> {
   const zip = await openDocxSession(ctx.docxPath);
   const run = { ...ctx, zip };

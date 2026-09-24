@@ -48,14 +48,26 @@ Optional env:
 
 生产用 `pnpm build && node dist/main.js`，**不要用 `tsx`**（tsx 常驻多约 28 MB，且带类型解析）。
 
-实测（macOS，与 api-python 同一测量口径，`ps` RSS + `top` phys_footprint）：
+实测（macOS，`ps` RSS 口径；同一构建空载复测有 ±5 MB 抖动，因为 macOS 的 RSS 把共享页也计进每个进程，
+机器越忙读数越高）：
 
 | 指标 | 值 |
 | --- | --- |
-| 空闲常驻 | RSS 39 MB / footprint 41 MB（api-python 38 MB） |
+| 空闲常驻 | dist 76 MB（同机 api-python 43 MB）。对照组：裸 Fastify + 一个路由 = 65 MB，即本服务的代码与依赖只加约 1~2 MB |
+| 首个解 docx 的请求 | 76 → 81 MB（jszip 载入 + 整包解压，这是工作本身） |
 | 单路构建峰值进程树 | 126 MB（服务本体）+ 255 MB（pandoc 子进程） |
 | 样式预览峰值 | pandoc 374 MB 占绝对大头，引擎侧只差 20~30 MB |
-| 15 任务浸泡后 | RSS 回落到 37 MB，无累积泄漏，不需要定时重启 |
+| 15 任务浸泡后 | RSS 回落到空闲水位，无累积泄漏，不需要定时重启 |
+
+> 早期版本这里记的是「空闲 39 MB」——那是把裸 node 进程（实测 38 MB）当成了服务，已作废。
+
+**常驻水位已经压不动了**：jszip 已改成首次开包时才 `import`（`ooxml/zip.ts`），
+但 A/B（同一构建、各 3 次）只从 77.0/77.1/76.7 降到 76.2/76.3/76.4 MB —— 模块本身摊薄后约 1 MB。
+xmldom（+1.3 MB）、yaml（+2.4 MB）同理，而它们的调用点是同步的，为 1~2 MB 把同步链改成异步不值。
+结论：空闲足迹由 Fastify + V8 决定，要再降只能换框架或减并发，不该继续在「谁 import 得晚」上做文章。
+
+真正值得省的是**一次请求内的峰值**（已做）：图片反查索引从「整目录 base64 常驻」改成
+逐张 sha256（`pandoc.ts`）。100 MB 图片目录：旧实现索引进程 RSS 189~228 MB，新实现 79 MB。
 
 一次请求的峰值 ≈ `服务本体常驻 + pandoc 峰值 + 引擎增量`。pandoc 与引擎无关且占大头
 （小文档 115 MB → 多图 257 MB → 预览样例 374 MB），Node 侧增量约 30~90 MB（docx 解析在进程内），
@@ -131,4 +143,8 @@ NODE_OPTIONS=--max-old-space-size=512 node dist/main.js
   `contracts/openapi.json`；缺必填字段时两端同为 `{"detail":"… is required"}`。
 - 内存改造（zip 单次会话 / 配置缓存 / 并发闸门 / TTL 回收）后上述四项全部重跑通过；
   另把改造前后的产物逐部件 sha1 对比，除 `docProps/core.xml` 的生成时间戳外全部相同。
+- 常驻/按需这一轮（图片反查改摘要索引、jszip 惰性载入、配置缓存加 LRU 上界且失败不再被固化、
+  CDN 覆盖不再写进共享缓存对象）后：`parity full` 9 例、矩阵 13 例、REST 41 项（仍只有上表
+  所列 5 项框架级差异）、预览 8 模板全部一致；3 个带图用例改造前后逐部件 sha1 比对，
+  除 `docProps/core.xml` 时间戳外全部相同。
 

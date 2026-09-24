@@ -7,7 +7,7 @@
  */
 import { attr, child, childEls, parseXml, type XEl } from './ooxml/xml.js';
 import { pythonInt } from './ooxml/util.js';
-import { readPart } from './ooxml/zip.js';
+import { openDocxSession } from './ooxml/zip.js';
 import { parseCached } from './file-cache.js';
 
 export interface StyleFonts {
@@ -91,7 +91,8 @@ export function extractReferenceStyles(referenceDocx: string): Promise<Reference
 }
 
 async function readReferenceStyles(referenceDocx: string): Promise<ReferenceStyle[]> {
-  const stylesXml = await readPart(referenceDocx, 'word/styles.xml');
+  const zip = await openDocxSession(referenceDocx);
+  const stylesXml = await zip.readPart('word/styles.xml');
   if (!stylesXml) throw new Error('reference.docx 缺少 word/styles.xml');
   const root = parseXml(stylesXml).documentElement;
 

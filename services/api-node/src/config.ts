@@ -124,17 +124,6 @@ function probePandoc(repoRoot: string): string | null {
   return null;
 }
 
-/** 供子进程（Pandoc / 备用 Python）使用的环境变量。 */
-export function childEnv(repoRoot: string): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...process.env, PYTHONIOENCODING: 'utf-8' };
-  const pandoc = findPandoc(repoRoot);
-  if (pandoc) {
-    env.PATH = `${path.dirname(pandoc)}${path.delimiter}${env.PATH ?? ''}`;
-    env.PANDOC ||= pandoc;
-  }
-  return env;
-}
-
 let pandocHit: string | null = null;
 
 /** 探测是 `which` + 文件系统遍历，每次构建跑一遍纯属浪费；命中即记住。 */

@@ -1,17 +1,10 @@
 /**
- * DSL 驱动的列表样式注入（list_style_library + use_list_styles）。
- * 等价于 pipeline/ooxml_list_styles.py。
+ * DSL 驱动的列表样式注入（list_style_library + use_list_styles），等价于 pipeline/ooxml_list_styles.py。
  *
- * 设计哲学（松耦合 + 高效）：
- *
- *   • 库（list_style_library）单独成 yaml，可被任意 styles.yaml 通过 `extends:` 引入
- *   • 模板用 `use_list_styles:` 声明启用哪些样式，并可单独覆盖 paragraph 字段
- *   • 元样式 ListBase 自带 0 缩进 / 无制表符 —— 派生样式只需声明编号差异
- *   • 段落属性 / run 属性的注入复用 styles-dsl（postprocess_styles）中已有的
- *     `applyParagraph` / `applyRun`，零重复实现
- *   • numId 从 100 起分配，与 multilevel_list 的低位 numId 完全隔离
- *
- * 与 multilevel 一样直接改写已解析的部件根节点，序列化由调用方（styles 阶段）统一负责。
+ * 库单独成 yaml，模板用 `extends:` 引入、`use_list_styles:` 声明启用项并可覆盖 paragraph 字段；
+ * 段落/run 属性复用 styles-dsl 的 `applyParagraph` / `applyRun`，与 multilevel 一样直接改写已解析的
+ * 部件根节点，序列化由 styles 阶段统一负责。
+ * numId 从 100 起分配，与 multilevel_list 的低位 numId 完全隔离。
  */
 import { addEl, addElAt, attr, child, descendants, removeEl, setAttr, type XEl } from './xml.js';
 import { findStyleById, pythonInt, removeChildTags } from './util.js';
@@ -69,11 +62,10 @@ export function applyListStyles(
 ): Map<string, number> {
   if (!useList || useList.length === 0) return new Map();
 
-  // 1) 解析库 + 启用项
   const items = resolveUseList(flattenLibrary(library ?? []), useList, options.warn);
   if (items.length === 0) return new Map();
 
-  // 2) numbering.xml: 为每个启用样式创建 abstractNum + num
+  // 1) numbering.xml: 为每个启用样式创建 abstractNum + num
   const used = usedNumIds(numberingRoot);
 
   const newNums: Array<{ numId: number; abstractId: string }> = [];
@@ -94,7 +86,7 @@ export function applyListStyles(
 
   for (const { numId, abstractId } of newNums) appendNum(numberingRoot, numId, abstractId);
 
-  // 3) styles.xml: 创建段落样式 + 写 paragraph/run + 挂 numPr
+  // 2) styles.xml: 创建段落样式 + 写 paragraph/run + 挂 numPr
   const fonts = options.fonts ?? {};
   for (const style of items) {
     const sid = style.id;
@@ -108,15 +100,12 @@ export function applyListStyles(
 }
 
 /**
- * 把 document.xml 中 Pandoc 散装 numId 重定向到模板默认列表样式。
+ * 把 document.xml 中 Pandoc 散装 numId 重定向到模板默认列表样式：为每个原 numId 分配
+ * 独立新 numId，都指向 `defaultNumId` 的 abstractNumId 并强制 9 级 startOverride=1，
+ * 于是每个列表块各自从 1 重新计数。
  *
- * 为每个原 numId 分配一个**独立的新 numId**，都指向 `defaultNumId` 对应的
- * abstractNumId 并强制 9 级 startOverride=1 → 每个列表块从 1 重新计数。
- * 若提供 `defaultStyleId`，同时为这些段落注入 `w:pStyle`，让列表段套用
- * DSL 中定义的列表样式（如「数字列表」），从而继承基样式（如「文章的正文」）
- * 的字体/字号/行距。找不到 abstract 时退化为共享 `defaultNumId`。
- *
- * 就地改写 document / numbering，返回重写段数。
+ * 给了 `defaultStyleId` 时同时注入 `w:pStyle`，让列表段套用 DSL 里的列表样式（如「数字列表」），
+ * 从而继承基样式（如「文章的正文」）的字体/字号/行距。就地改写 document / numbering，返回重写段数。
  */
 export function redirectListNumIds(
   documentRoot: XEl,

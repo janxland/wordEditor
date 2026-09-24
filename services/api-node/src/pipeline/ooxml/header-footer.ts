@@ -39,11 +39,7 @@ export function checkAlignments(header: Alignments, footer: Alignments): void {
   }
 }
 
-/**
- * 用一个文案段落替换整个页眉/页脚部件的内容。
- *
- * 就地改写根节点，序列化由调用方（阶段）统一负责。
- */
+/** 用一个文案段落替换整个页眉/页脚部件；就地改写根节点，序列化由调用方（阶段）负责。 */
 export function applyHeaderFooter(root: XEl, text: string, aligns: Alignments): void {
   const firstParagraph = childEls(root, 'w:p')[0];
   const styleId = firstParagraph

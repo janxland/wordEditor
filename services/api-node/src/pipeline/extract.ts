@@ -6,9 +6,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { walkFiles } from '../fs-utils.js';
 import { docxToMarkdown, parseRelations, planImages } from './ooxml/docx-to-md.js';
 import { parseXml } from './ooxml/xml.js';
-import { readParts, readPartsBytes } from './ooxml/zip.js';
+import { openDocxSession } from './ooxml/zip.js';
 import { sanitizeImportName, slugify } from './naming.js';
 
 export interface ImportedDocx {
@@ -18,21 +19,6 @@ export interface ImportedDocx {
   /** 相对任务目录的 [相对路径, 绝对路径] 列表，供前端回传 entries。 */
   files: Array<{ relPath: string; absPath: string }>;
   log: string;
-}
-
-function walk(dir: string): string[] {
-  if (!fs.existsSync(dir)) return [];
-  const out: string[] = [];
-  const stack = [dir];
-  while (stack.length) {
-    const current = stack.pop()!;
-    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
-      const full = path.join(current, entry.name);
-      if (entry.isDirectory()) stack.push(full);
-      else if (entry.isFile()) out.push(full);
-    }
-  }
-  return out.sort();
 }
 
 export async function extractDocxToMarkdown(options: {
@@ -54,7 +40,9 @@ export async function extractDocxToMarkdown(options: {
   const imageDir = path.join(workDir, 'images', slug);
   const imageRel = `images/${slug}`;
 
-  const sources = await readParts(docxPath, [
+  // 一次导入只解一遍整包：文本部件和图片部件共用同一个会话。
+  const zip = await openDocxSession(docxPath);
+  const sources = await zip.readParts([
     'word/document.xml',
     'word/styles.xml',
     'word/_rels/document.xml.rels',
@@ -69,8 +57,7 @@ export async function extractDocxToMarkdown(options: {
     .documentElement;
   const rels = parseRelations(relsRoot);
   const plans = planImages(rels);
-  const media = await readPartsBytes(
-    docxPath,
+  const media = await zip.readPartsBytes(
     plans.map((p) => p.source),
   );
   fs.mkdirSync(imageDir, { recursive: true });
@@ -101,7 +88,7 @@ export async function extractDocxToMarkdown(options: {
     imageRelDir: imageRel,
     files: [
       { relPath: `${stem}.md`, absPath: mdPath },
-      ...walk(imageDir).map((abs) => ({
+      ...walkFiles(imageDir).map((abs) => ({
         relPath: path.relative(workDir, abs).split(path.sep).join('/'),
         absPath: abs,
       })),

@@ -8,32 +8,18 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { walkFiles } from '../fs-utils.js';
 import { run, type LineHandler } from './process.js';
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|bmp|svg|webp)$/i;
 
-function listFilesRecursive(root: string): string[] {
-  if (!fs.existsSync(root)) return [];
-  const out: string[] = [];
-  const stack = [root];
-  while (stack.length) {
-    const dir = stack.pop()!;
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) stack.push(full);
-      else if (entry.isFile()) out.push(full);
-    }
-  }
-  return out.sort();
-}
-
 /**
  * `--embed-resources` 会把 <img src> 变成 data URI，HTML→DOCX 阶段无法把它转成
- * 真正的 OOXML 图片关系（Word 里只剩一个空 drawing 框）。按 base64 反查原始文件，
+ * 真正的 OOXML 图片关系（Word 里只剩一个空 drawing 框）。按内容反查原始文件，
  * 把 src 换回本地路径，配合 --resource-path 即可正常嵌入。
  *
- * 索引键用内容摘要而不是 base64 本身：后者要把每张图片编码后整表常驻，
- * 峰值内存 ≈ 图片目录总体积 ×1.37；逐张「读 → 哈希 → 释放」后只剩最大一张的体积。
+ * 索引键用 sha256 而不是 base64：后者要让整目录的图片编码后常驻（峰值 ≈ 体积 ×1.37），
+ * 逐张「读→哈希→释放」后只剩最大一张的体积。
  */
 export function restoreImagePaths(
   html: string,
@@ -45,7 +31,7 @@ export function restoreImagePaths(
 
   const digest = (buf: Buffer): string => createHash('sha256').update(buf).digest('hex');
   const byDigest = new Map<string, string>();
-  for (const file of listFilesRecursive(mdDir)) {
+  for (const file of walkFiles(mdDir)) {
     if (!IMAGE_EXT.test(file)) continue;
     try {
       byDigest.set(digest(fs.readFileSync(file)), file);

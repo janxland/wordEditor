@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { isFile, MAX_ENTRY_B64_CHARS } from '../config.js';
+import { insideDir } from '../fs-utils.js';
 import { sanitizeDownloadName } from '../pipeline/naming.js';
 
 export interface Job {
@@ -68,13 +69,6 @@ export interface MaterializedInput {
   skipped: number;
 }
 
-function insideWorkDir(workDir: string, rel: string): string | null {
-  const cleaned = rel.replace(/\\/g, '/').replace(/^\/+/, '');
-  if (!cleaned) return null;
-  const abs = path.resolve(workDir, cleaned);
-  return abs === workDir || abs.startsWith(workDir + path.sep) ? abs : null;
-}
-
 /** 前端「上传整个文件夹」模式：落盘全部条目后按 mdRelPath 定位主 Markdown。 */
 export function writeUploadEntries(
   job: Job,
@@ -86,7 +80,7 @@ export function writeUploadEntries(
 
   let skipped = 0;
   for (const entry of entries) {
-    const abs = insideWorkDir(job.dir, String(entry.relPath ?? ''));
+    const abs = insideDir(job.dir, String(entry.relPath ?? ''));
     const b64 = String(entry.contentBase64 ?? '');
     if (!abs || b64.length > MAX_ENTRY_B64_CHARS) {
       skipped += 1;
@@ -96,7 +90,7 @@ export function writeUploadEntries(
     fs.writeFileSync(abs, Buffer.from(b64, 'base64'));
   }
 
-  const inputMd = insideWorkDir(job.dir, rel);
+  const inputMd = insideDir(job.dir, rel);
   if (!inputMd || !isFile(inputMd)) {
     throw new Error(`mdRelPath 未在上传列表中: ${mdRelPath}`);
   }

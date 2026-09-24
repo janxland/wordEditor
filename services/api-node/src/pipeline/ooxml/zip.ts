@@ -10,8 +10,8 @@ type JsZipCtor = typeof import('jszip');
 let jszipCtor: JsZipCtor | null = null;
 
 /**
- * 只有真要开包时才 import jszip：它是全服务里最重的第三方模块（实测单独 import 就多
- * 占 ~10 MB RSS，而启动 63 MB 里约 1/6）。只查模板/健康/契约的部署因此不必为它买单。
+ * 首次真要开包时才 import jszip。摊薄后它只占约 1 MB，但「用不到的模块不常驻」
+ * 是本服务的部署前提：只查模板/健康/契约的进程不该为 docx 引擎付钱。
  */
 async function jszip(): Promise<JsZipCtor> {
   return (jszipCtor ??= (await import('jszip')).default);
@@ -19,8 +19,8 @@ async function jszip(): Promise<JsZipCtor> {
 
 /**
  * 一次构建共用一个已载入的包：部件读改写全在内存里，磁盘只在 flush 时写一次。
- * 旧写法是每个阶段各自 load→改→DEFLATE 整包，一次构建要读 13 遍、重压缩 7 遍
- * （word/media 跟着白压 7 次），实测每多一个阶段峰值 RSS 就多 11~15 MB。
+ * 旧写法每阶段各自 load→改→DEFLATE 整包（读 13 遍、重压缩 7 遍，word/media 跟着白压），
+ * 实测每多一个阶段峰值 RSS 多 11~15 MB。
  */
 export interface DocxSession {
   listParts(): Promise<string[]>;
@@ -102,36 +102,4 @@ export async function openDocxSession(docxPath: string): Promise<DocxSession> {
     },
   };
   return session;
-}
-
-/** 以下一次性入口保持原契约：自行开关会话，供单次读写的调用方（extract / reference-styles）使用。 */
-export async function listParts(docxPath: string): Promise<string[]> {
-  return openDocxSession(docxPath).then((s) => s.listParts());
-}
-
-export async function readParts(
-  docxPath: string,
-  parts: string[],
-): Promise<Map<string, string | null>> {
-  return openDocxSession(docxPath).then((s) => s.readParts(parts));
-}
-
-export async function readPart(docxPath: string, part: string): Promise<string | null> {
-  return (await readParts(docxPath, [part])).get(part) ?? null;
-}
-
-export async function readPartsBytes(
-  docxPath: string,
-  parts: string[],
-): Promise<Map<string, Buffer | null>> {
-  return openDocxSession(docxPath).then((s) => s.readPartsBytes(parts));
-}
-
-export async function patchDocxParts(
-  docxPath: string,
-  patches: Record<string, PartPatch>,
-): Promise<void> {
-  const session = await openDocxSession(docxPath);
-  await session.patch(patches);
-  await session.flush();
 }

@@ -1,18 +1,16 @@
 /**
- * 接口契约层：contracts/openapi.json 是两个引擎共用的单一接口来源。
- *
- * 同一份文件既原样对外发布（AI Agent / Swagger UI 直接读），又给 Fastify 内置的 ajv
- * 当请求体校验规则用；契约一改，文档与校验同时跟着变。
+ * 接口契约层：contracts/openapi.json 是两个引擎共用的单一接口来源，既原样对外发布
+ * （AI Agent / Swagger UI 直接读），又给 Fastify 内置的 ajv 当请求体校验规则——契约一改，
+ * 文档与校验同时跟着变。
  */
 import fs from 'node:fs';
 import path from 'node:path';
 
 import { parseCached } from '../pipeline/file-cache.js';
 
+/** bytes 用于原样发布，schemas 用于取校验规则。 */
 interface Contract {
-  /** 对外发布用的原始字节。 */
   bytes: Buffer;
-  /** 请求体校验规则的来源。 */
   schemas: Record<string, object>;
 }
 
@@ -30,14 +28,13 @@ export function openapiBytes(repoRoot: string): Buffer {
   return contract(repoRoot).bytes;
 }
 
-export function bodySchema(repoRoot: string, name: string): object {
+function bodySchema(repoRoot: string, name: string): object {
   return contract(repoRoot).schemas[name];
 }
 
 /**
- * 只把契约里的必填项交给 ajv（Fastify 内置校验器）：
- * 类型强转会把数字塞成字符串、空串与缺省也要分开判，这些语义留在处理函数里，
- * 框架只负责「字段在不在」，错误文案与 api-python 的手写检查同字。
+ * 只把必填项交给 ajv：类型强转、空串与缺省分开判这些语义留在处理函数里，
+ * 框架只管「字段在不在」，错误文案与 api-python 的手写检查同字。
  */
 export function requiredSchema(
   repoRoot: string,

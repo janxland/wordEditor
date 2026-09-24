@@ -57,14 +57,3 @@ export async function run(
     else child.stdin.end();
   });
 }
-
-/** 需要拿到 stdout 文本（如 --json 输出）时使用。 */
-export async function runJson<T>(
-  command: string,
-  args: string[],
-  options: { cwd: string; env?: NodeJS.ProcessEnv },
-): Promise<T> {
-  const result = await run(command, args, options);
-  if (result.code !== 0) throw new Error(result.stderr.trim() || `exit ${result.code}`);
-  return JSON.parse(result.stdout) as T;
-}

@@ -7,9 +7,6 @@
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 
 export const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-export const XML_NS = 'http://www.w3.org/XML/1998/namespace';
-export const REL_NS =
-  'http://schemas.openxmlformats.org/package/2006/relationships';
 
 const XML_DECL = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n';
 

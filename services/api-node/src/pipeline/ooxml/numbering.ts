@@ -36,13 +36,6 @@ export function findAbstractNum(root: XEl, abstractId: string): XEl | undefined 
   return abstractNumEls(root).find((ab) => attr(ab, 'w:abstractNumId') === abstractId);
 }
 
-/** 某条 num 声明的 abstractNumId 原值（字符串）。 */
-export function numAbstractIdVal(root: XEl, numId: number): string | undefined {
-  const num = findNum(root, numId);
-  const el = num ? child(num, 'w:abstractNumId') : undefined;
-  return el ? attr(el, 'w:val') : undefined;
-}
-
 /** num → 其 abstractNumId 数值；缺 abstractNumId 或非法时返回 undefined。 */
 export function abstractIdOfNum(root: XEl, numId: number): number | undefined {
   const num = findNum(root, numId);

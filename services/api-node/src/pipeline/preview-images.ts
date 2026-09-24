@@ -9,39 +9,16 @@ import { parseCached } from './file-cache.js';
 
 const IMG_MD_RE = /!\[([^\]]*)\]\(([^)]+)\)/g;
 
+/** 预览图配置：只用到 images 表（CDN 相对路径清单，供下载失败时回退本地同名文件）。 */
 interface CdnConfig {
-  cdn_base?: string;
   images?: Record<string, string>;
 }
 
 function loadCdnConfig(repoRoot: string): CdnConfig {
   const file = path.join(repoRoot, 'config', 'preview-cdn.json');
-  if (!fs.existsSync(file)) return { cdn_base: envCdnBase(), images: {} };
-  const cfg = parseCached(file, (f) => JSON.parse(fs.readFileSync(f, 'utf-8')) as CdnConfig);
-  // 覆盖写在副本上：缓存里那份是共享对象，改它就等于把进程环境烧进缓存。
-  const override = envCdnBase();
-  return override ? { ...cfg, cdn_base: override } : cfg;
-}
-
-function envCdnBase(): string {
-  return (process.env.WORDEDITOR_PREVIEW_CDN ?? '').trim().replace(/\/+$/, '');
-}
-
-/** CDN 基址拼相对路径；无基址时原样返回。 */
-export function cdnUrl(relPath: string, repoRoot: string): string {
-  const base = (loadCdnConfig(repoRoot).cdn_base ?? '').replace(/\/+$/, '');
-  const rel = relPath.replace(/^\/+/, '');
-  return base ? `${base}/${rel}` : rel;
-}
-
-/** 模板预览页默认插图清单：{ 名称: 可访问 URL }。 */
-export function defaultPreviewImageUrls(repoRoot: string): Record<string, string> {
-  const cfg = loadCdnConfig(repoRoot);
-  const out: Record<string, string> = {};
-  for (const [name, rel] of Object.entries(cfg.images ?? {})) {
-    out[name] = cdnUrl(rel, repoRoot);
-  }
-  return out;
+  return fs.existsSync(file)
+    ? parseCached(file, (f) => JSON.parse(fs.readFileSync(f, 'utf-8')) as CdnConfig)
+    : {};
 }
 
 async function download(url: string, dest: string): Promise<boolean> {
