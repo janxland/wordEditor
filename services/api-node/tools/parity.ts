@@ -3,7 +3,7 @@
  * Python / Node 引擎产物对比：验证「同一输入 → 同一 docx」。
  *
  *   npx tsx tools/parity.ts pandoc -i input/x.md -t hutb-guanke
- *   npx tsx tools/parity.ts stage document -i input/x.md -t hutb-guanke
+ *   npx tsx tools/parity.ts stage --upto document -i input/x.md -t hutb-guanke
  *   npx tsx tools/parity.ts full    -i input/x.md -t hutb-guanke
  *
  * pandoc：两边都只跑 Pandoc，隔离出管道差异。

@@ -1,4 +1,4 @@
-/** MD → Word 管线请求/响应（与 dev-api /build/stream 对齐） */
+/** MD → Word 管线请求/响应（与后端 /api/build/stream 对齐） */
 
 /** 产出留痕：写入 docx 文档属性 */
 export interface BuildProvenance {

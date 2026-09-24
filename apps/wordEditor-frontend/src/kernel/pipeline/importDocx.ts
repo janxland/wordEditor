@@ -1,4 +1,4 @@
-/** DOCX → Markdown 还原管线（对接 dev-api /import/docx） */
+/** DOCX → Markdown 还原管线（对接 /api/import/docx） */
 
 export interface ImportDocxRequest {
   filename: string;
