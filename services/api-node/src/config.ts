@@ -70,29 +70,21 @@ function walkFor(dir: string, fileName: RegExp): string | null {
   return null;
 }
 
-/** 与 pipeline/tool_paths.py 等价的 Pandoc 定位。 */
-function probePandoc(repoRoot: string): string | null {
-  const envPath = process.env.PANDOC;
-  if (envPath && isFile(envPath)) return envPath;
-
-  const onPath = which('pandoc');
-  if (onPath) return onPath;
-
-  const exe = process.platform === 'win32' ? 'pandoc.exe' : 'pandoc';
-  const toolsDir = path.join(repoRoot, '.tools');
-  if (fs.existsSync(toolsDir)) {
-    for (const pkg of fs.readdirSync(toolsDir).sort()) {
-      if (!/pandoc/i.test(pkg)) continue;
-      const base = path.join(toolsDir, pkg);
-      for (const rel of [['bin', exe], [exe], ['bin', 'pandoc.exe'], ['bin', 'pandoc']]) {
-        const candidate = path.join(base, ...rel);
-        if (isFile(candidate)) return candidate;
-      }
-    }
-  }
-
+/** 与 tool_paths.py:_iter_pandoc_candidates 同序：环境变量 → 系统安装点 → .tools → winget → scoop → choco。 */
+function pandocCandidates(repoRoot: string): string[] {
   const home = os.homedir();
-  const fixed = [
+  /** 包目录下按 Python 的 rel 顺序展开：bin/pandoc、bin/pandoc.exe、pandoc、pandoc.exe。 */
+  const perPackage = (dir: string): string[] => {
+    if (!fs.existsSync(dir)) return [];
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && /pandoc/i.test(e.name))
+      .map((e) => e.name)
+      .sort()
+      .flatMap((pkg) => ['bin/pandoc', 'bin/pandoc.exe', 'pandoc', 'pandoc.exe'].map((rel) => path.join(dir, pkg, rel)));
+  };
+  return [
+    process.env.PANDOC ?? '',
     path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Pandoc', 'pandoc.exe'),
     path.join(process.env.ProgramFiles || 'C:\\Program Files (x86)', 'Pandoc', 'pandoc.exe'),
     path.join(home, 'AppData', 'Local', 'Pandoc', 'pandoc.exe'),
@@ -101,25 +93,32 @@ function probePandoc(repoRoot: string): string | null {
     '/opt/homebrew/bin/pandoc',
     '/usr/local/bin/pandoc',
     '/usr/bin/pandoc',
-  ];
-  for (const candidate of fixed) {
-    if (isFile(candidate)) return candidate;
-  }
-
-  const winGet = path.join(home, 'AppData', 'Local/Microsoft/WinGet/Packages');
-  if (fs.existsSync(winGet)) {
-    for (const pkg of fs.readdirSync(winGet).sort()) {
-      if (!/pandoc/i.test(pkg)) continue;
-      const found = walkFor(path.join(winGet, pkg), /^pandoc\.exe$/i);
-      if (found) return found;
-    }
-  }
-
-  for (const candidate of [
+    ...perPackage(path.join(repoRoot, '.tools')),
+    ...((): string[] => {
+      const winGet = path.join(home, 'AppData', 'Local/Microsoft/WinGet/Packages');
+      if (!fs.existsSync(winGet)) return [];
+      return fs
+        .readdirSync(winGet)
+        .sort()
+        .filter((pkg) => /pandoc/i.test(pkg))
+        .map((pkg) => walkFor(path.join(winGet, pkg), /^pandoc\.exe$/i) ?? '')
+        .filter(Boolean);
+    })(),
     path.join(home, 'scoop/apps/pandoc/current/pandoc.exe'),
     'C:\\ProgramData\\chocolatey\\bin\\pandoc.exe',
-  ]) {
-    if (isFile(candidate)) return candidate;
+  ].filter(Boolean);
+}
+
+/**
+ * 先问 PATH（Python 侧 shutil.which 也是第一步），再按候选表逐个试。
+ * 顺序与命中路径的 realpath 口径都必须和 tool_paths.py 一致：两引擎各自挑到不同版本的
+ * pandoc，产物连 docProps/custom.xml 的 generator 都会分叉（3.9 不写版本号，3.10.2 写）。
+ */
+function probePandoc(repoRoot: string): string | null {
+  const onPath = which('pandoc');
+  if (onPath) return onPath;
+  for (const candidate of pandocCandidates(repoRoot)) {
+    if (isFile(candidate)) return fs.realpathSync(candidate);
   }
   return null;
 }
