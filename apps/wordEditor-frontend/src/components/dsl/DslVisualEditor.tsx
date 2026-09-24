@@ -256,7 +256,7 @@ export const DslVisualEditor: React.FC = () => {
         {activeSection === 'headings' && (
           <Space direction="vertical" style={{ width: '100%' }}>
             <Text type="secondary">
-              文档化字段，与 postprocess_document.py 标题识别规则对照。
+              文档化字段，与后端标题识别规则（Node / Python 引擎一致）对照。
             </Text>
             <Button
               type="dashed"

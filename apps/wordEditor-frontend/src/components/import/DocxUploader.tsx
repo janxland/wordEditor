@@ -47,7 +47,7 @@ export const DocxUploader: React.FC = () => {
         </p>
         <p className="ant-upload-text">点击或拖拽 .docx 到此区域</p>
         <p className="ant-upload-hint">
-          仅支持单个 .docx；服务端调用 <Text code>extract_docx_to_md.py</Text> 还原 MD 与图片
+          仅支持单个 .docx；服务端解析 OOXML 结构还原 MD 与图片（Node / Python 引擎产物一致）
         </p>
       </Dragger>
 
