@@ -24,6 +24,45 @@ Optional env:
 - `WORDEDITOR_PORT` (default `8787`)
 - `WORDEDITOR_REPO_ROOT` (auto-detected by default)
 - `PANDOC` (optional explicit pandoc executable path)
+- `WORDEDITOR_MAX_CONCURRENCY` (重任务并发上限，默认按物理内存推出 1~8)
+- `WORDEDITOR_JOB_TTL_MINUTES` (任务目录保留时长，默认 360 分钟)
+
+## 部署与内存
+
+生产用 `pnpm build && node dist/main.js`，**不要用 `tsx`**（tsx 常驻多约 28 MB，且带类型解析）。
+
+实测（macOS，与 api-python 同一测量口径，`ps` RSS + `top` phys_footprint）：
+
+| 指标 | 值 |
+| --- | --- |
+| 空闲常驻 | RSS 39 MB / footprint 41 MB（api-python 38 MB） |
+| 单路构建峰值进程树 | 126 MB（服务本体）+ 255 MB（pandoc 子进程） |
+| 样式预览峰值 | pandoc 374 MB 占绝对大头，引擎侧只差 20~30 MB |
+| 15 任务浸泡后 | RSS 回落到 37 MB，无累积泄漏，不需要定时重启 |
+
+一次请求的峰值 ≈ `服务本体常驻 + pandoc 峰值 + 引擎增量`。pandoc 与引擎无关且占大头
+（小文档 115 MB → 多图 257 MB → 预览样例 374 MB），Node 侧增量约 30~90 MB（docx 解析在进程内），
+Python 侧约 2~6 MB 但另起 2~3 个短命子进程。**因此限并发比限内存有效**：
+
+| 主机内存 | 建议 `WORDEDITOR_MAX_CONCURRENCY` |
+| --- | --- |
+| 1 GB | 1~2 |
+| 2 GB | 2~3 |
+| 4 GB | 5 |
+| 8 GB+ | 8（代码默认上限） |
+
+闸门的取舍是「用排队换内存」，4 路并发构建实测：上限 4（等于不限）进程组峰值 **479 MB**，
+上限 2 降到 **271 MB** 且 4/4 全部成功，多出的 2 路在 SSE 里收到 `[排队] … 第 N 位` 日志。
+
+`--max-old-space-size` 只是给堆**设界**（让内存在服务内部失败，而不是被 OOM killer 打挂整机），
+它本身不省内存；取值参考启动日志打印的「JS 堆上限 / 物理内存」两行：
+
+```bash
+NODE_OPTIONS=--max-old-space-size=512 node dist/main.js
+```
+
+上传体上已有 `MAX_BODY_BYTES = 96 MB` 的硬顶，`/api/import/docx` 走 JSON base64（约 1.37 倍膨胀），
+内存敏感的小机型可把它调小。
 
 ## Tech Stack
 
@@ -65,4 +104,6 @@ Optional env:
   日志行逐字一致。`password` 的 `w:hash`/`w:salt` 是随机盐，哈希算法本身已与 `_hash_password` 同盐核对过。
 - 其余端点 41 项（含 `/api/import/docx` 含公式与图片的 docx、
   各错误分支、并发 4 任务的作业目录隔离）：除上表所列，响应一致。
+- 内存改造（zip 单次会话 / 配置缓存 / 并发闸门 / TTL 回收）后上述四项全部重跑通过；
+  另把改造前后的产物逐部件 sha1 对比，除 `docProps/core.xml` 的生成时间戳外全部相同。
 

@@ -7,7 +7,15 @@ import type { AppContext } from './http/context.js';
 import { fail } from './http/respond.js';
 
 export function createServer(ctx: AppContext) {
-  const app = Fastify({ logger: false, bodyLimit: MAX_BODY_BYTES });
+  const app = Fastify({
+    // 结构化访问日志走 Fastify 自带的 pino，不额外引依赖；WORDEDITOR_LOG_LEVEL=warn 可静音。
+    logger: { level: process.env.WORDEDITOR_LOG_LEVEL ?? 'info' },
+    bodyLimit: MAX_BODY_BYTES,
+    // 故意不设 connectionTimeout / requestTimeout：两者在 Node 里都是「套接字静默」超时，
+    // 而一路 Pandoc 会有几十秒不写字节（实测 5s 就会掐断 SSE）。慢速头部攻击由 Node 自带的
+    // headersTimeout(60s) 兜住，跨反代的静默由心跳帧兜住。
+    forceCloseConnections: true,
+  });
 
   app.setErrorHandler((err, _req, reply) => {
     if (reply.raw.headersSent) return;
