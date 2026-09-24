@@ -28,3 +28,6 @@ Thumbs.db
 
 # 已弃用：上游克隆目录（模板 Lua 已迁入 templates/hutb-shared/）
 vendor/
+
+# 本机内置工具（Pandoc 等），不入库
+.tools/

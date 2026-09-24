@@ -1,25 +1,19 @@
 import fs from 'node:fs';
 
-import { cacheDir, resolvePort, resolveRepoRoot } from './config/env.js';
-import { createApp } from './app.js';
+import { resolveCacheDir, resolvePort, resolveRepoRoot } from './config.js';
+import { createServer } from './server.js';
 
-async function main(): Promise<void> {
-  const repoRoot = resolveRepoRoot();
-  const cDir = cacheDir(repoRoot);
-  fs.mkdirSync(cDir, { recursive: true });
+const repoRoot = resolveRepoRoot();
+const cacheDir = resolveCacheDir(repoRoot);
+fs.mkdirSync(cacheDir, { recursive: true });
 
-  const app = createApp(repoRoot, cDir);
-  const port = resolvePort();
+const app = createServer({ repoRoot, cacheDir });
+const port = resolvePort();
 
-  await app.listen({ port, host: '0.0.0.0' });
-  // eslint-disable-next-line no-console
-  console.log(`[api-node] listening on http://localhost:${port}`);
-  // eslint-disable-next-line no-console
-  console.log(`[api-node] repo root: ${repoRoot}`);
-}
-
-main().catch((e) => {
-  // eslint-disable-next-line no-console
-  console.error(e);
-  process.exit(1);
-});
+app
+  .listen({ port, host: '0.0.0.0' })
+  .then(() => console.log(`[api-node] http://localhost:${port}  repo=${repoRoot}`))
+  .catch((e: unknown) => {
+    console.error(e);
+    process.exit(1);
+  });

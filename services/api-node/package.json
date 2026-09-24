@@ -12,7 +12,6 @@
     "@xmldom/xmldom": "^0.8.10",
     "fastify": "^4.28.1",
     "jszip": "^3.10.1",
-    "xpath": "^0.0.34",
     "yaml": "^2.8.1"
   },
   "devDependencies": {
