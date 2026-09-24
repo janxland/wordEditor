@@ -237,7 +237,7 @@ export function resolveUseList(
       continue;
     }
     if (!sid || !libraryFlat.has(sid)) {
-      warn(`  ! 列表样式库未找到: ${sid === undefined ? 'None' : `'${sid}'`}`);
+      warn(`  ! 列表样式库未找到: ${sid === undefined ? 'null' : `'${sid}'`}`);
       continue;
     }
     const flat: Record<string, unknown> = { ...deepCopy(libraryFlat.get(sid)!) };

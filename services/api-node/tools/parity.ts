@@ -30,6 +30,7 @@ import {
   type ResolvedTemplate,
 } from '../src/pipeline/templates.js';
 import type { StageName } from '../src/pipeline/stages/context.js';
+import type { BuildOptions } from '../src/pipeline/types.js';
 
 
 const argv = process.argv.slice(2);
@@ -231,7 +232,7 @@ async function nodeBuild(
     template,
     inputMd,
     outputDocx: output,
-    options: postprocess ? {} : { noPostprocess: true },
+    options: { ...(postprocess ? {} : { noPostprocess: true }), ...headerFooter },
     uptoStage,
     emit: (e) => {
       if (e.type === 'log' && process.env.PARITY_VERBOSE) console.log(`  [node] ${e.line}`);
@@ -250,6 +251,24 @@ const cfg = loadTemplatesConfig(repoRoot);
 const template = resolveTemplate(repoRoot, findTemplate(cfg, templateId));
 const stage = opt('--upto') as StageName;
 
+/** 页眉页脚由入参驱动，只有 full 模式会真正跑到：同名透传给两条链路。 */
+const HEADER_FOOTER_FLAGS: Array<[string, keyof BuildOptions]> = [
+  ['--header-text', 'headerText'],
+  ['--footer-text', 'footerText'],
+  ['--header-align', 'headerAlign'],
+  ['--header-vertical-align', 'headerVerticalAlign'],
+  ['--footer-align', 'footerAlign'],
+  ['--footer-vertical-align', 'footerVerticalAlign'],
+];
+const headerFooter: BuildOptions = {};
+const headerFooterArgs: string[] = [];
+for (const [flag, key] of HEADER_FOOTER_FLAGS) {
+  const value = opt(flag);
+  if (!value) continue;
+  headerFooter[key] = value;
+  headerFooterArgs.push(flag, value);
+}
+
 switch (mode) {
   case 'pandoc':
     runPythonBuild(inputMd, templateId, pyDocx);
@@ -264,7 +283,7 @@ switch (mode) {
     await nodeBuild(inputMd, template, nodeDocx, true, stage);
     break;
   case 'full':
-    runPythonScript('build.py', ['-i', inputMd, '-o', pyDocx, '-t', templateId]);
+    runPythonScript('build.py', ['-i', inputMd, '-o', pyDocx, '-t', templateId, ...headerFooterArgs]);
     await nodeBuild(inputMd, template, nodeDocx, true);
     break;
   default:
