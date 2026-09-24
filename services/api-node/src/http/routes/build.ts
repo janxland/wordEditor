@@ -3,7 +3,7 @@ import fs from 'node:fs';
 
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
-import { findPandoc } from '../../config.js';
+import { findPandoc, isFile } from '../../config.js';
 import { createJob, jobDocxPath, writeMarkdown, writeUploadEntries } from '../../jobs/workspace.js';
 import { runBuild } from '../../pipeline/build.js';
 import type { PipelineEvent } from '../../pipeline/types.js';
@@ -15,12 +15,9 @@ import { errorMessage, fail } from '../respond.js';
 import { beginSse, writeSse } from '../sse.js';
 import type { BuildRequestBody, DownloadPayload, PreviewStylesRequestBody } from '../types.js';
 
-export function artifactDownloadUrl(jobId: string, fileName: string): string {
-  return `/api/build/download?jobId=${jobId}&fileName=${encodeURIComponent(fileName)}`;
-}
-
 function payload(jobId: string, fileName: string): DownloadPayload {
-  return { jobId, fileName, downloadUrl: artifactDownloadUrl(jobId, fileName) };
+  // 与 app.py 一致：fileName 已经过 sanitize，只余 \w.-()空格中文，直接拼进 URL。
+  return { jobId, fileName, downloadUrl: `/api/build/download?jobId=${jobId}&fileName=${fileName}` };
 }
 
 function sseEmitter(reply: FastifyReply) {
@@ -96,7 +93,7 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
     if (!/^[\w-]+$/.test(jobId)) return fail(reply, 400, 'invalid jobId');
 
     const docx = jobDocxPath(ctx.cacheDir, jobId);
-    if (!fs.existsSync(docx)) return fail(reply, 404, 'file not found or expired');
+    if (!isFile(docx)) return fail(reply, 404, 'file not found or expired');
 
     const fileName = sanitizeDownloadName(query.fileName ?? 'export.docx');
     return reply
@@ -104,7 +101,7 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
         'Content-Type',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       )
-      .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`)
+      .header('Content-Disposition', `attachment; filename*=utf-8''${encodeURIComponent(fileName)}`)
       .send(fs.createReadStream(docx));
   });
 

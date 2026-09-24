@@ -14,7 +14,8 @@ const SETTINGS_PART = 'word/settings.xml';
 const SPIN_COUNT = 100_000;
 const CRYPT_SID = 14;
 
-function hashPassword(password: string, salt: Buffer): Buffer {
+/** 与 Python `_hash_password` 逐字节一致：盐 + utf-16le 口令，SHA-512 迭代 SPIN_COUNT 次。 */
+export function hashPassword(password: string, salt: Buffer): Buffer {
   const pw = Buffer.from(password, 'utf16le');
   let h = crypto.createHash('sha512').update(Buffer.concat([salt, pw])).digest();
   const counter = Buffer.alloc(4);

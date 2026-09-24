@@ -46,7 +46,20 @@ Optional env:
 - `GET /api/health` 的 `service` 为 `api-node`：用来分辨当前生效的引擎。
 - `GET /api/tools` 的 `python.path`：Python 侧是自身解释器，Node 侧是探测到的 `python3`（仅备用引擎需要）。
 - 错误文案：Python 常给 `build failed: 1` / 带尾随换行的 stderr，Node 在同样的 `{"detail"}` / SSE `{"error"}` 结构下给可读原因（如未知模板 + 可用列表）。
-- SSE `step` 事件集合一致，但顺序按真实阶段单调推进；Python 因 `build.py` stdout 块缓冲，后处理事件会先于 `模板:/输入:` 到达，不复制这个乱序。
+- SSE `step` 事件集合一致，但顺序按真实阶段单调推进；Python 因 `build.py` stdout 块缓冲，后处理事件会先于 `模板:/输入:` 到达，不复制这个乱序，也不复制每个 `[后处理]` 前的那个空行。
+- SSE/JSON 的字面量差异：`json.dumps` 的 `", "` / `": "` 空白、浮点写成 `1.0`（Node 为 `1`）—— 任何 JS 消费者解析后同值。
+- 方法不匹配（如 `POST /api/file`）：FastAPI 回 405，Fastify 4 有意对所有未知方法统一回 404。
+- 请求体不是合法 JSON（如 `PUT /api/file` 传裸文本）：FastAPI 抛 500 纯文本，Node 经 `setErrorHandler` 回 400 `{"detail"}`。
+- 上传模式里越界/超大的条目：两边都静默跳过该条目，Node 额外给一行告警日志。
 - `PUT /api/file?path=`（空路径）：Python 试图写仓库根返回 500，Node 返回 400 `invalid path`。
 - 请求体上限 `MAX_BODY_BYTES` 96 MB（超限 413）：Python 无上限，Node 保留护栏。
+
+## 已核对的回归范围
+
+- 完整链路 `parity full`：8 个模板产物语义一致。
+- `/api/build/stream` 选项矩阵 13 例（`noHtmlPipe` / `noPostprocess` / `password` / 页眉页脚对齐组合 /
+  `provenance` / 中文与非法字符文件名 / 别名模板 / entries 上传带图 / 三线表+公式）：产物与 `done` 负载一致，
+  日志行逐字一致。`password` 的 `w:hash`/`w:salt` 是随机盐，哈希算法本身已与 `_hash_password` 同盐核对过。
+- 其余端点 36 项（含 5 个模板的 `/api/preview/styles` 产物、`/api/import/docx` 含公式与图片的 docx、
+  各错误分支、并发 4 任务的作业目录隔离）：除上表所列，响应一致。
 

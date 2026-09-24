@@ -56,11 +56,13 @@ async function parts(docx: string): Promise<Map<string, Buffer>> {
   return out;
 }
 
-/** 时间戳一类的写入差异不参与语义比较。 */
+/** 每次运行都会变的字段（时间戳、随机口令盐、引擎自己的作业目录）不参与语义比较。 */
 function preStrip(text: string): string {
   return text
     .replace(/<\?xml[^>]*\?>\s*/g, '')
-    .replace(/<dcterms:(created|modified)\b[^>]*>[^<]*<\/dcterms:\1>/g, '');
+    .replace(/<dcterms:(created|modified)\b[^>]*>[^<]*<\/dcterms:\1>/g, '')
+    .replace(/ w:(hash|salt)="[^"]*"/g, '')
+    .replace(/\/\.cache\/wordeditor-api-(python|node)\/[\w-]+/g, '');
 }
 
 /**
