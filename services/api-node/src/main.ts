@@ -1,11 +1,13 @@
 import fs from 'node:fs';
 
 import { resolveCacheDir, resolvePort, resolveRepoRoot } from './config.js';
+import { startJobJanitor } from './jobs/workspace.js';
 import { createServer } from './server.js';
 
 const repoRoot = resolveRepoRoot();
 const cacheDir = resolveCacheDir(repoRoot);
 fs.mkdirSync(cacheDir, { recursive: true });
+startJobJanitor(cacheDir);
 
 const app = createServer({ repoRoot, cacheDir });
 const port = resolvePort();

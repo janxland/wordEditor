@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
 import { findPandoc, isFile } from '../../config.js';
+import { withSlot } from '../../jobs/gate.js';
 import { createJob, jobDocxPath, writeMarkdown, writeUploadEntries } from '../../jobs/workspace.js';
 import { runBuild } from '../../pipeline/build.js';
 import type { PipelineEvent } from '../../pipeline/types.js';
@@ -68,16 +69,22 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
       step('finish');
 
       const fileName = sanitizeDownloadName(body.fileName || input.defaultFileName);
-      await runBuild({
-        repoRoot: ctx.repoRoot,
-        pandoc,
-        template,
-        inputMd: input.inputMd,
-        outputDocx: job.outputDocx,
-        options,
-        provenance: body.provenance,
-        emit,
-      });
+      // 一路构建要拉起 300~400MB 的 Pandoc，槽位满时排队而不是继续压内存。
+      await withSlot(
+        () =>
+          runBuild({
+            repoRoot: ctx.repoRoot,
+            pandoc,
+            template,
+            inputMd: input.inputMd,
+            outputDocx: job.outputDocx,
+            options,
+            provenance: body.provenance,
+            emit,
+          }),
+        (position) =>
+          emit({ type: 'log', line: `[排队] 服务端并发已满，等待中（第 ${position} 位）`, stream: 'stdout' }),
+      );
 
       writeSse(reply, 'done', payload(job.id, fileName));
     } catch (e) {
@@ -110,15 +117,18 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
     const templateId = String(body.templateId ?? '').trim();
     if (!templateId) return fail(reply, 400, 'templateId is required');
     if (!body.stylesYaml?.trim()) return fail(reply, 400, 'stylesYaml is required');
+    const stylesYaml = body.stylesYaml;
 
     try {
-      const result = await runStylePreview({
-        repoRoot: ctx.repoRoot,
-        cacheDir: ctx.cacheDir,
-        templateId,
-        stylesYaml: body.stylesYaml,
-        onEvent: () => undefined,
-      });
+      const result = await withSlot(() =>
+        runStylePreview({
+          repoRoot: ctx.repoRoot,
+          cacheDir: ctx.cacheDir,
+          templateId,
+          stylesYaml,
+          onEvent: () => undefined,
+        }),
+      );
       return payload(result.jobId, result.fileName);
     } catch (e) {
       return fail(reply, 500, `style preview failed\n${errorMessage(e)}`.trim());

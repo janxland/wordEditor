@@ -23,6 +23,39 @@ export function jobDocxPath(cacheDir: string, jobId: string): string {
   return path.join(cacheDir, jobId, 'output.docx');
 }
 
+/** 任务目录从最后一次写入起保留多久（分钟）；下载链接指向盘上的 output.docx，不能即用即删。 */
+const JOB_TTL_MINUTES = Number.parseInt(process.env.WORDEDITOR_JOB_TTL_MINUTES ?? '', 10) || 360;
+
+/**
+ * 回收过期任务目录：一次构建会落盘输入、图片与产物，不回收就只增不减
+ * （实测跑了几轮回归后堆到 217 个目录 / 151MB）。返回删除个数。
+ */
+export function pruneJobs(cacheDir: string, now = Date.now()): number {
+  const ttlMs = JOB_TTL_MINUTES * 60_000;
+  let removed = 0;
+  for (const entry of fs.readdirSync(cacheDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const dir = path.join(cacheDir, entry.name);
+    if (now - fs.statSync(dir).mtimeMs < ttlMs) continue;
+    fs.rmSync(dir, { recursive: true, force: true });
+    removed += 1;
+  }
+  return removed;
+}
+
+/** 启动清一次 + 定期巡检；定时器 unref，不阻止进程退出。 */
+export function startJobJanitor(cacheDir: string): void {
+  const sweep = (): void => {
+    try {
+      pruneJobs(cacheDir);
+    } catch {
+      /* 巡检失败等下一轮，不影响请求路径 */
+    }
+  };
+  sweep();
+  setInterval(sweep, 15 * 60_000).unref();
+}
+
 export interface UploadEntry {
   relPath: string;
   contentBase64: string;

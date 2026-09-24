@@ -3,6 +3,7 @@ import fs from 'node:fs';
 
 import type { FastifyInstance } from 'fastify';
 
+import { withSlot } from '../../jobs/gate.js';
 import { createJob } from '../../jobs/workspace.js';
 import { extractDocxToMarkdown } from '../../pipeline/extract.js';
 import type { AppContext } from '../context.js';
@@ -13,15 +14,18 @@ export function registerImportRoutes(app: FastifyInstance, ctx: AppContext): voi
   app.post('/api/import/docx', async (req, reply) => {
     const body = (req.body ?? {}) as ImportDocxRequestBody;
     if (!body.contentBase64) return fail(reply, 400, 'contentBase64 is required');
+    const contentBase64 = body.contentBase64;
 
     const job = createJob(ctx.cacheDir);
     try {
-      const result = await extractDocxToMarkdown({
-        workDir: job.dir,
-        filename: String(body.filename ?? 'input.docx'),
-        contentBase64: body.contentBase64,
-        imageSlug: body.imageSlug,
-      });
+      const result = await withSlot(() =>
+        extractDocxToMarkdown({
+          workDir: job.dir,
+          filename: String(body.filename ?? 'input.docx'),
+          contentBase64,
+          imageSlug: body.imageSlug,
+        }),
+      );
 
       return {
         jobId: job.id,
