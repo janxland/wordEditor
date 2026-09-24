@@ -14,14 +14,27 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  background: var(--bg);
 }
 
+/* 外壳固定视口：滚动只发生在 .app-content 内部，头部/侧栏不随页面滚走 */
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .app-sider {
   background: var(--sider) !important;
+}
+
+.app-sider .ant-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-sider .ant-menu {
+  flex: 1;
+  overflow-y: auto;
 }
 
 .app-brand {
@@ -33,6 +46,16 @@ body,
   font-weight: 600;
   font-size: 15px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* 断点折叠到 64px 时品牌字必然越界——收图标、隐文字 */
+.app-sider.ant-layout-sider-collapsed .app-brand {
+  justify-content: center;
+  padding: 18px 0;
+}
+
+.app-sider.ant-layout-sider-collapsed .app-brand span {
+  display: none;
 }
 
 .app-header {
@@ -55,7 +78,8 @@ body,
   margin: 0 !important;
   padding: 12px 16px !important;
   background: var(--bg);
-  min-height: calc(100vh - 56px);
+  height: calc(100vh - 56px);
+  overflow: auto;
 }
 
 .app-loading {
