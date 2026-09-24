@@ -93,6 +93,12 @@ def _sse(event: str, payload: dict[str, Any]) -> bytes:
     return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n".encode("utf-8")
 
 
+# 一路 Pandoc 可能几十秒不产生任何字节，反代会按 read timeout（nginx 默认 60s）掐断流。
+# `:` 开头是 SSE 注释帧，客户端解析器（只认 event:/data:）会忽略。与 api-node 逐字节一致。
+_SSE_HEARTBEAT = b":ping\n\n"
+_SSE_HEARTBEAT_SECONDS = 15
+
+
 def _pipe_script(script_name: str, *args: str) -> list[str]:
     script = PIPELINE / script_name
     return [os.sys.executable, str(script), *args]
@@ -230,7 +236,11 @@ def _stream_build_events(request_data: dict[str, Any]) -> Generator[bytes, None,
 
         done_streams = 0
         while done_streams < 2:
-            stream_name, line = q.get()
+            try:
+                stream_name, line = q.get(timeout=_SSE_HEARTBEAT_SECONDS)
+            except queue.Empty:
+                yield _SSE_HEARTBEAT
+                continue
             if line is None:
                 done_streams += 1
                 continue
@@ -407,7 +417,12 @@ async def preview_styles(request: Request) -> dict[str, str]:
 @app.post("/api/build/stream")
 async def build_stream(request: Request) -> StreamingResponse:
     data = await request.json()
-    return StreamingResponse(_stream_build_events(data), media_type="text/event-stream")
+    # 响应头与 api-node 的 beginSse() 对齐；X-Accel-Buffering 让 nginx 不缓冲整条流。
+    return StreamingResponse(
+        _stream_build_events(data),
+        media_type="text/event-stream; charset=utf-8",
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.get("/api/build/download")

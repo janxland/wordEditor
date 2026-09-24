@@ -39,7 +39,7 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
     const mdRelPath = String(body.mdRelPath ?? '').trim();
     const upload = Array.isArray(body.entries) && body.entries.length > 0 && mdRelPath ? body.entries : null;
 
-    beginSse(reply);
+    const close = beginSse(reply);
     const emit = sseEmitter(reply);
     const step = (status: 'process' | 'finish', message?: string): void =>
       emit({ type: 'step', id: 'prepare', status, message });
@@ -90,7 +90,7 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
     } catch (e) {
       writeSse(reply, 'error', { error: errorMessage(e) });
     } finally {
-      reply.raw.end();
+      close();
     }
   });
 

@@ -1,5 +1,6 @@
 /** 子进程封装：所有外部工具（Pandoc / 备用 Python 引擎）都走这里。 */
 import { spawn } from 'node:child_process';
+import { StringDecoder } from 'node:string_decoder';
 
 export type LineHandler = (stream: 'stdout' | 'stderr', line: string) => void;
 
@@ -16,35 +17,40 @@ export async function run(
 ): Promise<RunResult> {
   return new Promise((resolve) => {
     const child = spawn(command, args, { cwd: options.cwd, env: options.env ?? process.env });
-    const result: RunResult = { code: 1, stdout: '', stderr: '' };
-    const buffers = { stdout: '', stderr: '' };
+    const streams = ['stdout', 'stderr'] as const;
+    type Stream = (typeof streams)[number];
+    /** 逐块 toString 会把跨块的 UTF-8 序列解成 U+FFFD，必须用 StringDecoder 接续半个字符。 */
+    const decoders: Record<Stream, StringDecoder> = {
+      stdout: new StringDecoder('utf8'),
+      stderr: new StringDecoder('utf8'),
+    };
+    const text: Record<Stream, string> = { stdout: '', stderr: '' };
+    const partial: Record<Stream, string> = { stdout: '', stderr: '' };
 
-    const push = (stream: 'stdout' | 'stderr', chunk: string): void => {
-      const lines = (buffers[stream] + chunk).split(/\r?\n/);
-      buffers[stream] = lines.pop() ?? '';
-      for (const line of lines) {
-        if (stream === 'stdout') result.stdout += `${line}\n`;
-        else result.stderr += `${line}\n`;
-        options.onLine?.(stream, line);
-      }
+    const push = (stream: Stream, chunk: string): void => {
+      text[stream] += chunk;
+      const lines = (partial[stream] + chunk).split(/\r?\n/);
+      partial[stream] = lines.pop() ?? '';
+      for (const line of lines) options.onLine?.(stream, line);
     };
 
-    child.stdout.on('data', (d: Buffer) => push('stdout', d.toString()));
-    child.stderr.on('data', (d: Buffer) => push('stderr', d.toString()));
+    for (const stream of streams) {
+      child[stream].on('data', (d: Buffer) => push(stream, decoders[stream].write(d)));
+    }
     child.on('error', (err) => {
-      result.stderr += `${err.message}\n`;
+      text.stderr += `${err.message}\n`;
       options.onLine?.('stderr', `无法启动 ${command}: ${err.message}`);
-      resolve(result);
+      resolve({ code: 1, stdout: text.stdout, stderr: text.stderr });
     });
     child.on('close', (code) => {
-      for (const stream of ['stdout', 'stderr'] as const) {
-        const rest = buffers[stream].trim();
-        if (!rest) continue;
-        if (stream === 'stderr') result.stderr += `${rest}\n`;
-        options.onLine?.(stream, rest);
+      for (const stream of streams) {
+        push(stream, decoders[stream].end());
+        // 末行没有换行也要回报一次，与逐行日志的既有口径一致。
+        const rest = partial[stream];
+        partial[stream] = '';
+        if (rest.trim()) options.onLine?.(stream, rest);
       }
-      result.code = code ?? 1;
-      resolve(result);
+      resolve({ code: code ?? 1, stdout: text.stdout, stderr: text.stderr });
     });
 
     if (options.stdin !== undefined) child.stdin.end(options.stdin);
