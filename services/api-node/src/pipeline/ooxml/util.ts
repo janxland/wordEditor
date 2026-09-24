@@ -4,6 +4,7 @@
  */
 import {
   addEl,
+  addElAt,
   attr,
   child,
   childEls,
@@ -18,6 +19,87 @@ import {
 } from './xml.js';
 
 export const HUTB_HEADING_NUM_ID = 2;
+
+// ─────────────── 低阶标签操作（DSL 注入各模块共用） ───────────────
+
+export type TagAttrs = Record<string, string | number>;
+
+function setAttrs(el: XEl, attrs: TagAttrs): void {
+  for (const [key, value] of Object.entries(attrs)) el.setAttribute(`w:${key}`, String(value));
+}
+
+/** 有则改属性、无则追加到末尾。 */
+export function setChildTag(parent: XEl, tag: string, attrs: TagAttrs = {}): XEl {
+  const el = child(parent, `w:${tag}`) ?? addEl(parent, `w:${tag}`);
+  setAttrs(el, attrs);
+  return el;
+}
+
+/** 删掉同名子元素后新建一个并追加（因此元素顺序变到末尾）。 */
+export function replaceChildTag(parent: XEl, tag: string, attrs: TagAttrs = {}): XEl {
+  const old = child(parent, `w:${tag}`);
+  if (old) parent.removeChild(old);
+  const el = addEl(parent, `w:${tag}`);
+  setAttrs(el, attrs);
+  return el;
+}
+
+export function removeChildTags(parent: XEl, ...tags: string[]): void {
+  for (const tag of tags) {
+    const el = child(parent, `w:${tag}`);
+    if (el) parent.removeChild(el);
+  }
+}
+
+/** pPr 必须是首个子元素（OOXML schema 顺序）。 */
+export function ensurePpr(parent: XEl): XEl {
+  return child(parent, 'w:pPr') ?? addElAt(parent, 'w:pPr', 0);
+}
+
+/** rPr 追加到末尾，与 Python 的 SubElement 行为一致。 */
+export function ensureRpr(parent: XEl): XEl {
+  return child(parent, 'w:rPr') ?? addEl(parent, 'w:rPr');
+}
+
+/**
+ * 等价 Python 的 `int(str)`：只接受纯整数串，非法返回 undefined（调用方按 try/except 跳过）。
+ * Number.parseInt 会接受 "3abc"/"1e3"，语义不同，故解析属性一律走这里。
+ */
+export function pythonInt(raw: string | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  const trimmed = raw.trim();
+  return /^[+-]?\d+$/.test(trimmed) ? Number(trimmed) : undefined;
+}
+
+/** Python 的 round() 是半偶舍入：round(20.5)=20，与 Math.round 不同。 */
+function pyRound(value: number): number {
+  const floor = Math.floor(value);
+  const diff = value - floor;
+  if (diff > 0.5) return floor + 1;
+  if (diff < 0.5) return floor;
+  return floor % 2 === 0 ? floor : floor + 1;
+}
+
+/** 行距：single / 1.5 / double / 「22pt」固定磅值 / 数字（twips）。 */
+export function lineSpacingAttrs(
+  value: string | number | null | undefined,
+): TagAttrs {
+  if (value === null || value === undefined || value === 'single') {
+    return { line: '240', lineRule: 'auto' };
+  }
+  if (value === 1.5 || value === '1.5') return { line: '360', lineRule: 'auto' };
+  if (value === 2 || value === '2' || value === 'double') {
+    return { line: '480', lineRule: 'auto' };
+  }
+  if (typeof value === 'string') {
+    const m = /^\s*([0-9]+(?:\.[0-9]+)?)\s*(pt|磅)\s*$/i.exec(value);
+    if (m) return { line: String(pyRound(Number(m[1]) * 20)), lineRule: 'exact' };
+  }
+  if (typeof value === 'number') return { line: String(Math.trunc(value)), lineRule: 'auto' };
+  throw new Error(`unknown line_spacing: ${JSON.stringify(value)}`);
+}
+
+// ─────────────── 样式查找 ───────────────
 
 const CHINESE_NUMS = '一二三四五六七八九十百千';
 
@@ -58,7 +140,6 @@ export function parseHeadingLine(
 export function styleId(style: XEl): string {
   return attr(style, 'w:styleId') ?? '';
 }
-
 export function styleName(style: XEl): string {
   return attr(child(style, 'w:name'), 'w:val') ?? '';
 }
