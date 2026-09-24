@@ -54,15 +54,15 @@ export function templateIdFor(cfg: TemplatesConfig, templateId?: string): string
   return TEMPLATE_ALIASES[raw] ?? raw;
 }
 
-export function findTemplate(cfg: TemplatesConfig, templateId?: string): TemplateDef {
+function findTemplate(cfg: TemplatesConfig, templateId?: string): TemplateDef {
   const id = templateIdFor(cfg, templateId);
   const found = cfg.templates.find((t) => t.id === id);
   if (found) return found;
   throw new Error(`未知模板 '${id}'。可用: ${cfg.templates.map((t) => t.id).join(', ')}`);
 }
 
-/** build.py:resolve_lua_filters —— 模板必须配置 lua_filter。 */
-export function resolveTemplate(repoRoot: string, def: TemplateDef): ResolvedTemplate {
+/** 解析成绝对路径部件；模板必须配置 lua_filter（build.py:resolve_lua_filters）。 */
+function resolveTemplate(repoRoot: string, def: TemplateDef): ResolvedTemplate {
   if (!def.lua_filter) {
     throw new Error(`模板「${def.name}」须在 templates.json 中配置 lua_filter。`);
   }
@@ -77,6 +77,11 @@ export function resolveTemplate(repoRoot: string, def: TemplateDef): ResolvedTem
     coverBlock: def.cover_block ? path.join(repoRoot, def.cover_block) : null,
     tailBlock: def.tail_block ? path.join(repoRoot, def.tail_block) : null,
   };
+}
+
+/** 注册表 → 模板定义 → 绝对路径部件：调用方只需 id。 */
+export function templateById(repoRoot: string, templateId: string): ResolvedTemplate {
+  return resolveTemplate(repoRoot, findTemplate(loadTemplatesConfig(repoRoot), templateId));
 }
 
 /** GET /api/templates：附带 reference.docx 是否就位。 */

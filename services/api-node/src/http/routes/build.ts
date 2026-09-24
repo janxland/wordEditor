@@ -1,55 +1,54 @@
 /** 构建端点：POST /api/build/stream、GET /api/build/download、POST /api/preview/styles。 */
 import fs from 'node:fs';
 
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 
 import { findPandoc, isFile } from '../../config.js';
 import { withSlot } from '../../jobs/gate.js';
-import { createJob, jobDocxPath, writeMarkdown, writeUploadEntries } from '../../jobs/workspace.js';
+import {
+  createJob,
+  jobDocxPath,
+  writeMarkdown,
+  writeUploadEntries,
+  type UploadEntry,
+} from '../../jobs/workspace.js';
 import { runBuild } from '../../pipeline/build.js';
-import type { PipelineEvent } from '../../pipeline/types.js';
+import type { BuildOptions } from '../../pipeline/types.js';
 import { runStylePreview } from '../../pipeline/preview.js';
 import { sanitizeDownloadName } from '../../pipeline/naming.js';
-import { findTemplate, loadTemplatesConfig, resolveTemplate } from '../../pipeline/templates.js';
+import type { DocxProvenance } from '../../pipeline/metadata.js';
+import { templateById } from '../../pipeline/templates.js';
 import type { AppContext } from '../context.js';
 import { requiredSchema } from '../contract.js';
-import { errorMessage, fail } from '../respond.js';
-import { beginSse, writeSse } from '../sse.js';
-import type { BuildRequestBody, DownloadPayload, PreviewStylesRequestBody } from '../types.js';
+import { badRequest, fromBody, fromQuery, HttpError, mustMatch, mustStr, mustTrim, strOf, trimOf } from '../params.js';
+import { errorMessage, serverError } from '../respond.js';
+import { openSse } from '../sse.js';
+import type { DownloadPayload } from '../types.js';
 
 function payload(jobId: string, fileName: string): DownloadPayload {
   // 与 app.py 一致：fileName 已经过 sanitize，只余 \w.-()空格中文，直接拼进 URL。
   return { jobId, fileName, downloadUrl: `/api/build/download?jobId=${jobId}&fileName=${fileName}` };
 }
 
-function sseEmitter(reply: FastifyReply) {
-  return (event: PipelineEvent): void => {
-    if (event.type === 'step') {
-      writeSse(reply, 'step', { id: event.id, status: event.status, message: event.message });
-    } else {
-      writeSse(reply, 'log', { line: event.line, stream: event.stream });
-    }
-  };
-}
-
 export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void {
   // 该端点的入参错误按契约以 SSE error 帧回吐（HTTP 恒 200），所以不注册请求体 schema，
   // 否则框架会在进处理函数之前就抛 400，前端只能看到一个无详情的连接错误。
   app.post('/api/build/stream', async (req, reply) => {
-    const body = (req.body ?? {}) as BuildRequestBody;
-    const options = body.options ?? {};
-    const templateId = String(body.templateId ?? '').trim();
-    const mdRelPath = String(body.mdRelPath ?? '').trim();
-    const upload = Array.isArray(body.entries) && body.entries.length > 0 && mdRelPath ? body.entries : null;
-
-    const close = beginSse(reply);
-    const emit = sseEmitter(reply);
+    const body = fromBody(req);
+    const ch = openSse(reply);
+    const { emit, close } = ch;
     const step = (status: 'process' | 'finish', message?: string): void =>
-      emit({ type: 'step', id: 'prepare', status, message });
+      ch.step('prepare', status, message);
 
     try {
-      if (!templateId) throw new Error('templateId is required');
-      if (!upload && !body.markdown?.trim()) throw new Error('markdown 或 entries 必填');
+      const templateId = mustTrim(body, 'templateId');
+      const markdown = strOf(body, 'markdown');
+      const mdRelPath = trimOf(body, 'mdRelPath');
+      const entries = Array.isArray(body.entries) && body.entries.length > 0
+        ? (body.entries as UploadEntry[])
+        : null;
+      const upload = entries && mdRelPath ? entries : null;
+      if (!upload && !markdown.trim()) throw badRequest('markdown 或 entries 必填');
 
       const pandoc = findPandoc(ctx.repoRoot);
       if (!pandoc) {
@@ -59,19 +58,19 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
         );
       }
 
-      const template = resolveTemplate(ctx.repoRoot, findTemplate(loadTemplatesConfig(ctx.repoRoot), templateId));
+      const template = templateById(ctx.repoRoot, templateId);
       const job = createJob(ctx.cacheDir);
 
       step('process', upload ? `写入 ${upload.length} 个文件…` : '写入 Markdown…');
       const input = upload
         ? writeUploadEntries(job, upload, mdRelPath, templateId)
-        : writeMarkdown(job, String(body.markdown ?? ''), templateId);
+        : writeMarkdown(job, markdown, templateId);
       if (input.skipped) {
         emit({ type: 'log', line: `已跳过 ${input.skipped} 个越界或超大条目`, stream: 'stderr' });
       }
       step('finish');
 
-      const fileName = sanitizeDownloadName(body.fileName || input.defaultFileName);
+      const fileName = sanitizeDownloadName(strOf(body, 'fileName') || input.defaultFileName);
       // 一路构建要拉起 300~400MB 的 Pandoc，槽位满时排队而不是继续压内存。
       await withSlot(
         () =>
@@ -81,31 +80,30 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
             template,
             inputMd: input.inputMd,
             outputDocx: job.outputDocx,
-            options,
-            provenance: body.provenance,
+            options: (body.options ?? {}) as BuildOptions,
+            provenance: body.provenance as DocxProvenance | undefined,
             emit,
           }),
         (position) =>
           emit({ type: 'log', line: `[排队] 服务端并发已满，等待中（第 ${position} 位）`, stream: 'stdout' }),
       );
 
-      writeSse(reply, 'done', payload(job.id, fileName));
+      ch.done(payload(job.id, fileName));
     } catch (e) {
-      writeSse(reply, 'error', { error: errorMessage(e) });
+      ch.fail(errorMessage(e));
     } finally {
       close();
     }
   });
 
   app.get('/api/build/download', async (req, reply) => {
-    const query = req.query as { jobId?: string; fileName?: string };
-    const jobId = String(query.jobId ?? '');
-    if (!/^[\w-]+$/.test(jobId)) return fail(reply, 400, 'invalid jobId');
-
+    const jobId = mustMatch(strOf(fromQuery(req), 'jobId'), /^[\w-]+$/, 'invalid jobId');
     const docx = jobDocxPath(ctx.cacheDir, jobId);
-    if (!isFile(docx)) return fail(reply, 404, 'file not found or expired');
+    if (!isFile(docx)) throw new HttpError(404, 'file not found or expired');
 
-    const fileName = sanitizeDownloadName(query.fileName ?? 'export.docx');
+    // 缺参数走 Fastify/Query 的默认值口径（与 app.py 的 Query("export.docx") 一致），
+    // 所以这里用 ?? 而不是把空串当缺省。
+    const fileName = sanitizeDownloadName(String(fromQuery(req).fileName ?? 'export.docx'));
     return reply
       .header(
         'Content-Type',
@@ -118,12 +116,10 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
   app.post(
     '/api/preview/styles',
     { schema: { body: requiredSchema(ctx.repoRoot, 'PreviewStylesRequest') } },
-    async (req, reply) => {
-      const body = (req.body ?? {}) as PreviewStylesRequestBody;
-      const templateId = String(body.templateId ?? '').trim();
-      if (!templateId) return fail(reply, 400, 'templateId is required');
-      if (!body.stylesYaml?.trim()) return fail(reply, 400, 'stylesYaml is required');
-      const stylesYaml = body.stylesYaml;
+    async (req) => {
+      const body = fromBody(req);
+      const templateId = mustTrim(body, 'templateId');
+      const stylesYaml = mustStr(body, 'stylesYaml');
 
       try {
         const result = await withSlot(() =>
@@ -137,7 +133,7 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
         );
         return payload(result.jobId, result.fileName);
       } catch (e) {
-        return fail(reply, 500, `style preview failed\n${errorMessage(e)}`.trim());
+        throw serverError('style preview failed', e);
       }
     },
   );

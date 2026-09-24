@@ -22,6 +22,7 @@ export function createServer(ctx: AppContext) {
     // ajv 的「缺必填字段」翻译成与 api-python 手写检查同字的 detail。
     const missing = err.validation?.find((v) => v.keyword === 'required');
     if (missing) return void fail(reply, 400, `${missing.params.missingProperty} is required`);
+    // 路由里的入参校验只抛 HttpError（自带 statusCode），框架校验与它走同一个出口。
     void fail(reply, err.statusCode ?? 500, err.message || 'internal error');
   });
 

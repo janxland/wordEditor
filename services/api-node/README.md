@@ -118,6 +118,7 @@ NODE_OPTIONS=--max-old-space-size=512 node dist/main.js
 - SSE/JSON 的字面量差异：`json.dumps` 的 `", "` / `": "` 空白、浮点写成 `1.0`（Node 为 `1`）—— 任何 JS 消费者解析后同值。
 - 方法不匹配（如 `POST /api/file`）：FastAPI 回 405，Fastify 4 有意对所有未知方法统一回 404。
 - 请求体不是合法 JSON（如 `PUT /api/file` 传裸文本）：FastAPI 抛 500 纯文本，Node 经 `setErrorHandler` 回 400 `{"detail"}`。
+- 未捕获异常出的 500：FastAPI 只回纯文本 `Internal Server Error`，Node 统一回 `{"detail":"<原因>\n<详情>"}`，400 层的 `{"detail"}` 文案两端逐字相同。
 - 上传模式里越界/超大的条目：两边都静默跳过该条目，Node 额外给一行告警日志。
 - `PUT /api/file?path=`（空路径）：Python 试图写仓库根返回 500，Node 返回 400 `invalid path`。
 - 请求体上限 `MAX_BODY_BYTES` 96 MB（超限 413）：Python 无上限，Node 保留护栏。
@@ -136,6 +137,8 @@ NODE_OPTIONS=--max-old-space-size=512 node dist/main.js
   日志行逐字一致。`password` 的 `w:hash`/`w:salt` 是随机盐，哈希算法本身已与 `_hash_password` 同盐核对过。
 - 其余端点 41 项（含 `/api/import/docx` 含公式与图片的 docx、
   各错误分支、并发 4 任务的作业目录隔离）：除上表所列，响应一致。
+- 错误分支专项 24 项（20 个 REST 校验/越界/不存在路径 + 4 个 SSE `error` 帧）：
+  400 层 `detail` 逐字相同，余下 7 项均为上表已登记的类别。
 - SSE 心跳：两端每 15 秒发同一条 `:ping\n\n` 注释帧，响应头（`Content-Type` 带 charset、
   `Cache-Control`、`X-Accel-Buffering`）也已对齐；把间隔临时调到亚秒实测 node ping=7、
   python ping=15，`step` / `log` / `done` 计数与改造前相同。

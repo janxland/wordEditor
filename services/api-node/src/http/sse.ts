@@ -1,5 +1,10 @@
-/** SSE 帧写出：与 app.py 的 _sse() 同格式。 */
+/**
+ * SSE 通道层：心跳、帧字节、step/log/done/error 的字段名都归这里，
+ * 与 app.py 的 `_sse()` 逐字节一致；路由只做编排，不再手拼帧。
+ */
 import type { FastifyReply } from 'fastify';
+
+import type { PipelineEvent, StepId, StepStatus } from '../pipeline/types.js';
 
 /**
  * 心跳帧。一路构建可能几十秒不写字节，反代默认 read timeout（nginx 60s）会掐流。
@@ -8,8 +13,18 @@ import type { FastifyReply } from 'fastify';
 const HEARTBEAT = ':ping\n\n';
 const HEARTBEAT_MS = 15_000;
 
-/** 返回关闭函数：停心跳并结束响应。 */
-export function beginSse(reply: FastifyReply): () => void {
+export interface SseChannel {
+  /** 管线事件（step/log）按字段名转帧。 */
+  emit(event: PipelineEvent): void;
+  /** 路由自己阶段的 step 帧（如写输入的 prepare）。 */
+  step(id: StepId, status: StepStatus, message?: string): void;
+  done(payload: unknown): void;
+  fail(message: string): void;
+  /** 停心跳并结束响应。 */
+  close(): void;
+}
+
+export function openSse(reply: FastifyReply): SseChannel {
   reply.hijack();
   reply.raw.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
@@ -19,12 +34,22 @@ export function beginSse(reply: FastifyReply): () => void {
   });
   const timer = setInterval(() => reply.raw.write(HEARTBEAT), HEARTBEAT_MS);
   timer.unref();
-  return () => {
-    clearInterval(timer);
-    reply.raw.end();
-  };
-}
 
-export function writeSse(reply: FastifyReply, event: string, data: unknown): void {
-  reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  const write = (event: string, data: unknown): void => {
+    reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  return {
+    emit: (event) =>
+      event.type === 'step'
+        ? write('step', { id: event.id, status: event.status, message: event.message })
+        : write('log', { line: event.line, stream: event.stream }),
+    step: (id, status, message) => write('step', { id, status, message }),
+    done: (payload) => write('done', payload),
+    fail: (message) => write('error', { error: message }),
+    close: () => {
+      clearInterval(timer);
+      reply.raw.end();
+    },
+  };
 }

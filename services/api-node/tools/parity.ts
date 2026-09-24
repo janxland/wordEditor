@@ -24,12 +24,7 @@ import JSZip from 'jszip';
 
 import { findPandoc, resolveRepoRoot } from '../src/config.js';
 import { runBuild } from '../src/pipeline/build.js';
-import {
-  findTemplate,
-  loadTemplatesConfig,
-  resolveTemplate,
-  type ResolvedTemplate,
-} from '../src/pipeline/templates.js';
+import { templateById } from '../src/pipeline/templates.js';
 import type { StageName } from '../src/pipeline/stages/context.js';
 import type { BuildOptions } from '../src/pipeline/types.js';
 
@@ -258,8 +253,7 @@ if (mode === 'docx') {
 
 if (!fs.existsSync(inputMd)) throw new Error(`输入不存在: ${inputMd}`);
 
-const cfg = loadTemplatesConfig(repoRoot);
-const template = resolveTemplate(repoRoot, findTemplate(cfg, templateId));
+const template = templateById(repoRoot, templateId);
 const stage = opt('--upto') as StageName;
 
 /** 页眉页脚由入参驱动，只有 full 模式会真正跑到：同名透传给两条链路。 */

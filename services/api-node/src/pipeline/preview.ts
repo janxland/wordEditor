@@ -19,12 +19,7 @@ import { runBuild } from './build.js';
 import { materializeMarkdownImages } from './preview-images.js';
 import { openDocxSession } from './ooxml/zip.js';
 import { applyStylesStage } from './stages/styles-postprocess.js';
-import {
-  findTemplate,
-  loadTemplatesConfig,
-  resolveTemplate,
-  type ResolvedTemplate,
-} from './templates.js';
+import { templateById } from './templates.js';
 
 const SHARED_PREVIEW_MD = 'templates/hutb-shared/preview-styles.md';
 
@@ -48,7 +43,6 @@ function anchorExtends(text: string, baseDir: string): string {
 export interface StylePreviewResult {
   jobId: string;
   fileName: string;
-  template: ResolvedTemplate;
 }
 
 export async function runStylePreview(options: {
@@ -61,8 +55,7 @@ export async function runStylePreview(options: {
   const pandoc = findPandoc(options.repoRoot);
   if (!pandoc) throw new Error('未检测到 Pandoc');
 
-  const def = findTemplate(loadTemplatesConfig(options.repoRoot), options.templateId);
-  const template = resolveTemplate(options.repoRoot, def);
+  const template = templateById(options.repoRoot, options.templateId);
   if (!fs.existsSync(template.referenceDoc)) {
     throw new Error(`模板文件不存在: ${template.referenceDoc}`);
   }
@@ -116,9 +109,5 @@ export async function runStylePreview(options: {
     await zip.flush();
   }
 
-  return {
-    jobId: job.id,
-    fileName: sanitizeDownloadName(`style-preview-${options.templateId}.docx`),
-    template,
-  };
+  return { jobId: job.id, fileName: sanitizeDownloadName(`style-preview-${options.templateId}.docx`) };
 }
