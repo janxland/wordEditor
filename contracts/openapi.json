@@ -3,11 +3,11 @@
   "info": {
     "title": "wordEditor 论文排版 API",
     "version": "0.1.0",
-    "description": "Markdown ↔ docx 双向排版服务：Markdown 经 Pandoc + OOXML 后处理管线产出符合模板版式的 Word 文档，docx 可反向提取为带图片资源的 Markdown 文件夹。\n\n同一套契约由两个引擎实现，产物按命名空间归一后的 XML 逐部件等价：\n- api-node（Fastify，默认）：`pnpm --filter wordeditor-api-node dev`\n- api-python（FastAPI，备用）：`python -m uvicorn app:app --app-dir services/api-python`\n\n两端响应头、状态码、错误体 `{\"detail\": msg}` 与 SSE 帧格式逐字节一致；仅框架自身产生的差异（404/405、非法 JSON 的 500、`python.path` 路径写法、`/` 的 hint 文案）除外。",
+    "description": "Markdown ↔ docx 双向排版服务：Markdown 经 Pandoc + OOXML 后处理管线产出符合模板版式的 Word 文档，docx 可反向提取为带图片资源的 Markdown 文件夹。\n\n同一套契约由两个引擎实现，产物按命名空间归一后的 XML 逐部件等价：\n- api-node（Fastify，默认）：`pnpm --filter wordeditor-api-node dev`\n- api-python（FastAPI，备用）：`python -m uvicorn app:app --app-dir services/api-python`\n\n两端响应头、状态码、错误体 `{\"detail\": msg}` 与 SSE 帧格式逐字节一致；仅框架自身产生的差异（404/405、非法 JSON 的 500、`python.path` 路径写法、`/` 的 hint 文案）除外。\n\n鉴权：除公开端点外全部要求 `Authorization: Bearer <accessToken>`。导出 / 导入 / 样式预览 / 模板列表 = 任意登录用户；`PUT /api/file`（写仓库 = 模板制作）= 额外要 doc-worker 制作员角色；`GET /api/build/download` 只认创建者本人。本地离线回归可用 `WORDEDITOR_AUTH=off` 关掉守卫。",
     "x-ai": {
       "engines": ["api-node", "api-python"],
       "defaultBaseUrl": "http://localhost:8787",
-      "auth": "none（本机服务，无鉴权；对外暴露请自行加反代鉴权）",
+      "auth": "bearer（AuthCenter accessToken；除公开端点外全部要求。导出/导入/预览/模板列表=登录即可，PUT /api/file=doc-worker 制作员。WORDEDITOR_AUTH=off 可关闭，仅供本地离线回归）",
       "typicalFlow": [
         "GET /api/templates 取 templateId",
         "POST /api/build/stream（SSE）构建，done 事件给出 downloadUrl",
@@ -351,6 +351,13 @@
     }
   },
   "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "AuthCenter 登录换到的 accessToken。除 `/`、`/api/health`、`/api/tools`、`/openapi.json`、`/docs`、`/api/auth/login`、`/api/auth/register` 外全部端点都要带；缺失或失效返回 401 {\"detail\": \"未登录\"}。PUT /api/file 额外要求 doc-worker 角色，否则 403。"
+      }
+    },
     "parameters": {
       "PathParam": {
         "name": "path",

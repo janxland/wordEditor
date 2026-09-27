@@ -1,0 +1,358 @@
+/* 首页落地页 —— Apple 风：大标题、留白、滚动渐入、深色收尾 */
+.lp {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 96px 28px 48px;
+  color: #1d1d1f;
+}
+
+/* ---- 滚动渐入 ---- */
+.rv {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.rv.is-in {
+  opacity: 1;
+  transform: none;
+}
+/* 同 section 内错峰 */
+.lp-values .rv:nth-child(2) { transition-delay: 0.08s; }
+.lp-values .rv:nth-child(3) { transition-delay: 0.16s; }
+
+/* ---- 落地页沉浸式头部：透明悬浮 + 毛玻璃，不占布局 ---- */
+.app-header-landing {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: 60px !important;
+  line-height: 60px !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border-bottom: none !important;
+  padding: 0 max(28px, calc((100vw - 980px) / 2)) !important;
+}
+.app-header-landing .app-header-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  color: #1d1d1f;
+}
+
+/* 落地页内容区：去内边距，自己接管滚动（外壳 overflow:hidden，滚动必须发生在 content 内） */
+.app-content-landing {
+  padding: 0 !important;
+  height: 100vh !important;
+  overflow-y: auto !important;
+  background: #fff;
+}
+
+/* ---- Hero ---- */
+.lp-hero {
+  text-align: center;
+  padding: 40px 0 88px;
+}
+.lp-eyebrow {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  color: #86868b;
+  margin-bottom: 24px;
+}
+.lp-title {
+  font-size: clamp(44px, 7vw, 72px);
+  line-height: 1.12;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: #1d1d1f;
+  margin: 0 0 22px;
+}
+.lp-grad {
+  background: linear-gradient(96deg, #1677ff 10%, #6f5bf5 60%, #b44bf2);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.lp-sub {
+  font-size: clamp(17px, 2.4vw, 21px);
+  color: #6e6e73;
+  max-width: 620px;
+  margin: 0 auto 36px;
+  line-height: 1.6;
+}
+.lp-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* ---- 按钮（pill） ---- */
+.lp-btn {
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  padding: 13px 30px;
+  border-radius: 999px;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s, background 0.25s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.lp-btn:active { transform: scale(0.97); }
+.lp-btn-primary {
+  background: #1677ff;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(22, 119, 255, 0.28);
+}
+.lp-btn-primary:hover {
+  background: #3c8dff;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(22, 119, 255, 0.36);
+}
+.lp-btn-ghost {
+  background: transparent;
+  color: #1677ff;
+}
+.lp-btn-ghost:hover { background: rgba(22, 119, 255, 0.08); }
+.lp-btn-light {
+  background: #f5f5f7;
+  color: #1d1d1f;
+}
+.lp-btn-light:hover {
+  background: #fff;
+  transform: translateY(-2px);
+}
+
+/* ---- 微信联系通道（hover 出二维码） ---- */
+.lp-wechat-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.lp-wechat-pop {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 14px);
+  transform: translateX(-50%) translateY(6px);
+  background: #fff;
+  border-radius: 14px;
+  padding: 12px 12px 10px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08), 0 20px 48px rgba(0, 0, 0, 0.14);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  text-align: center;
+  z-index: 10;
+}
+.lp-wechat-wrap:hover .lp-wechat-pop,
+.lp-wechat-wrap:focus-within .lp-wechat-pop {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.lp-wechat-pop img {
+  display: block;
+  width: 148px;
+  height: 148px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #f5f5f7;
+}
+.lp-wechat-pop em {
+  display: block;
+  font-style: normal;
+  font-size: 12px;
+  color: #6e6e73;
+  margin-top: 8px;
+  white-space: nowrap;
+}
+/* 深色 CTA 里的弹层带小箭头指向 */
+.lp-wechat-dark .lp-wechat-pop { bottom: calc(100% + 14px); }
+.lp-wx-copy {
+  font-size: 14px;
+  color: #6e6e73;
+  transition: color 0.2s;
+}
+.lp-btn-ghost:hover .lp-wx-copy { color: #1677ff; }
+/* 小屏不悬浮展示（触摸无 hover），点击复制即可 */
+@media (hover: none) {
+  .lp-wechat-pop { display: none; }
+}
+
+/* ---- hero 下方无登录提示 ---- */
+.lp-no-login {
+  margin: 18px auto 0;
+  font-size: 13.5px;
+  color: #a1a1a6;
+}
+
+/* ---- 深色 CTA 内的双按钮 ---- */
+.lp-cta-actions {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.lp-btn-outline {
+  background: transparent;
+  color: #f5f5f7;
+  border: 1px solid #48484a;
+}
+.lp-btn-outline:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #8e8e93;
+  transform: translateY(-2px);
+}
+
+/* ---- 三步流程：纵向时间线 ---- */
+.lp-steps {
+  position: relative;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 0 88px;
+  display: flex;
+  flex-direction: column;
+}
+.lp-step {
+  position: relative;
+  padding: 0 0 44px 88px;
+}
+.lp-step:last-child { padding-bottom: 0; }
+.lp-step-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+.lp-step-no {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1677ff;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+.lp-step h3 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #1d1d1f;
+  margin: 0;
+}
+.lp-step p {
+  font-size: 15px;
+  color: #6e6e73;
+  line-height: 1.7;
+  margin: 0;
+  max-width: 480px;
+}
+.lp-step-line {
+  position: absolute;
+  left: 21px;
+  top: 40px;
+  bottom: 8px;
+  width: 1px;
+  background: linear-gradient(to bottom, #d2d2d7, #e8e8ed);
+}
+/* 圆点锚定在左侧竖线上 */
+.lp-step::before {
+  content: '';
+  position: absolute;
+  left: 17px;
+  top: 7px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #1677ff;
+  box-shadow: 0 0 0 4px rgba(22, 119, 255, 0.12);
+}
+
+/* ---- 价值点：悬浮卡片 ---- */
+.lp-values {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  padding-bottom: 96px;
+}
+.lp-value {
+  background: #fff;
+  border-radius: 18px;
+  padding: 28px 26px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.05);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s;
+}
+.lp-value:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05), 0 18px 40px rgba(0, 0, 0, 0.1);
+}
+.lp-value h4 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #1d1d1f;
+  margin: 0 0 10px;
+}
+.lp-value p {
+  font-size: 14.5px;
+  color: #6e6e73;
+  line-height: 1.7;
+  margin: 0;
+}
+
+/* ---- 深色收尾 CTA ---- */
+.lp-cta {
+  text-align: center;
+  background: #000;
+  color: #f5f5f7;
+  border-radius: 28px;
+  padding: 72px 32px;
+  margin-bottom: 40px;
+}
+.lp-cta h2 {
+  font-size: clamp(30px, 4.5vw, 44px);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  color: #f5f5f7;
+  margin: 0 0 14px;
+}
+.lp-cta p {
+  font-size: 16px;
+  color: #a1a1a6;
+  margin: 0 0 30px;
+}
+
+/* ---- 页脚 ---- */
+.lp-foot {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #a1a1a6;
+}
+.lp-foot-sep { color: #d2d2d7; }
+
+/* ---- 移动端 ---- */
+@media (max-width: 720px) {
+  .lp { padding-top: 56px; }
+  .lp-br { display: none; }
+  .lp-hero { padding-bottom: 64px; }
+  .lp-steps { padding-bottom: 64px; }
+  .lp-step { padding-left: 56px; }
+  .lp-step::before { left: 13px; }
+  .lp-step-line { left: 17px; }
+  .lp-step h3 { font-size: 18px; }
+  .lp-values {
+    grid-template-columns: 1fr;
+    padding-bottom: 64px;
+  }
+}

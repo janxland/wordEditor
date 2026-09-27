@@ -14,6 +14,13 @@ from typing import Any, Generator
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
+from auth_guard import (
+    auth_enabled,
+    check,
+    job_owner_of,
+    remember_job_owner,
+)
+
 ROOT = Path(__file__).resolve().parents[2]
 PIPELINE = ROOT / "services" / "api-python" / "pipeline"
 CACHE_DIR = ROOT / ".cache" / "wordeditor-api-python"
@@ -26,6 +33,17 @@ DEFAULT_PORT = int(
 # 接口契约改由 contracts/openapi.json 单一来源提供（见下方 /openapi.json），
 # 因此关掉 FastAPI 自动生成的那套：它只认函数签名，请求体一律是裸 Request，导出的 schema 是空的。
 app = FastAPI(title="wordEditor api-python", version="0.1.0", openapi_url=None, docs_url=None, redoc_url=None)
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    """与 api-node 的 onRequest 守卫同口径：公开路由直行，其余要 Bearer，写仓库要制作员。"""
+    user, failure = check(request.method, request.url.path, request.headers.get("authorization"))
+    if failure is not None:
+        status, detail = failure
+        return JSONResponse({"detail": detail}, status_code=status)
+    request.state.user = user
+    return await call_next(request)
 
 
 def _contract(name: str) -> bytes:
@@ -133,7 +151,9 @@ def _emit_step_from_build_line(line: str) -> list[dict[str, Any]]:
     return events
 
 
-def _stream_build_events(request_data: dict[str, Any]) -> Generator[bytes, None, None]:
+def _stream_build_events(
+    request_data: dict[str, Any], owner_id: int | None = None
+) -> Generator[bytes, None, None]:
     try:
         template_id = str(request_data.get("templateId") or "").strip()
         if not template_id:
@@ -152,6 +172,8 @@ def _stream_build_events(request_data: dict[str, Any]) -> Generator[bytes, None,
         job_id = str(uuid.uuid4())
         work_dir = CACHE_DIR / job_id
         work_dir.mkdir(parents=True, exist_ok=True)
+        if owner_id is not None:
+            remember_job_owner(job_id, owner_id)
 
         if use_upload:
             yield _sse("step", {"id": "prepare", "status": "process", "message": f"写入 {len(entries)} 个文件…"})
@@ -362,6 +384,9 @@ async def preview_styles(request: Request) -> dict[str, str]:
     job_id = str(uuid.uuid4())
     work_dir = CACHE_DIR / job_id
     work_dir.mkdir(parents=True, exist_ok=True)
+    user = getattr(request.state, "user", None)
+    if user:
+        remember_job_owner(job_id, user["userId"])
     styles_path = work_dir / "styles.yaml"
     styles_path.write_text(
         _anchor_extends(styles_yaml, ROOT / "templates" / template_id), encoding="utf-8"
@@ -423,21 +448,28 @@ async def preview_styles(request: Request) -> dict[str, str]:
 @app.post("/api/build/stream")
 async def build_stream(request: Request) -> StreamingResponse:
     data = await request.json()
+    user = getattr(request.state, "user", None)
+    # 产物只归创建者：jobId 泄露也下不到别人的 docx
+    owner_id = user["userId"] if user else None
     # 响应头与 api-node 的 beginSse() 对齐；X-Accel-Buffering 让 nginx 不缓冲整条流。
     return StreamingResponse(
-        _stream_build_events(data),
+        _stream_build_events(data, owner_id=owner_id),
         media_type="text/event-stream; charset=utf-8",
         headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
     )
 
 
 @app.get("/api/build/download")
-def build_download(jobId: str = Query(""), fileName: str = Query("export.docx")) -> FileResponse:
+def build_download(request: Request, jobId: str = Query(""), fileName: str = Query("export.docx")) -> FileResponse:
     if not re.match(r"^[\w-]+$", jobId):
         raise HTTPException(400, "invalid jobId")
     docx_path = CACHE_DIR / jobId / "output.docx"
     if not docx_path.is_file():
         raise HTTPException(404, "file not found or expired")
+    owner = job_owner_of(jobId)
+    user = getattr(request.state, "user", None)
+    if auth_enabled() and owner is not None and (not user or user["userId"] != owner):
+        raise HTTPException(403, "这不是你的构建任务")
     safe_name = _sanitize_download_name(fileName)
     return FileResponse(
         str(docx_path),

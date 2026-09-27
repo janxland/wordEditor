@@ -58,6 +58,25 @@ export function pruneJobs(cacheDir: string, now = Date.now()): number {
   return removed;
 }
 
+/**
+ * jobId → 创建者。下载链接只认 jobId，不认人；记住归属后，拿到别人 jobId 也下不了。
+ * 纯内存：进程重启后旧链接本来也就随 TTL 一起失效了，不需要落盘。
+ */
+const jobOwners = new Map<string, { userId: number; at: number }>();
+const OWNER_TTL_MS = Math.max(JOB_TTL_MINUTES, 60) * 60_000;
+
+export function rememberJobOwner(jobId: string, userId: number): void {
+  const now = Date.now();
+  for (const [key, value] of jobOwners) {
+    if (now - value.at > OWNER_TTL_MS) jobOwners.delete(key);
+  }
+  jobOwners.set(jobId, { userId, at: now });
+}
+
+export function jobOwnerOf(jobId: string): number | undefined {
+  return jobOwners.get(jobId)?.userId;
+}
+
 /** 启动清一次 + 定期巡检；定时器 unref，不阻止进程退出。 */
 export function startJobJanitor(cacheDir: string): void {
   const sweep = (): void => {

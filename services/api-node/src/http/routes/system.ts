@@ -6,13 +6,16 @@ import type { AppContext } from '../context.js';
 import { contractFile, openapiBytes } from '../contract.js';
 
 export function registerSystemRoutes(app: FastifyInstance, ctx: AppContext): void {
-  app.get('/', async () => ({
-    ok: true,
-    service: 'api-node',
-    port: resolvePort(),
-    hint: 'pnpm dev  (services/api-node)',
-    openapi: '/openapi.json',
-  }));
+  // 桌面端（WORDEDITOR_WEB_DIR）会把前端页面挂到 /，这里不再抢注根路径
+  if (!process.env.WORDEDITOR_WEB_DIR) {
+    app.get('/', async () => ({
+      ok: true,
+      service: 'api-node',
+      port: resolvePort(),
+      hint: 'pnpm dev  (services/api-node)',
+      openapi: '/openapi.json',
+    }));
+  }
 
   /**
    * 机器可读的接口契约：与 api-python 逐字节同发同一份 contracts/openapi.json。

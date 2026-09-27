@@ -6,6 +6,7 @@
  */
 import { openDocxSession } from '../ooxml/zip.js';
 import type { StageContext, StageName, StageRun } from './context.js';
+import { applyBlocksStage } from './blocks.js';
 import { applyDocumentStage } from './document-postprocess.js';
 import { applyHeaderFooterStage } from './header-footer.js';
 import { applyMetadataStage } from './metadata.js';
@@ -29,6 +30,9 @@ const STAGES: Stage[] = [
   { name: 'headerFooter', structural: false, run: applyHeaderFooterStage },
   { name: 'password', structural: false, run: applyPasswordStage },
   { name: 'metadata', structural: false, run: applyMetadataStage },
+  // 封面/尾表整页搬运：放在最后，确保不被任何样式阶段冲刷；且它不动已有内容，
+  // 只做字符串插入，所以放最后也不会与前面的阶段互相干扰。
+  { name: 'blocks', structural: false, run: applyBlocksStage },
 ];
 
 export async function runPostprocess(ctx: StageContext, upto?: StageName): Promise<void> {

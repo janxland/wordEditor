@@ -123,6 +123,41 @@
       "three_line_tables": false,
       "source": "derived",
       "note": "APA 7 学生论文：Letter、页边距 1 英寸、Calibri 11pt、双倍行距、段前段后 0、页脚居中页码。Markdown 中用 <div class=\"pagebreak\"></div> 分页，<div class=\"cs-XXX\"></div> 指定段样式（APATitle/APACenter/References）。reference.docx 由 templates/apa7/build_reference.py 生成"
+    },
+    {
+      "id": "hutb-jinrong-bigdata",
+      "name": "湖南工商大学 · 金融大数据与Python程序应用 · 课程论文",
+      "standalone": true,
+      "heading_numbering": "guanke",
+      "reference_doc": "templates/hutb-jinrong-bigdata/reference.docx",
+      "lua_filter": "templates/hutb-shared/markdown-to-docx.lua",
+      "extra_lua_filters": [
+        "templates/hutb-shared/zhengwen-style.lua",
+        "templates/hutb-jinrong-bigdata/en-abstract.lua"
+      ],
+      "styles_yaml": "templates/hutb-jinrong-bigdata/styles.yaml",
+      "three_line_tables": true,
+      "source": "derived",
+      "cover_block": "templates/hutb-jinrong-bigdata/cover_block.xml",
+      "tail_block": "templates/hutb-jinrong-bigdata/tail_block.xml",
+      "note": "反向复刻自《金融大数据与Python程序应用》课程论文格式模板.docx。 封面块 = 源 docx body[0:8]（校名+课程论文+校徽图+信息表+年月，自带分页符）； 尾页评审表块 = body[29:32]（标题段 + 14 行 11 列表 + 表后空段）。 正文：宋体/Times New Roman 四号（14pt）、行距固定值 24 磅、首行缩进 2 字符（560 twips）； 一级标题黑体四号。"
+    },
+    {
+      "id": "hutb-shehui-diaocha",
+      "name": "湖南工商大学 · 暑假社会调查报告",
+      "standalone": true,
+      "heading_numbering": "guanke",
+      "reference_doc": "templates/hutb-shehui-diaocha/reference.docx",
+      "lua_filter": "templates/hutb-shared/markdown-to-docx.lua",
+      "extra_lua_filters": [
+        "templates/hutb-shared/zhengwen-style.lua"
+      ],
+      "styles_yaml": "templates/hutb-shehui-diaocha/styles.yaml",
+      "three_line_tables": true,
+      "source": "derived",
+      "cover_block": "templates/hutb-shehui-diaocha/cover_block.xml",
+      "tail_block": "templates/hutb-shehui-diaocha/tail_block.xml",
+      "note": ""
     }
   ]
 }

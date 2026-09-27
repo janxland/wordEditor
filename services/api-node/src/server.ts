@@ -2,6 +2,7 @@
 import Fastify from 'fastify';
 
 import { MAX_BODY_BYTES } from './config.js';
+import { registerDesktopCors } from './http/cors.js';
 import { registerApiRoutes } from './http/routes/index.js';
 import type { AppContext } from './http/context.js';
 import { fail } from './http/respond.js';
@@ -17,6 +18,25 @@ export function createServer(ctx: AppContext) {
     forceCloseConnections: true,
   });
 
+  // 契约里 accept / deliver / cancel 是「无参动作」，但客户端常统一带上
+  // `Content-Type: application/json` 却不发 body —— Fastify 默认按 400 拒掉。
+  // 这里把空 body 当 {} 收下，非法 JSON 仍是 400（与既有校验同出口）。
+  app.addContentTypeParser(
+    'application/json',
+    { parseAs: 'string' },
+    (_req, body, done) => {
+      const raw = String(body ?? '').trim();
+      if (!raw) return void done(null, {});
+      try {
+        done(null, JSON.parse(raw) as unknown);
+      } catch (e) {
+        const err = e as Error & { statusCode?: number };
+        err.statusCode = 400;
+        done(err, undefined);
+      }
+    },
+  );
+
   app.setErrorHandler((err, _req, reply) => {
     if (reply.raw.headersSent) return;
     // ajv 的「缺必填字段」翻译成与 api-python 手写检查同字的 detail。
@@ -30,6 +50,7 @@ export function createServer(ctx: AppContext) {
     void fail(reply, 404, 'Not Found');
   });
 
+  registerDesktopCors(app); // 桌面端跨域放行：必须在守卫之前，OPTIONS 预检不带 token
   registerApiRoutes(app, ctx);
   return app;
 }

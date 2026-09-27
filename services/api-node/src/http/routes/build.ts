@@ -9,6 +9,8 @@ import {
   createJob,
   dropJob,
   jobDocxPath,
+  jobOwnerOf,
+  rememberJobOwner,
   writeMarkdown,
   writeUploadEntries,
   type Job,
@@ -22,6 +24,7 @@ import type { DocxProvenance } from '../../pipeline/metadata.js';
 import { templateById } from '../../pipeline/templates.js';
 import type { AppContext } from '../context.js';
 import { requiredSchema } from '../contract.js';
+import { authEnabled, type AuthedRequest } from '../guard.js';
 import { badRequest, fromBody, fromQuery, HttpError, mustMatch, mustStr, mustTrim, strOf, trimOf } from '../params.js';
 import { errorMessage, serverError } from '../respond.js';
 import { openSse } from '../sse.js';
@@ -64,6 +67,8 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
       const template = templateById(ctx.repoRoot, templateId);
       const job = createJob(ctx.cacheDir);
       created = job;
+      const owner = (req as AuthedRequest).authUser;
+      if (owner) rememberJobOwner(job.id, owner.userId);
 
       step('process', upload ? `写入 ${upload.length} 个文件…` : '写入 Markdown…');
       const input = upload
@@ -106,6 +111,13 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
     const docx = jobDocxPath(ctx.cacheDir, jobId);
     if (!isFile(docx)) throw new HttpError(404, 'file not found or expired');
 
+    // 产物只归创建者：jobId 一旦外泄，别人也拿不到这份 docx
+    const owner = jobOwnerOf(jobId);
+    const user = (req as AuthedRequest).authUser;
+    if (authEnabled() && owner != null && user?.userId !== owner) {
+      throw new HttpError(403, '这不是你的构建任务');
+    }
+
     // 缺参数走 Fastify/Query 的默认值口径（与 app.py 的 Query("export.docx") 一致），
     // 所以这里用 ?? 而不是把空串当缺省。
     const fileName = sanitizeDownloadName(String(fromQuery(req).fileName ?? 'export.docx'));
@@ -134,6 +146,7 @@ export function registerBuildRoutes(app: FastifyInstance, ctx: AppContext): void
             templateId,
             stylesYaml,
             onEvent: () => undefined,
+            ownerId: (req as AuthedRequest).authUser?.userId,
           }),
         );
         return payload(result.jobId, result.fileName);

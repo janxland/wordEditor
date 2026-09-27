@@ -8,7 +8,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { applyAbstractStyles } from '../ooxml/abstract-styles.js';
+import {
+  applyAbstractStyles,
+  type AbstractStyleIds,
+} from '../ooxml/abstract-styles.js';
 import { applyListStyles, redirectListNumIds } from '../ooxml/list-styles.js';
 import { applyMultilevel } from '../ooxml/multilevel.js';
 import { parseNumberingRoot } from '../ooxml/numbering.js';
@@ -64,6 +67,7 @@ async function patchDocx(zip: DocxSession, dsl: StylesDsl, log: (line: string) =
   // 第 2 步：摘要 / Abstract / 关键词段落注入
   if (dsl.custom_styles?.length) {
     const changed = applyAbstractStyles(documentRoot, stylesRoot, {
+      styleIds: abstractStyleIds(dsl.abstract),
       customStyles: dsl.custom_styles,
     });
     if (changed) log(`[postprocess_abstract] 注入摘要/关键词样式 ${changed} 段`);
@@ -141,6 +145,27 @@ async function patchDocx(zip: DocxSession, dsl: StylesDsl, log: (line: string) =
   if (removedPageFrames) {
     log(`[postprocess_styles] 已移除页眉/页脚页面黑框 ${removedPageFrames} 处`);
   }
+}
+
+/** DSL 的 abstract 块（snake_case）→ applyAbstractStyles 的 styleIds（camelCase）。 */
+function abstractStyleIds(
+  cfg: Record<string, string> | undefined,
+): AbstractStyleIds | undefined {
+  if (!cfg) return undefined;
+  const map: Record<string, keyof AbstractStyleIds> = {
+    abstract_style_id: 'abstract',
+    abstract_title_style_id: 'abstractTitle',
+    en_abstract_style_id: 'enAbstract',
+    en_abstract_title_style_id: 'enAbstractTitle',
+    keywords_style_id: 'keywords',
+    en_keywords_style_id: 'enKeywords',
+  };
+  const out: AbstractStyleIds = {};
+  for (const [k, v] of Object.entries(cfg)) {
+    const key = map[k];
+    if (key && v) out[key] = v;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 export async function applyStylesStage(ctx: StageRun): Promise<void> {

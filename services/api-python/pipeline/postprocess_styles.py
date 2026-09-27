@@ -525,6 +525,13 @@ def _is_english_only(text: str) -> bool:
     return bool(text) and not _re.search(r"[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]", text)
 
 
+ABSTRACT_STYLE_KEYS = frozenset({
+    "abstract_style_id", "abstract_title_style_id",
+    "en_abstract_style_id", "en_abstract_title_style_id",
+    "keywords_style_id", "en_keywords_style_id",
+})
+
+
 def apply_abstract_styles(
     doc_xml: bytes,
     styles_xml: bytes,
@@ -684,8 +691,13 @@ def patch_docx(path: Path, dsl: dict[str, Any]) -> None:
     doc_xml = original_doc
     abstract_changed = 0
     if dsl.get("custom_styles"):
+        # DSL 的 abstract 块可覆盖「英文摘要/关键词用哪个样式」。
+        # 默认英文摘要沿用 ae（文章的正文），但要求「ABSTRACT 用四号 TNR」的
+        # 模板（如金融大数据课程论文）需要指到独立样式上。
+        abs_cfg = {k: v for k, v in (dsl.get("abstract") or {}).items()
+                   if k in ABSTRACT_STYLE_KEYS}
         doc_xml, abstract_changed = apply_abstract_styles(
-            original_doc, new_styles, custom_styles=dsl.get("custom_styles"))
+            original_doc, new_styles, **abs_cfg, custom_styles=dsl.get("custom_styles"))
         if abstract_changed:
             print(f"[postprocess_abstract] 注入摘要/关键词样式 {abstract_changed} 段")
 

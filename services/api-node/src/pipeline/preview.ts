@@ -12,7 +12,7 @@ import path from 'node:path';
 import YAML from 'yaml';
 
 import { findPandoc } from '../config.js';
-import { createJob, dropJob } from '../jobs/workspace.js';
+import { createJob, dropJob, rememberJobOwner } from '../jobs/workspace.js';
 import type { PipelineEvent } from './types.js';
 import { sanitizeDownloadName } from './naming.js';
 import { runBuild } from './build.js';
@@ -51,6 +51,8 @@ export async function runStylePreview(options: {
   templateId: string;
   stylesYaml: string;
   onEvent: (event: PipelineEvent) => void;
+  /** 创建者 userId：预览产物同样只归本人下载 */
+  ownerId?: number;
 }): Promise<StylePreviewResult> {
   const pandoc = findPandoc(options.repoRoot);
   if (!pandoc) throw new Error('未检测到 Pandoc');
@@ -61,6 +63,7 @@ export async function runStylePreview(options: {
   }
 
   const job = createJob(options.cacheDir);
+  if (options.ownerId != null) rememberJobOwner(job.id, options.ownerId);
   try {
     // 样例稿按请求原样给出的 id 查找，别名只用于解析模板定义。
     const ownSample = path.join(options.repoRoot, 'templates', options.templateId, 'preview-styles.md');

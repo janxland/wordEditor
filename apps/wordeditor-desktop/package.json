@@ -1,0 +1,25 @@
+{
+  "name": "wordeditor-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WordEditor 做单台：本地跑 pandoc 管线，内置后端与前端，供做单人接单 / 制作 / 交付",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "npm run build && electron .",
+    "smoke": "npm run build && electron . --smoke",
+    "prepare:runtime": "node scripts/prepare-resources.mjs",
+    "package:mac": "npm run build && npm run prepare:runtime && electron-builder --mac --dir",
+    "package:win": "npm run build && npm run prepare:runtime && electron-builder --win --dir",
+    "dist:mac": "npm run build && npm run prepare:runtime && electron-builder --mac",
+    "dist:win": "npm run build && npm run prepare:runtime && electron-builder --win",
+    "deploy:releases": "node scripts/deploy-releases.js",
+    "fetch:pandoc": "node scripts/fetch-pandoc.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.57",
+    "electron": "44.4.5",
+    "electron-builder": "26.15.3",
+    "typescript": "^5.8.3"
+  }
+}

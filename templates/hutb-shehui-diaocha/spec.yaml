@@ -1,0 +1,164 @@
+schema: wordeditor-template-spec/v1
+
+# ===================================================================
+# 湖南工商大学 · 暑假社会调查报告
+# 反向复刻自《附件1：暑假社会调查报告格式规范.doc》（source.docx 为 LibreOffice
+# 转换产物，自包含）。原文档为 .doc 二进制格式，textutil 会压平表格故不可用。
+# 格式数值一律以模板正文里的**文字描述**为准（铁律二）：
+#   正文「四号宋体、行距固定值24磅」（示范段实测 sz=24 与描述矛盾，以描述为准 → 28）；
+#   各部分标题「四号黑体」；层次标题「一、（黑体四号）」；题目「小二号宋体」（实测 36 无加粗）。
+# ===================================================================
+id: hutb-shehui-diaocha
+name: "湖南工商大学 · 暑假社会调查报告"
+
+numbering: guanke          # 一、→（一）→①；规范要求「一、㈠ 1. ⑴ ①」五级，guanke 最接近
+standalone: true
+three_line_tables: true
+
+# 本报告类型无摘要 / 无 ABSTRACT / 不要求参考文献（规范原文「其他不要求撰写参考文献」）
+# → abstract_styles 与 extra_styles 全部省略，段落统一走「文章的正文」。
+
+source_docx: "source.docx"   # 相对本 spec 所在目录
+
+# ------------------------------------------------------------------ 页面
+# 规范明写：上边距30mm 下25mm 左30mm 右20mm（非源实测值——源是被规范文档，页边距不代表产物要求）
+page:
+  width_twips: 11906
+  height_twips: 16838
+  margin:
+    top: 1701               # 30mm
+    bottom: 1417            # 25mm
+    left: 1701              # 30mm
+    right: 1134             # 20mm
+  header_twips: 851
+  footer_twips: 992
+  cols_space: 425
+  doc_grid:
+    type: lines
+    line_pitch: 312
+
+fonts:
+  latin: "Times New Roman"
+  cjk: "宋体"
+
+# ------------------------------------------------------------------ 正文
+# 规范明写「四号宋体、行距固定值24磅」→ 28（示范段实测 sz=24 与描述矛盾，铁律二以描述为准）
+body:
+  paragraph:
+    align: both
+    line_spacing: "24pt"
+    first_line_chars: 2
+    first_line_dxa: 560
+    spacing_before_dxa: 0
+    spacing_after_dxa: 0
+    word_wrap_break_latin: true
+  run:
+    cjk_font: "宋体"
+    latin_font: "Times New Roman"
+    size_half_pt: 28
+    size_cs_half_pt: 28
+
+# ------------------------------------------------------------------ 标题（一级黑体四号 = HUTB 默认；二~四级照基线）
+headings:
+  - level: 1
+    page_break_before: false
+    paragraph:
+      align: left
+      line_spacing: "24pt"
+      first_line_chars: 2
+      first_line_dxa: 560
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+    run:
+      cjk_font: "黑体"
+      latin_font: "Times New Roman"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+      bold: true
+  - level: 2
+    paragraph:
+      align: left
+      line_spacing: "24pt"
+      first_line_chars: 2
+      first_line_dxa: 560
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+      bold: true
+  - level: 3
+    paragraph:
+      align: left
+      line_spacing: "24pt"
+      first_line_chars: 2
+      first_line_dxa: 560
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+      bold: true
+  - level: 4
+    paragraph:
+      align: left
+      line_spacing: "24pt"
+      first_line_chars: 2
+      first_line_dxa: 560
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+      bold: true
+
+# ------------------------------------------------------------------ 论文题目
+# 规范明写「小二号宋体」；示范段实测 sz=36 居中无加粗（与描述一致，bold 取实测 false）
+title:
+  paragraph:
+    align: center
+    line_spacing: "24pt"
+    spacing_before_dxa: 0
+    spacing_after_dxa: 0
+    indent_clear: true
+    word_wrap_break_latin: true
+  run:
+    cjk_font: "宋体"
+    latin_font: "Times New Roman"
+    size_half_pt: 36
+    size_cs_half_pt: 36
+
+# ------------------------------------------------------------------ 封面
+# slice [21,38)：自动探测认错（本文档封面不在第一页——规范说明占了前三页，
+# 探测命中 long_para [0,11]），故改显式索引：
+#   21..25 顶部空段撑位 + 26 校徽图 + 28 报告标题 + 32 信息表(8行) + 34 年月日 + 35..37 尾随空段。
+# 源文档通篇无显式分页符（靠空段+版面分页）→ page_break 必须 injected，由注入器补分页。
+cover:
+  slice: [21, 38]
+  page_break: "injected"
+  fields:
+    - {key: "title",        label: "题目",     row: 0, col: 1}
+    - {key: "college",      label: "学院",     row: 1, col: 1}
+    - {key: "major",        label: "专业",     row: 2, col: 1}
+    - {key: "class_name",   label: "班级",     row: 3, col: 1}
+    - {key: "student_id",   label: "学号",     row: 4, col: 1}
+    - {key: "student_name", label: "学生姓名", row: 5, col: 1}
+    - {key: "teacher",      label: "指导教师", row: 6, col: 1}
+    - {key: "academic_title", label: "职称",   row: 7, col: 1}
+    - {key: "date",         label: "年月",     para: 13}   # 切片内相对索引（34-21）
+
+# ------------------------------------------------------------------ 尾页评审表
+# slice auto：探测正确命中（table+marker [58,61]，前接段含「评审」）。
+# 该表是「评审意见 + 成绩 + 签名」式评审表，无分项评分 → rubric 只填结构性字段，groups 留空。
+tail:
+  slice: auto
+  title: "湖南工商大学暑假社会调查报告评审表"
+  rubric:
+    grade_row: "成  绩"
+    signature_row: "签名"

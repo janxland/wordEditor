@@ -29,6 +29,18 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from ooxml_schema_order import (  # noqa: E402
+    PPR_ORDER,
+    TBLPR_ORDER,
+    TCPR_ORDER,
+    ensure_ordered,
+    put_ordered,
+)
+
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 XML = "http://www.w3.org/XML/1998/namespace"
 NS = {"w": W}
@@ -92,13 +104,9 @@ def _caption_para(text: str) -> ET.Element:
     """表头单元格里的说明段落：居中、宋体五号。"""
     p = ET.Element(q("p"))
     ppr = ET.SubElement(p, q("pPr"))
-    jc = ET.SubElement(ppr, q("jc"))
-    jc.set(q("val"), "center")
-    sp = ET.SubElement(ppr, q("spacing"))
-    sp.set(q("before"), "40")
-    sp.set(q("after"), "40")
-    sp.set(q("line"), "240")
-    sp.set(q("lineRule"), "auto")
+    # 走 put_ordered：spacing 必须排在 jc 之前，否则 Word 报「文档有问题」
+    put_ordered(ppr, "spacing", PPR_ORDER, before="40", after="40", line="240", lineRule="auto")
+    put_ordered(ppr, "jc", PPR_ORDER, val="center")
     rpr = ET.SubElement(ppr, q("rPr"))
     sz = ET.SubElement(rpr, q("sz"))
     sz.set(q("val"), "21")
@@ -134,15 +142,12 @@ def _make_table(paras: list[ET.Element], caption: str) -> ET.Element:
     tbl = ET.Element(q("tbl"))
     tbl_pr = ET.SubElement(tbl, q("tblPr"))
 
-    tw = ET.SubElement(tbl_pr, q("tblW"))
-    tw.set(q("type"), "dxa")
-    tw.set(q("w"), TABLE_W)
-    jc = ET.SubElement(tbl_pr, q("jc"))
-    jc.set(q("val"), "center")
-    layout = ET.SubElement(tbl_pr, q("tblLayout"))
-    layout.set(q("type"), "fixed")
+    # 取值一字未改，只是按 schema 顺序就位（tblBorders 在 tblLayout 之前）
+    put_ordered(tbl_pr, "tblW", TBLPR_ORDER, w=TABLE_W, type="dxa")
+    put_ordered(tbl_pr, "jc", TBLPR_ORDER, val="center")
+    put_ordered(tbl_pr, "tblLayout", TBLPR_ORDER, type="fixed")
 
-    borders = ET.SubElement(tbl_pr, q("tblBorders"))
+    borders = ensure_ordered(tbl_pr, "tblBorders", TBLPR_ORDER)
     _border(borders, "top", _LINE)
     _border(borders, "bottom", _LINE)
     _border(borders, "left", _NIL)
@@ -150,7 +155,7 @@ def _make_table(paras: list[ET.Element], caption: str) -> ET.Element:
     _border(borders, "insideH", _NIL)
     _border(borders, "insideV", _NIL)
 
-    cell_mar = ET.SubElement(tbl_pr, q("tblCellMar"))
+    cell_mar = ensure_ordered(tbl_pr, "tblCellMar", TBLPR_ORDER)
     for edge in ("top", "left", "bottom", "right"):
         e = ET.SubElement(cell_mar, q(edge))
         e.set(q("w"), "0")
@@ -162,7 +167,7 @@ def _make_table(paras: list[ET.Element], caption: str) -> ET.Element:
 
     # 第一行：表头（顶线与栏目线之间）——说明这段是什么代码
     head_tc = _table_cell(TABLE_W, [_caption_para(caption)])
-    tc_borders = ET.SubElement(head_tc.find(q("tcPr")), q("tcBorders"))
+    tc_borders = ensure_ordered(head_tc.find(q("tcPr")), "tcBorders", TCPR_ORDER)
     _border(tc_borders, "bottom", _RULE)
     head_tr = ET.Element(q("tr"))
     # 说明行由 _caption_para 承担，整张表只有两行；不设 tblHeader，

@@ -1,4 +1,5 @@
 import { apiBase, engineUrl } from '@/core/engine';
+import { apiFetch } from './apiFetch';
 import { fetchAsBlob } from './download';
 
 export interface StylePreviewRequest {
@@ -16,7 +17,7 @@ async function requestStylePreview(
   req: StylePreviewRequest,
   baseUrl = apiBase(),
 ): Promise<StylePreviewMeta> {
-  const res = await fetch(`${baseUrl}/preview/styles`, {
+  const res = await apiFetch(`${baseUrl}/preview/styles`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),

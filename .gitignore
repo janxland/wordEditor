@@ -31,3 +31,11 @@ vendor/
 
 # 本机内置工具（Pandoc 等），不入库
 .tools/
+resources/pandoc/
+
+# 桌面端（Electron）打包产物：安装包 / .app / unpacked，GB 级，不入库
+apps/wordeditor-desktop/release/
+apps/wordeditor-desktop/resources/
+
+# 临时校验脚本
+apps/wordEditor-frontend/tmp-check.mjs

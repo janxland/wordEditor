@@ -1,0 +1,315 @@
+schema: wordeditor-template-spec/v1
+
+# ===================================================================
+# 湖南工商大学 ·《金融大数据与Python程序应用》课程论文
+# 反向复刻自 课程论文格式模板.docx（source.docx，自包含以便重跑）
+# 所有数值均为对源 docx 的 OOXML 实测值，不凭肉眼估计。
+# ===================================================================
+id: hutb-jinrong-bigdata
+name: "湖南工商大学 · 金融大数据与Python程序应用 · 课程论文"
+note: >-
+  反向复刻自《金融大数据与Python程序应用》课程论文格式模板.docx。
+  封面块 = 源 docx body[0:8]（校名+课程论文+校徽图+信息表+年月，自带分页符）；
+  尾页评审表块 = body[29:32]（标题段 + 14 行 11 列表 + 表后空段）。
+  正文：宋体/Times New Roman 四号（14pt）、行距固定值 24 磅、首行缩进 2 字符（560 twips）；
+  一级标题黑体四号。
+
+numbering: guanke          # 一、→（一）→①→1.1
+standalone: true
+three_line_tables: true
+
+# hutb-shared/zhengwen-style.lua 把英文摘要一律归到「文章的正文」（宋体小四），
+# 与本模板「[ABSTRACT] 四号 Times New Roman」的要求不符，故追加一个本模板专用的
+# 过滤器，在主过滤器之后把这几段的 custom-style 改回 AbstractTitle/Abstract/Keywords。
+extra_lua_filters:
+  - templates/hutb-shared/zhengwen-style.lua
+  - templates/hutb-jinrong-bigdata/en-abstract.lua
+
+# 摘要段落用哪个样式（DSL abstract 块，Python / Node 双引擎都会读）。
+# 默认英文摘要沿用 ae（文章的正文 宋体小四）；本模板要求 ABSTRACT / KEY WORDS
+# 是四号 Times New Roman，故指到独立样式 AbstractTitle / Abstract / Keywords。
+abstract_styles:
+  abstract_style_id: ZhaiYao
+  abstract_title_style_id: ZhaiYaoTitle
+  en_abstract_style_id: Abstract
+  en_abstract_title_style_id: AbstractTitle
+  keywords_style_id: KeyWordsZh
+  en_keywords_style_id: Keywords
+
+source_docx: "source.docx"   # 相对本 spec 所在目录（自包含，重跑不依赖 Downloads）
+
+# ------------------------------------------------------------------ 页面
+page:
+  width_twips: 11906        # A4 210mm
+  height_twips: 16838       # A4 297mm
+  margin:
+    top: 1440               # 25.4mm
+    bottom: 1440
+    left: 1800              # 31.75mm
+    right: 1800
+  header_twips: 851
+  footer_twips: 992
+  cols_space: 425
+  doc_grid:
+    type: lines
+    line_pitch: 312
+
+fonts:
+  latin: "Times New Roman"
+  cjk: "宋体"
+
+# ------------------------------------------------------------------ 正文
+# 字号口径 = HUTB 通用基线（_shared/hutb-base.yaml 的「文章的正文」）：宋体 + Times New Roman 小四(24)
+# 行距口径 = 源 docx：正文示范段明写「行距固定值24磅」，实测 line=480 lineRule=exact
+# 注：源 docx 示范段自身被作者设成了 sz=28(四号)，与它标注的「小四号」矛盾 → 以标注文字 + HUTB 基线为准
+body:
+  paragraph:
+    align: both
+    line_spacing: "24pt"
+    first_line_chars: 2
+    first_line_dxa: 560
+    spacing_before_dxa: 0
+    spacing_after_dxa: 0
+    word_wrap_break_latin: true
+  run:
+    cjk_font: "宋体"
+    latin_font: "Times New Roman"
+    size_half_pt: 24
+    size_cs_half_pt: 24
+
+# ------------------------------------------------------------------ 标题
+# 一级：源 docx 明写「一、（黑体四号）」→ 黑体四号(28) 加粗，首行缩进 2 字符、固定 24 磅
+# 二~四级：源 docx 未示范 → 照 HUTB 通用基线（hutb-gongke）：宋体小四(24) 加粗，首行缩进 2 字符
+headings:
+  - level: 1
+    page_break_before: false
+    paragraph:
+      align: left
+      line_spacing: "24pt"
+      first_line_chars: 2
+      first_line_dxa: 560
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+    run:
+      cjk_font: "黑体"
+      latin_font: "Times New Roman"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+      bold: true
+  - level: 2
+    paragraph:
+      align: left
+      line_spacing: "24pt"
+      first_line_chars: 2
+      first_line_dxa: 560
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+      bold: true
+  - level: 3
+    paragraph:
+      align: left
+      line_spacing: "24pt"
+      first_line_chars: 2
+      first_line_dxa: 560
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+      bold: true
+  - level: 4
+    paragraph:
+      align: left
+      line_spacing: "24pt"
+      first_line_chars: 2
+      first_line_dxa: 560
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+      bold: true
+
+# ------------------------------------------------------------------ 论文题目
+# 源 docx 实测：P007「论文题目（小二号宋体，加粗）」sz=36(18pt=小二)、居中、line=480 exact
+title:
+  paragraph:
+    align: center
+    line_spacing: "24pt"
+    spacing_before_dxa: 0
+    spacing_after_dxa: 0
+    indent_clear: true
+    word_wrap_break_latin: true
+  run:
+    cjk_font: "宋体"
+    latin_font: "Times New Roman"
+    size_half_pt: 36
+    size_cs_half_pt: 36
+    bold: true
+
+# ------------------------------------------------------------------ 摘要 / 关键词 / 参考文献
+# 口径 = 源 docx 的**文字标注**（不是示范段被随手设的 OOXML 值）：
+#   「[内容摘要] …（四号宋体，行距固定值24磅）」   → 摘要 28 宋体
+#   「[关键词] …（四号宋体）」                     → 关键词 28 宋体，不缩进
+#   「[ABSTRACT] …（四号Times New Roman，固定24磅）」→ 英文摘要 28 TNR
+#   「[KEY WORDS] …（四号Times New Roman字体）」    → 28 TNR
+#   「参考文献（黑体四号，不少于10篇，中英文文献都要有）」→ 文献标题 28 黑体居中
+#   「[1] …（中文小四号宋体，英文小四号Times New Roman）」→ 文献条目 24
+# 样式 id 与 hutb-shared/zhengwen-style.lua 的 custom-style 名一一对应（映射到本体系，不自造）。
+extra_styles:
+  - id: "ZhaiYaoTitle"
+    name: "摘要标题"
+    paragraph:
+      align: both
+      line_spacing: "24pt"
+      indent_clear: true
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+      bold: true
+  - id: "ZhaiYao"
+    name: "摘要"
+    paragraph:
+      align: both
+      line_spacing: "24pt"
+      first_line_chars: 2
+      first_line_dxa: 560
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+  - id: "AbstractTitle"
+    # name 必须与 pandoc 按 custom-style 生成的样式名逐字一致（"AbstractTitle"，无空格），
+    # 否则 DSL 按 name 匹配不到，段落会掉回「文章的正文」。
+    name: "AbstractTitle"
+    paragraph:
+      align: both
+      line_spacing: "24pt"
+      indent_clear: true
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "Times New Roman"
+      latin_font: "Times New Roman"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+      bold: true
+  - id: "Abstract"
+    name: "Abstract"
+    paragraph:
+      align: both
+      line_spacing: "24pt"
+      first_line_chars: 2
+      first_line_dxa: 560
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "Times New Roman"
+      latin_font: "Times New Roman"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+  - id: "KeyWordsZh"
+    name: "关键词"
+    paragraph:
+      align: both
+      line_spacing: "24pt"
+      first_line_chars: 0
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+  - id: "Keywords"
+    name: "Keywords"
+    paragraph:
+      align: both
+      line_spacing: "24pt"
+      first_line_chars: 0
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "Times New Roman"
+      latin_font: "Times New Roman"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+  # 注：源模板「参考文献」标题要求黑体四号 + 居中；本体系没有独立文献标题样式，
+  # 且 hutb 的 lua 不支持 apa7 那套 <div class="cs-XXX"> 映射 → 不为此新造样式（避免过度切），
+  # 归入一级标题（黑体四号居左）。若必须居中，需给 hutb-shared 主 lua 加 cs- 支持（跨模板改动，未做）。
+  - id: "Cankaowenxian"
+    name: "参考文献"
+    paragraph:
+      align: both
+      line_spacing: "24pt"
+      indent_clear: true
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+
+# ------------------------------------------------------------------ 封面
+# body[0:8]：湖南工商大学 / 课 程 论 文 / 校徽图 / 信息表(7行) / 空段 / 2026年6月 / 分页段
+cover:
+  # slice: auto = 由 template_factory 自动探测边界（策略见 `detect` 输出）。
+  # 只有自动探测认错时才改写显式索引，例如 slice: [0, 8]。
+  slice: auto
+  page_break: "inherited"     # 切片内已含 <w:br w:type="page"/>，注入时不再补
+  fields:
+    - {key: "title",        label: "题目",     row: 0, col: 1}
+    - {key: "student_name", label: "学生姓名", row: 1, col: 1}
+    - {key: "student_id",   label: "学号",     row: 2, col: 1}
+    - {key: "college",      label: "学院",     row: 3, col: 1, default: "财政金融学院"}
+    - {key: "class_name",   label: "专业班级", row: 4, col: 1}
+    - {key: "course",       label: "课程名称", row: 5, col: 1, default: "金融大数据与Python程序应用"}
+    - {key: "teacher",      label: "任课教师", row: 6, col: 1, default: "陈青山"}
+    - {key: "date",         label: "年月",     para: 5, default: "2026 年 6 月"}
+
+# ------------------------------------------------------------------ 尾页评审表
+# body[29:32]：标题段「课程论文评审表」+ 14 行表 + 表后空段
+tail:
+  slice: auto                 # 自动探测：末表 + 前接段含「评审」关键字
+  title: "课程论文评审表"
+  rubric:
+    total: 100
+    grade_row: "评审成绩"
+    remark_row: "备注"
+    signature_row: "任课教师签名"
+    groups:
+      - key: "topic"
+        label: "选题（20分）"
+        max: 20
+        items:
+          - {desc: "选题的价值与现实意义。", score: 10}
+          - {desc: "选题的可行性与创新性。", score: 10}
+      - key: "argument"
+        label: "论证（50分）"
+        max: 50
+        items:
+          - {desc: "论文结构是否合理，研究思路是否清晰，论据是否充分。", score: 20}
+          - {desc: "模型或方法选择的合理性，数据分析的深度与逻辑严谨性。", score: 20}
+          - {desc: "数据结果的分析与解读以及数据的可视化呈现质量。", score: 10}
+      - key: "norm"
+        label: "规范性（30分）"
+        max: 30
+        items:
+          - {desc: "论文字数是否达到要求，论文写作与排版是否规范。", score: 10}
+          - {desc: "Python代码的规范性、可读性及可复现性。是否符合学术诚信的要求。", score: 20}

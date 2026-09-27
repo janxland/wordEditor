@@ -1,6 +1,9 @@
 import React from 'react';
+import { Navigate } from 'react-router-dom';
 import { Card, Space, Tag, Timeline, Typography } from 'antd';
 import { CHANGELOG, type ChangelogItem } from '@/data/changelog';
+import { isAdmin } from '@/services/docOrder';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -12,7 +15,12 @@ const KIND_META: Record<ChangelogItem['kind'], { label: string; color: string }>
   docs: { label: '文档', color: 'default' },
 };
 
-export const AboutPage: React.FC = () => (
+export const AboutPage: React.FC = () => {
+  // 技术细节页面：导航里不展示，直接敲 URL 也只对超级管理员开放
+  const me = useCurrentUser();
+  if (!isAdmin(me)) return <Navigate to="/" replace />;
+
+  return (
   <div className="about-page">
     <Card>
       <Space direction="vertical" size={4}>
@@ -61,4 +69,5 @@ export const AboutPage: React.FC = () => (
       }))}
     />
   </div>
-);
+  );
+};

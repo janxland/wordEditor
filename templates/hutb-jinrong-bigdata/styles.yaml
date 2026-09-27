@@ -1,0 +1,283 @@
+# 由 template_factory.py 从 spec.yaml 生成，请勿手改（改 spec 后重跑）。
+extends: "../_shared/hutb-base.yaml"
+template:
+  id: "hutb-jinrong-bigdata"
+  name: "湖南工商大学 · 金融大数据与Python程序应用 · 课程论文"
+default_list_style: "DecimalList"
+abstract:
+  abstract_style_id: "ZhaiYao"
+  abstract_title_style_id: "ZhaiYaoTitle"
+  en_abstract_style_id: "Abstract"
+  en_abstract_title_style_id: "AbstractTitle"
+  keywords_style_id: "KeyWordsZh"
+  en_keywords_style_id: "Keywords"
+use_list_styles:
+  - id: "DecimalList"
+  - id: "BulletList"
+  - id: "ParenDecimalList"
+  - id: "CircledList"
+  - id: "ChineseList"
+overrides:
+  - match:
+      kind: "body"
+    word_wrap_break_latin: true
+  - match:
+      id: "1"
+    paragraph:
+      word_wrap_break_latin: true
+      clear_indent: true
+      align: "left"
+      line_spacing: "24pt"
+      first_line_chars: 2
+      first_line_dxa: 560
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+    run:
+      cjk_font: "黑体"
+      latin_font: "Times New Roman"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+      bold: true
+  - match:
+      id: "2"
+    paragraph:
+      word_wrap_break_latin: true
+      clear_indent: true
+      align: "left"
+      line_spacing: "24pt"
+      first_line_chars: 2
+      first_line_dxa: 560
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+      bold: true
+  - match:
+      id: "3"
+    paragraph:
+      word_wrap_break_latin: true
+      clear_indent: true
+      align: "left"
+      line_spacing: "24pt"
+      first_line_chars: 2
+      first_line_dxa: 560
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+      bold: true
+  - match:
+      id: "4"
+    paragraph:
+      word_wrap_break_latin: true
+      clear_indent: true
+      align: "left"
+      line_spacing: "24pt"
+      first_line_chars: 2
+      first_line_dxa: 560
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+      bold: true
+custom_styles:
+  - id: "ae"
+    name: "文章的正文"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: "24pt"
+      first_line_chars: 2
+      first_line_dxa: 560
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+  - id: "ZhaiYaoTitle"
+    name: "摘要标题"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: "24pt"
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+      indent_clear: true
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+      bold: true
+  - id: "ZhaiYao"
+    name: "摘要"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: "24pt"
+      first_line_chars: 2
+      first_line_dxa: 560
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+  - id: "AbstractTitle"
+    name: "AbstractTitle"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: "24pt"
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+      indent_clear: true
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "Times New Roman"
+      latin_font: "Times New Roman"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+      bold: true
+  - id: "Abstract"
+    name: "Abstract"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: "24pt"
+      first_line_chars: 2
+      first_line_dxa: 560
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "Times New Roman"
+      latin_font: "Times New Roman"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+  - id: "KeyWordsZh"
+    name: "关键词"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: "24pt"
+      first_line_chars: 0
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+  - id: "Keywords"
+    name: "Keywords"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: "24pt"
+      first_line_chars: 0
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "Times New Roman"
+      latin_font: "Times New Roman"
+      size_half_pt: 28
+      size_cs_half_pt: 28
+  - id: "Cankaowenxian"
+    name: "参考文献"
+    based_on: "a"
+    paragraph:
+      align: "both"
+      line_spacing: "24pt"
+      spacing_before_dxa: 0
+      spacing_after_dxa: 0
+      indent_clear: true
+      word_wrap_break_latin: true
+    run:
+      cjk_font: "宋体"
+      latin_font: "Times New Roman"
+      size_half_pt: 24
+      size_cs_half_pt: 24
+fonts:
+  latin: "Times New Roman"
+  cjk: "宋体"
+multilevel_list:
+  num_id: 2
+  levels:
+    - ilvl: 0
+      heading_style: "1"
+      num_fmt: "chineseCounting"
+      lvl_text: "%1、"
+      suff: "nothing"
+      start: 1
+      run:
+        cjk_font: "黑体"
+        size_half_pt: 28
+        size_cs_half_pt: 28
+        bold: true
+      paragraph:
+        align: "left"
+        line_spacing: "24pt"
+        first_line_chars: 2
+        spacing_before_dxa: 0
+        spacing_after_dxa: 0
+    - ilvl: 1
+      heading_style: "2"
+      num_fmt: "chineseCounting"
+      lvl_text: "（%2）"
+      suff: "nothing"
+      start: 1
+      run:
+        cjk_font: "宋体"
+        size_half_pt: 24
+        size_cs_half_pt: 24
+        bold: true
+      paragraph:
+        align: "left"
+        line_spacing: "24pt"
+        first_line_chars: 2
+        spacing_before_dxa: 0
+        spacing_after_dxa: 0
+    - ilvl: 2
+      heading_style: "3"
+      num_fmt: "decimalEnclosedCircle"
+      lvl_text: "%3."
+      suff: "space"
+      start: 1
+      run:
+        cjk_font: "宋体"
+        size_half_pt: 24
+        size_cs_half_pt: 24
+        bold: true
+      paragraph:
+        align: "left"
+        line_spacing: "24pt"
+        first_line_chars: 2
+        spacing_before_dxa: 0
+        spacing_after_dxa: 0
+    - ilvl: 3
+      heading_style: "4"
+      num_fmt: "decimal"
+      lvl_text: "%3.%4"
+      suff: "space"
+      start: 1
+      run:
+        cjk_font: "宋体"
+        size_half_pt: 24
+        size_cs_half_pt: 24
+        bold: true
+      paragraph:
+        align: "left"
+        line_spacing: "24pt"
+        first_line_chars: 2
+        spacing_before_dxa: 0
+        spacing_after_dxa: 0

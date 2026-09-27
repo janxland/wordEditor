@@ -1,0 +1,31 @@
+{
+  "source": "/private/tmp/附件1：暑假社会调查报告格式规范.docx",
+  "body_elements": 61,
+  "cover": {
+    "slice": [
+      0,
+      11
+    ],
+    "strategy": "long_para",
+    "evidence": "index 11 段落长度 154 ≥ 100（正文信号）",
+    "elements": 11,
+    "has_page_break": false,
+    "has_table": false,
+    "first_text": "湖南工商大学暑假社会调查报告格式规范",
+    "last_text": "2.正文"
+  },
+  "tail": {
+    "slice": [
+      58,
+      61
+    ],
+    "strategy": "table+marker",
+    "evidence": "index 59 表格（前接文本含关键字 '评审'）",
+    "table_index": 59,
+    "elements": 3,
+    "title": "湖南工商大学暑假社会调查报告评审表",
+    "rows": 6,
+    "cols": 10,
+    "has_page_break": false
+  }
+}

@@ -11,7 +11,8 @@ export type StageName =
   | 'verbatim'
   | 'headerFooter'
   | 'password'
-  | 'metadata';
+  | 'metadata'
+  | 'blocks';
 
 export interface StageContext {
   repoRoot: string;

@@ -35,6 +35,8 @@ export interface DocxSession {
    * 批量版会把全部媒体原始字节同时按住到函数结束，峰值 = 媒体总体积。
    */
   readPartBytes(part: string): Promise<Buffer | null>;
+  /** 写入二进制部件（word/media/*）：封面块搬运图片时用。 */
+  writePartBytes(part: string, data: Buffer): Promise<void>;
   /** 有改动才落盘；无改动时连读入都省掉。 */
   flush(): Promise<void>;
 }
@@ -87,6 +89,14 @@ export async function openDocxSession(docxPath: string): Promise<DocxSession> {
       const file = z.file(part);
       // async('nodebuffer') 本身就产出新 Buffer，无需再 Buffer.from 复制一张。
       return file && !file.dir ? file.async('nodebuffer') : null;
+    },
+
+    async writePartBytes(part, data) {
+      const z = await open();
+      // createFolders:false —— 否则 jszip 会额外塞一个 'word/media/' 目录条目进包。
+      z.file(part, data, { createFolders: false });
+      textCache.delete(part);
+      dirty = true;
     },
 
     async patch(patches) {

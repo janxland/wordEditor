@@ -1,0 +1,54 @@
+appId: cn.roginx.wordeditor.desktop
+productName: WordEditor做单台
+copyright: Copyright © 2026 roginx.ink
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+extraResources:
+  - from: resources/runtime/api-node
+    to: api-node
+    filter:
+      - "**/*"
+  - from: resources/runtime/web
+    to: web
+    filter:
+      - "**/*"
+  - from: resources/runtime/config
+    to: config
+    filter:
+      - "**/*"
+  - from: resources/runtime/contracts
+    to: contracts
+    filter:
+      - "**/*"
+  - from: resources/pandoc
+    to: pandoc
+    filter:
+      - "**/*"
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  darkModeSupport: true
+  hardenedRuntime: false
+  gatekeeperAssess: false
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-win-${arch}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+asar: false
+compression: maximum

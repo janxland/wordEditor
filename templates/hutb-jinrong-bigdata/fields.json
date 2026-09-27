@@ -1,0 +1,77 @@
+{
+  "template_id": "hutb-jinrong-bigdata",
+  "surface": "cover",
+  "fields": [
+    {
+      "key": "title",
+      "label": "题目",
+      "default": "",
+      "at": {
+        "row": 0,
+        "col": 1
+      }
+    },
+    {
+      "key": "student_name",
+      "label": "学生姓名",
+      "default": "",
+      "at": {
+        "row": 1,
+        "col": 1
+      }
+    },
+    {
+      "key": "student_id",
+      "label": "学号",
+      "default": "",
+      "at": {
+        "row": 2,
+        "col": 1
+      }
+    },
+    {
+      "key": "college",
+      "label": "学院",
+      "default": "财政金融学院",
+      "at": {
+        "row": 3,
+        "col": 1
+      }
+    },
+    {
+      "key": "class_name",
+      "label": "专业班级",
+      "default": "",
+      "at": {
+        "row": 4,
+        "col": 1
+      }
+    },
+    {
+      "key": "course",
+      "label": "课程名称",
+      "default": "金融大数据与Python程序应用",
+      "at": {
+        "row": 5,
+        "col": 1
+      }
+    },
+    {
+      "key": "teacher",
+      "label": "任课教师",
+      "default": "陈青山",
+      "at": {
+        "row": 6,
+        "col": 1
+      }
+    },
+    {
+      "key": "date",
+      "label": "年月",
+      "default": "2026 年 6 月",
+      "at": {
+        "para": 5
+      }
+    }
+  ]
+}

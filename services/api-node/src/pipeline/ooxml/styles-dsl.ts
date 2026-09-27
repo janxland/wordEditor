@@ -119,6 +119,8 @@ export interface StylesDsl {
   custom_styles?: CustomStyleRule[];
   headings?: unknown[];
   multilevel_list?: MultilevelSpec;
+  /** 摘要 / Abstract / 关键词段落用哪个样式；键名与 Python 侧 ABSTRACT_STYLE_KEYS 一致。 */
+  abstract?: Record<string, string>;
   list_style_library?: LibraryItem[];
   use_list_styles?: UseListItem[];
   default_list_style?: string;

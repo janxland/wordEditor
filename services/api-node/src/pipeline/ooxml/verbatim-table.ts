@@ -25,6 +25,13 @@ import {
   wtText,
   type XEl,
 } from './xml.js';
+import {
+  PPR_ORDER,
+  TBLPR_ORDER,
+  TCPR_ORDER,
+  ensureOrdered,
+  putOrdered,
+} from './schema-order.js';
 import type { TagAttrs } from './util.js';
 
 /** 代码段样式；与三线表的排除清单一致。 */
@@ -73,12 +80,14 @@ function captionPara(root: XEl, text: string): XEl {
   const doc = root.ownerDocument;
   const p = newEl(doc, 'w:p');
   const ppr = addEl(p, 'w:pPr');
-  setAttr(addEl(ppr, 'w:jc'), 'w:val', 'center');
-  const spacing = addEl(ppr, 'w:spacing');
-  setAttr(spacing, 'w:before', 40);
-  setAttr(spacing, 'w:after', 40);
-  setAttr(spacing, 'w:line', 240);
-  setAttr(spacing, 'w:lineRule', 'auto');
+  // 走 putOrdered：spacing 必须排在 jc 之前，否则 Word 报「文档有问题」
+  putOrdered(ppr, 'spacing', PPR_ORDER, {
+    before: 40,
+    after: 40,
+    line: 240,
+    lineRule: 'auto',
+  });
+  putOrdered(ppr, 'jc', PPR_ORDER, { val: 'center' });
   setAttr(addEl(addEl(ppr, 'w:rPr'), 'w:sz'), 'w:val', 21);
 
   const r = addEl(p, 'w:r');
@@ -112,13 +121,12 @@ function makeTable(root: XEl, paras: readonly XEl[], caption: string): XEl {
   const tbl = newEl(doc, 'w:tbl');
   const tblPr = addEl(tbl, 'w:tblPr');
 
-  const tblW = addEl(tblPr, 'w:tblW');
-  setAttr(tblW, 'w:type', 'dxa');
-  setAttr(tblW, 'w:w', TABLE_W);
-  setAttr(addEl(tblPr, 'w:jc'), 'w:val', 'center');
-  setAttr(addEl(tblPr, 'w:tblLayout'), 'w:type', 'fixed');
+  // 取值一字未改，只是按 schema 顺序就位（tblBorders 在 tblLayout 之前）
+  putOrdered(tblPr, 'tblW', TBLPR_ORDER, { w: TABLE_W, type: 'dxa' });
+  putOrdered(tblPr, 'jc', TBLPR_ORDER, { val: 'center' });
+  putOrdered(tblPr, 'tblLayout', TBLPR_ORDER, { type: 'fixed' });
 
-  const borders = addEl(tblPr, 'w:tblBorders');
+  const borders = ensureOrdered(tblPr, 'tblBorders', TBLPR_ORDER);
   border(borders, 'top', LINE);
   border(borders, 'bottom', LINE);
   border(borders, 'left', NIL);
@@ -126,7 +134,7 @@ function makeTable(root: XEl, paras: readonly XEl[], caption: string): XEl {
   border(borders, 'insideH', NIL);
   border(borders, 'insideV', NIL);
 
-  const cellMar = addEl(tblPr, 'w:tblCellMar');
+  const cellMar = ensureOrdered(tblPr, 'tblCellMar', TBLPR_ORDER);
   for (const edge of ['top', 'left', 'bottom', 'right']) {
     const e = addEl(cellMar, `w:${edge}`);
     setAttr(e, 'w:w', 0);
@@ -138,7 +146,7 @@ function makeTable(root: XEl, paras: readonly XEl[], caption: string): XEl {
   // 第一行：表头（顶线与栏目线之间）——说明这段是什么代码。
   // 不设 tblHeader：长代码跨页时表头不重复，与 PDF 链路（.codecap 只出现一次）一致。
   const headTc = tableCell(root, TABLE_W, [captionPara(root, caption)]);
-  border(addEl(child(headTc, 'w:tcPr')!, 'w:tcBorders'), 'bottom', RULE);
+  border(ensureOrdered(child(headTc, 'w:tcPr')!, 'tcBorders', TCPR_ORDER), 'bottom', RULE);
   const headTr = addEl(tbl, 'w:tr');
   headTr.appendChild(headTc);
 

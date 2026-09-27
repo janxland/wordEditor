@@ -253,14 +253,24 @@ def extract_tail(path: Path, out_dir: Path) -> dict | None:
 # ---------------------------------------------------------------- 块注入
 
 def _inject_block(docx_path: Path, cover_dir: Path, prefix: str, at: str) -> Path:
-    """把 <prefix>_block 注入 docx：at="start"（开头）或 "end"（末尾，自动补分页）。"""
-    block = etree.fromstring((cover_dir / f"{prefix}_block.xml").read_bytes())
-    rels_info = json.loads((cover_dir / f"{prefix}_rels.json").read_text(encoding="utf-8"))
+    """把 <prefix>_block 注入 docx：at="start"（开头）或 "end"（末尾，自动补分页）。
 
+    块文件根为 <w:blocks> 时走 **字节级原样拼接** 路径：产物 document.xml 除插入
+    位置外一个字节都不改，块内容也与源 docx 逐字节相同（只重映射 rId）。
+    """
+    block_bytes = (cover_dir / f"{prefix}_block.xml").read_bytes()
+    rels_info = json.loads((cover_dir / f"{prefix}_rels.json").read_text(encoding="utf-8"))
     with zipfile.ZipFile(docx_path) as z:
         entries = {n: z.read(n) for n in z.namelist()}
-    doc = etree.fromstring(entries["word/document.xml"])
-    body = doc.find(f"{{{W}}}body")
+
+    is_raw = b"<w:blocks" in block_bytes[:4096]
+    if is_raw:
+        inner = block_bytes[block_bytes.find(b">", block_bytes.find(b"<w:blocks")) + 1:
+                             block_bytes.rfind(b"</w:blocks>")]
+    else:
+        block = etree.fromstring(block_bytes)
+        doc = etree.fromstring(entries["word/document.xml"])
+        body = doc.find(f"{{{W}}}body")
 
     # 新增关系 + 拷贝 media + 补 Content-Type
     PKG_R = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -303,11 +313,52 @@ def _inject_block(docx_path: Path, cover_dir: Path, prefix: str, at: str) -> Pat
     entries["word/_rels/document.xml.rels"] = etree.tostring(
         rels, xml_declaration=True, encoding="UTF-8", standalone=True)
 
-    # 重映射片段中的 rId
-    for e in block.iter():
-        for k, v in list(e.attrib.items()):
-            if k in RID_ATTRS and v in rid_map:
-                e.set(k, rid_map[v])
+    # 重映射片段中的 rId（raw 模式走字符串替换，其余字节不动）
+    if is_raw:
+        inner = re.sub(rb'((?:r:(?:embed|link|id|pict|dm|lo|qs|cs)|w:data)=")(rId\d+)(")',
+                       lambda m: m.group(1) + rid_map.get(m.group(2).decode(), m.group(2)).encode()
+                       + m.group(3), inner)
+    else:
+        for e in block.iter():
+            for k, v in list(e.attrib.items()):
+                if k in RID_ATTRS and v in rid_map:
+                    e.set(k, rid_map[v])
+
+    if is_raw:
+        doc_xml = entries["word/document.xml"]
+        # 块里用到的前缀必须在产物根上有声明，否则 unbound prefix → Word 报损坏。
+        # 把 <w:blocks> 上携带的 xmlns 声明补进产物 <w:document> 根元素。
+        head_end = block_bytes.find(b">", block_bytes.find(b"<w:blocks")) + 1
+        decls = re.findall(rb'xmlns:[A-Za-z0-9_.-]+="[^"]*"', block_bytes[:head_end])
+        rs = doc_xml.find(b"<w:document")
+        re_ = doc_xml.find(b">", rs)
+        have = {d.split(b"=")[0] for d in
+                re.findall(rb'xmlns:[A-Za-z0-9_.-]+="[^"]*"', doc_xml[rs:re_ + 1])}
+        add = [d for d in decls if d.split(b"=")[0] not in have]
+        if add:
+            doc_xml = doc_xml[:re_] + b" " + b" ".join(add) + doc_xml[re_:]
+        PAGEBREAK = (b'<w:p><w:pPr><w:rPr><w:rFonts w:hint="eastAsia"/></w:rPr></w:pPr>'
+                     b'<w:r><w:rPr><w:rFonts w:hint="eastAsia"/></w:rPr>'
+                     b'<w:br w:type="page"/></w:r></w:p>')
+        if at == "end":
+            body_end = doc_xml.rfind(b"</w:body>")
+            payload = PAGEBREAK + inner
+        else:
+            body_start = doc_xml.find(b">", doc_xml.find(b"<w:body")) + 1
+            has_break = re.search(rb'<w:br\b[^>]*w:type="page"', inner) is not None
+            payload = inner if has_break else inner + PAGEBREAK
+            doc_xml = doc_xml[:body_start] + payload + doc_xml[body_start:]
+            entries["word/document.xml"] = doc_xml
+            payload = None
+        if payload is not None:
+            doc_xml = doc_xml[:body_end] + payload + doc_xml[body_end:]
+            entries["word/document.xml"] = doc_xml
+        tmp = docx_path.with_suffix(".tmp.docx")
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
+            for name, data in entries.items():
+                z.writestr(name, data)
+        tmp.replace(docx_path)
+        return docx_path
 
     frag = list(block)
     if at == "end":

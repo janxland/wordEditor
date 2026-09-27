@@ -29,6 +29,15 @@ export function resolveRepoRoot(): string {
   throw new Error('无法定位仓库根：请设置 WORDEDITOR_REPO_ROOT');
 }
 
+/**
+ * 部署形态（惰性读取：ESM import 提升会让顶层读取早于 dotenv 注入）：
+ * - cloud：线上薄后端（只做鉴权 + 工单 + 附件中转，无需 pandoc）。
+ * - full：本地 / 桌面端完整能力（默认）。
+ */
+export function edition(): string {
+  return (process.env.WORDEDITOR_EDITION ?? 'full').trim().toLowerCase();
+}
+
 export function resolvePort(): number {
   return Number(process.env.WORDEDITOR_PORT || process.env.WORDEDITOR_PY_PORT || 8787);
 }

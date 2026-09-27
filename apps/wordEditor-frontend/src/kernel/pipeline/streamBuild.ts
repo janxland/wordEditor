@@ -1,3 +1,4 @@
+import { apiFetch } from '@/services/apiFetch';
 import type { BuildRequest, BuildSuccess } from './types';
 
 export interface BuildStreamStepEvent {
@@ -52,7 +53,7 @@ export async function streamBuild(
   request: BuildRequest,
   handlers: BuildStreamHandlers = {},
 ): Promise<BuildSuccess> {
-  const res = await fetch(`${baseUrl}/build/stream`, {
+  const res = await apiFetch(`${baseUrl}/build/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),

@@ -1,9 +1,10 @@
 import type { TemplatesConfig } from '@/core/types';
 import { apiBase } from '@/core/engine';
+import { apiFetch } from '@/services/apiFetch';
 import type { IStorageAdapter } from './types';
 
 async function apiGet<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+  const res = await apiFetch(url);
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { detail?: string; error?: string };
     throw new Error(err.detail ?? err.error ?? `HTTP ${res.status}`);
@@ -12,7 +13,7 @@ async function apiGet<T>(url: string): Promise<T> {
 }
 
 async function apiPut(url: string, body: unknown): Promise<void> {
-  const res = await fetch(url, {
+  const res = await apiFetch(url, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

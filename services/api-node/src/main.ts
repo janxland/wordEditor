@@ -1,6 +1,15 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import os from 'node:os';
 import v8 from 'node:v8';
+
+// docorder COS 凭据等本地环境（.env 不进 git）；服务从 api-node 目录启动，取 cwd 下的 .env
+import { config as loadEnv } from 'dotenv';
+try {
+  loadEnv({ path: path.join(process.cwd(), '.env') });
+} catch {
+  /* 无 .env 时跳过 */
+}
 
 import { resolveCacheDir, resolvePort, resolveRepoRoot } from './config.js';
 import { MAX_CONCURRENCY } from './jobs/gate.js';

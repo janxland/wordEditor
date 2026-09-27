@@ -1,0 +1,60 @@
+{
+  "template_id": "hutb-jinrong-bigdata",
+  "surface": "tail",
+  "title": "课程论文评审表",
+  "total": 100,
+  "grade_row": "评审成绩",
+  "remark_row": "备注",
+  "signature_row": "任课教师签名",
+  "groups": [
+    {
+      "key": "topic",
+      "label": "选题（20分）",
+      "max": 20,
+      "items": [
+        {
+          "desc": "选题的价值与现实意义。",
+          "score": 10
+        },
+        {
+          "desc": "选题的可行性与创新性。",
+          "score": 10
+        }
+      ]
+    },
+    {
+      "key": "argument",
+      "label": "论证（50分）",
+      "max": 50,
+      "items": [
+        {
+          "desc": "论文结构是否合理，研究思路是否清晰，论据是否充分。",
+          "score": 20
+        },
+        {
+          "desc": "模型或方法选择的合理性，数据分析的深度与逻辑严谨性。",
+          "score": 20
+        },
+        {
+          "desc": "数据结果的分析与解读以及数据的可视化呈现质量。",
+          "score": 10
+        }
+      ]
+    },
+    {
+      "key": "norm",
+      "label": "规范性（30分）",
+      "max": 30,
+      "items": [
+        {
+          "desc": "论文字数是否达到要求，论文写作与排版是否规范。",
+          "score": 10
+        },
+        {
+          "desc": "Python代码的规范性、可读性及可复现性。是否符合学术诚信的要求。",
+          "score": 20
+        }
+      ]
+    }
+  ]
+}

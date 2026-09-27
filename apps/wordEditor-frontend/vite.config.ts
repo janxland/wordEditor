@@ -38,6 +38,12 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (p) => p.replace(/^\/py-api/, '/api'),
         },
+        // 认证与工单：/auth-api/* → AuthCenter（eorder-server）。生产由 nginx 同口径暴露。
+        '/auth-api': {
+          target: env.VITE_AUTH_TARGET || 'https://edu.roginx.ink',
+          changeOrigin: true,
+          rewrite: (p) => p.replace(/^\/auth-api/, '/api'),
+        },
       },
     },
     preview: {

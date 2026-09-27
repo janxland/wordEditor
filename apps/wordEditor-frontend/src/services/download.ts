@@ -1,5 +1,7 @@
+import { apiFetch } from './apiFetch';
+
 export async function fetchAsBlob(url: string): Promise<Blob> {
-  const res = await fetch(url);
+  const res = await apiFetch(url);
   if (!res.ok) {
     throw new Error(`请求失败 (HTTP ${res.status})`);
   }

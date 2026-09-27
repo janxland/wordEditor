@@ -1,4 +1,5 @@
 import { apiBase } from '@/core/engine';
+import { apiFetch } from './apiFetch';
 
 export interface ReferenceStyleFonts {
   ascii?: string;
@@ -60,7 +61,7 @@ export async function fetchReferenceStyles(
   templateId: string,
   baseUrl = apiBase(),
 ): Promise<ReferenceStylesResponse> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${baseUrl}/templates/reference-styles?template=${encodeURIComponent(templateId)}`,
   );
   const data = (await res.json()) as ReferenceStylesResponse & { detail?: string; error?: string };
