@@ -1,6 +1,6 @@
 {
   "name": "wordeditor-desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "WordEditor 做单台：本地跑 pandoc 管线，内置后端与前端，供做单人接单 / 制作 / 交付",
   "main": "dist/main.js",
