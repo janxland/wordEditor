@@ -350,7 +350,9 @@ def init_template(src_docx: str | Path, tid: str, name: str, marker: str | None 
     root = Path(__file__).resolve().parents[3]  # tpl_factory/workflow.py → 仓库根
     out_dir = root / "templates" / tid
     if out_dir.exists() and not force:
-        raise SystemExit(f"templates/@TID@ 已存在，加 --force 覆盖（spec 会被重写！）")
+        raise SystemExit(
+            f"templates/{tid} 已存在，加 --force 覆盖（spec 会被重写！）；"
+            f"或换一个 id")
     out_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, out_dir / "source.docx")
 

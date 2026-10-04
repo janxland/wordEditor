@@ -25,6 +25,13 @@ CACHE = ROOT / ".cache" / "wordeditor-direct"
 CONFIG = ROOT / "config" / "templates.json"
 IMAGE_DIRS = ("images", "media", "charts")           # 工作区内会被一起带走的标准资源目录
 
+# 默认模板的**兜底值**。
+# 真正的数据源是 config/templates.json 顶层的 "default_template"，正常路径都读它
+# （见 list_templates() 与 build.py:88）。这里只是该文件缺失/字段缺失时的最后一道兜底，
+# 所以必须与 default_template 保持一致 —— 改模板要改 config/templates.json，不要改这里。
+# 同进程内的第二份定义一律 import 本常量（mcp_server.py 已如此），不要再抄字符串。
+DEFAULT_TEMPLATE_ID = "hutb-guanke"
+
 
 def list_templates() -> list[dict]:
     cfg = json.loads(CONFIG.read_text(encoding="utf-8"))
@@ -70,11 +77,19 @@ def resolve_md(path: str | Path) -> Path:
 
 def build_to_workspace(
     md_path: str | Path,
-    template_id: str = "hutb-guanke",
+    template_id: str = DEFAULT_TEMPLATE_ID,
     output_path: str | Path | None = None,
     keep_job: bool = False,
+    extra_args: list[str] | None = None,
 ) -> Path:
-    """把一份 MD（含工作区图片）按模板导出为 docx，默认回写工作区。"""
+    """把一份 MD（含工作区图片）按模板导出为 docx，默认回写工作区。
+
+    extra_args 透传给 pipeline/build.py，用于 CLI/MCP 暴露高级能力
+    （--password-env / --header-text / --footer-text / --author / --remark /
+    --doc-title / --header-align / --footer-align / --no-postprocess …）。
+    透传而非逐个映射：build.py 的参数表会长大，映射一份就得同步维护一份。
+    传错参数由 build.py 自己报错退出，不在这里校验（避免两处参数表）。
+    """
     md = resolve_md(md_path)
     template_id = _valid_template(template_id)
     workspace = md.parent                                    # 工作区 = MD 所在目录
@@ -97,6 +112,7 @@ def build_to_workspace(
             "-i", str(job / md.name),
             "-o", str(job / "output.docx"),
             "-t", template_id,
+            *(extra_args or []),
         ]
         env = {**__import__("os").environ, "PYTHONIOENCODING": "utf-8"}
         proc = subprocess.run(
@@ -126,10 +142,10 @@ def build_to_workspace(
         if not keep_job:
             shutil.rmtree(job, ignore_errors=True)
 
-    print(f"工作区: {workspace}")
-    print(f"模板:   {template_id}")
-    print(f"输入:   {md}")
-    print(f"产物:   {out}")
+    # 进度信息走 stderr：stdout 留给调用方消费（we clone 要输出 JSON）
+    for line in (f"工作区: {workspace}", f"模板:   {template_id}",
+                 f"输入:   {md}", f"产物:   {out}"):
+        print(line, file=sys.stderr)
     return out
 
 

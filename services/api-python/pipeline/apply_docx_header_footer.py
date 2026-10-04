@@ -3,6 +3,14 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+
 import argparse
 import os
 import re
@@ -12,63 +20,57 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-XML = "http://www.w3.org/XML/1998/namespace"
-ET.register_namespace("w", W)
+from ooxml_util import NS, W, XML, q  # noqa: E402
 
-NS = {"w": W}
+
 PART_RE = re.compile(r"^word/(header|footer)\d*\.xml$")
 PLACEHOLDER_RE = re.compile(r"\{(page|pages)\}|(?<![A-Za-z])([NM])(?![A-Za-z])")
 
 
-def _q(name: str) -> str:
-    return f"{{{W}}}{name}"
 
 
-def _w_attr(name: str) -> str:
-    return _q(name)
 
 
 def _make_run_properties() -> ET.Element:
-    rpr = ET.Element(_q("rPr"))
-    rfonts = ET.SubElement(rpr, _q("rFonts"))
-    rfonts.set(_w_attr("eastAsia"), "宋体")
-    rfonts.set(_w_attr("ascii"), "宋体")
-    rfonts.set(_w_attr("hAnsi"), "宋体")
-    rfonts.set(_w_attr("hint"), "eastAsia")
+    rpr = ET.Element(q("rPr"))
+    rfonts = ET.SubElement(rpr, q("rFonts"))
+    rfonts.set(q("eastAsia"), "宋体")
+    rfonts.set(q("ascii"), "宋体")
+    rfonts.set(q("hAnsi"), "宋体")
+    rfonts.set(q("hint"), "eastAsia")
     return rpr
 
 
 def _append_text(parent: ET.Element, text: str) -> None:
     if not text:
         return
-    run = ET.SubElement(parent, _q("r"))
+    run = ET.SubElement(parent, q("r"))
     run.append(_make_run_properties())
-    t = ET.SubElement(run, _q("t"))
+    t = ET.SubElement(run, q("t"))
     if text[:1].isspace() or text[-1:].isspace():
         t.set(f"{{{XML}}}space", "preserve")
     t.text = text
 
 
 def _append_field(parent: ET.Element, instruction: str) -> None:
-    run = ET.SubElement(parent, _q("r"))
+    run = ET.SubElement(parent, q("r"))
     run.append(_make_run_properties())
 
-    begin = ET.SubElement(run, _q("fldChar"))
-    begin.set(_w_attr("fldCharType"), "begin")
-    begin.set(_w_attr("dirty"), "true")
+    begin = ET.SubElement(run, q("fldChar"))
+    begin.set(q("fldCharType"), "begin")
+    begin.set(q("dirty"), "true")
 
-    instr = ET.SubElement(run, _q("instrText"))
+    instr = ET.SubElement(run, q("instrText"))
     instr.set(f"{{{XML}}}space", "preserve")
     instr.text = f" {instruction} "
 
-    separate = ET.SubElement(run, _q("fldChar"))
-    separate.set(_w_attr("fldCharType"), "separate")
-    result = ET.SubElement(run, _q("t"))
+    separate = ET.SubElement(run, q("fldChar"))
+    separate.set(q("fldCharType"), "separate")
+    result = ET.SubElement(run, q("t"))
     result.text = "1"
 
-    end = ET.SubElement(run, _q("fldChar"))
-    end.set(_w_attr("fldCharType"), "end")
+    end = ET.SubElement(run, q("fldChar"))
+    end.set(q("fldCharType"), "end")
 
 
 def _append_template(parent: ET.Element, text: str) -> None:
@@ -84,12 +86,12 @@ def _append_template(parent: ET.Element, text: str) -> None:
 def _set_alignment(ppr: ET.Element, horizontal: str, vertical: str) -> None:
     jc = ppr.find("w:jc", NS)
     if jc is None:
-        jc = ET.SubElement(ppr, _q("jc"))
-    jc.set(_w_attr("val"), horizontal)
+        jc = ET.SubElement(ppr, q("jc"))
+    jc.set(q("val"), horizontal)
     text_alignment = ppr.find("w:textAlignment", NS)
     if text_alignment is None:
-        text_alignment = ET.SubElement(ppr, _q("textAlignment"))
-    text_alignment.set(_w_attr("val"), vertical)
+        text_alignment = ET.SubElement(ppr, q("textAlignment"))
+    text_alignment.set(q("val"), vertical)
 
 
 def _replace_part(xml_bytes: bytes, text: str, horizontal: str, vertical: str) -> bytes:
@@ -99,16 +101,16 @@ def _replace_part(xml_bytes: bytes, text: str, horizontal: str, vertical: str) -
     if first_paragraph is not None:
         style = first_paragraph.find("w:pPr/w:pStyle", NS)
         if style is not None:
-            style_id = style.get(_w_attr("val"))
+            style_id = style.get(q("val"))
 
     for child in list(root):
         root.remove(child)
 
-    paragraph = ET.SubElement(root, _q("p"))
-    ppr = ET.SubElement(paragraph, _q("pPr"))
+    paragraph = ET.SubElement(root, q("p"))
+    ppr = ET.SubElement(paragraph, q("pPr"))
     if style_id:
-        style = ET.SubElement(ppr, _q("pStyle"))
-        style.set(_w_attr("val"), style_id)
+        style = ET.SubElement(ppr, q("pStyle"))
+        style.set(q("val"), style_id)
     _set_alignment(ppr, horizontal, vertical)
     _append_template(paragraph, text)
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)

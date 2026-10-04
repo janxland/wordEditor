@@ -35,14 +35,6 @@ def cdn_url(rel_path: str, cfg: dict | None = None) -> str:
     return f"{base}/{rel}" if base else rel
 
 
-def default_preview_image_urls(cfg: dict | None = None) -> dict[str, str]:
-    c = cfg or load_cdn_config()
-    out: dict[str, str] = {}
-    for name, rel in (c.get("images") or {}).items():
-        out[name] = cdn_url(rel, c)
-    return out
-
-
 def _local_fallback(rel: str) -> Path | None:
     p = ROOT / rel.lstrip("/")
     return p if p.is_file() else None

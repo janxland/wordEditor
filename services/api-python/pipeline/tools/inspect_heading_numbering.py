@@ -16,8 +16,12 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-NS = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
-W = NS["w"]
+# 命名空间常量唯一定义在 api-python 根的 ooxml_ns.py（本文件在 pipeline/tools/ 下）。
+_API_DIR = str(Path(__file__).resolve().parents[2])
+if _API_DIR not in sys.path:
+    sys.path.insert(0, _API_DIR)
+
+from ooxml_ns import NS, W  # noqa: E402
 
 
 def _q(tag: str) -> str:

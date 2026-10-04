@@ -121,10 +121,15 @@ def _set_style_para(style, *, align: str, line: int | None = None, line_rule: st
         ind.set(qn("w:firstLine"), str(first_line_dxa if first_line_dxa is not None
                                         else first_line_chars * 100))
     # 中文版式开关：允许西文在单词内换行、字符网格对齐
-    _set_wordwrap_zero(ppr)
+    _set_wordwrap_zero_docx(ppr)
 
-def _set_wordwrap_zero(ppr) -> None:
-    """关掉「单词中间换行」+ 允许标点溢出，贴近中文论文排版习惯。"""
+def _set_wordwrap_zero_docx(ppr) -> None:
+    """关掉「单词中间换行」+ 允许标点溢出，贴近中文论文排版习惯。
+
+    注意：本模块走 python-docx/lxml 栈，ooxml_util.set_wordwrap_zero 走
+    ElementTree 栈，两者元素类型不通用 —— 这是同一事实在两套 XML 栈上的
+    两个必要投影，不是冗余复制，改名只为消除同名歧义。
+    """
     if ppr.find(qn("w:wordWrap")) is None:
         el = OxmlElement("w:wordWrap")
         el.set(qn("w:val"), "0")

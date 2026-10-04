@@ -17,22 +17,33 @@ is_lgl, start, heading_style)。本模块负责三件事：
 """
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from ooxml_util import (  # noqa: E402
+    NS,
+    W,
+    ensure_ppr,
+    ensure_rpr,
+    line_spacing_attrs,
+    q,
+    replace_child,
+)
+from ooxml_numbering import max_abstract_id  # noqa: E402
+
 import re
 from typing import Any
 from xml.etree import ElementTree as ET
 
-W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-NS = {"w": W}
-ET.register_namespace("w", W)
 
-
-def _q(tag: str) -> str:
-    return f"{{{W}}}{tag}"
 
 
 def _find_lvl(ab: ET.Element, ilvl: int) -> ET.Element | None:
     for lvl in ab.findall("w:lvl", NS):
-        if lvl.get(_q("ilvl")) == str(ilvl):
+        if lvl.get(q("ilvl")) == str(ilvl):
             return lvl
     return None
 
@@ -40,9 +51,9 @@ def _find_lvl(ab: ET.Element, ilvl: int) -> ET.Element | None:
 def _set_child(parent: ET.Element, tag: str, attrs: dict[str, str]) -> ET.Element:
     el = parent.find(f"w:{tag}", NS)
     if el is None:
-        el = ET.SubElement(parent, _q(tag))
+        el = ET.SubElement(parent, q(tag))
     for k, v in attrs.items():
-        el.set(_q(k), v)
+        el.set(q(k), v)
     return el
 
 
@@ -52,37 +63,17 @@ def _remove_child(parent: ET.Element, tag: str) -> None:
         parent.remove(el)
 
 
-def _replace_child(parent: ET.Element, tag: str, attrs: dict[str, Any] | None = None) -> ET.Element:
-    """删除同名子元素并新建；attrs 中的值会被 str() 化后设为 w: 命名空间属性。"""
-    old = parent.find(f"w:{tag}", NS)
-    if old is not None:
-        parent.remove(old)
-    el = ET.SubElement(parent, _q(tag))
-    if attrs:
-        for k, v in attrs.items():
-            el.set(_q(k), str(v))
-    return el
-
 
 def _new_lvl(ilvl: int) -> ET.Element:
-    return ET.Element(_q("lvl"), {_q("ilvl"): str(ilvl)})
+    return ET.Element(q("lvl"), {q("ilvl"): str(ilvl)})
 
-
-def _max_abstract_id(root: ET.Element) -> int:
-    m = -1
-    for ab in root.findall("w:abstractNum", NS):
-        try:
-            m = max(m, int(ab.get(_q("abstractNumId"), "0")))
-        except ValueError:
-            pass
-    return m
 
 
 def _max_num_id(root: ET.Element) -> int:
     m = 0
     for n in root.findall("w:num", NS):
         try:
-            m = max(m, int(n.get(_q("numId"), "0")))
+            m = max(m, int(n.get(q("numId"), "0")))
         except ValueError:
             pass
     return m
@@ -90,14 +81,14 @@ def _max_num_id(root: ET.Element) -> int:
 
 def _find_num(root: ET.Element, num_id: int) -> ET.Element | None:
     for n in root.findall("w:num", NS):
-        if n.get(_q("numId")) == str(num_id):
+        if n.get(q("numId")) == str(num_id):
             return n
     return None
 
 
 def _find_abstract_num(root: ET.Element, abstract_id: str) -> ET.Element | None:
     for ab in root.findall("w:abstractNum", NS):
-        if ab.get(_q("abstractNumId")) == abstract_id:
+        if ab.get(q("abstractNumId")) == abstract_id:
             return ab
     return None
 
@@ -115,46 +106,23 @@ _DEFAULT_PPR_IND = {
 
 
 # ─────────────── 行间距辅助 ───────────────
-def _line_spacing_attrs(value: Any) -> dict[str, str]:
-    if value in (None, "single"):
-        return {"line": "240", "lineRule": "auto"}
-    if value in (1.5, "1.5"):
-        return {"line": "360", "lineRule": "auto"}
-    if value in (2, "double", "2"):
-        return {"line": "480", "lineRule": "auto"}
-    if isinstance(value, str):
-        m = re.match(r"^\s*([0-9]+(?:\.[0-9]+)?)\s*(pt|磅)\s*$", value, re.IGNORECASE)
-        if m:
-            twips = int(round(float(m.group(1)) * 20))
-            return {"line": str(twips), "lineRule": "exact"}
-    if isinstance(value, (int, float)):
-        return {"line": str(int(value)), "lineRule": "auto"}
-    return {}
-
 
 # ─────────────── lvl 段落属性（首行缩进、行间距、段前段后） ───────────────
-def _ensure_ppr(lvl: ET.Element) -> ET.Element:
-    ppr = lvl.find("w:pPr", NS)
-    if ppr is None:
-        ppr = ET.Element(_q("pPr"))
-        lvl.insert(0, ppr)
-    return ppr
-
 
 def _apply_level_paragraph(lvl: ET.Element, p: dict[str, Any]) -> None:
     """在 lvl 的 pPr 中写入首行缩进、行间距、段前段后。"""
-    ppr = _ensure_ppr(lvl)
+    ppr = ensure_ppr(lvl)
 
     # 行间距
     sp_attrs: dict[str, str] = {}
     if "line_spacing" in p:
-        sp_attrs.update(_line_spacing_attrs(p["line_spacing"]))
+        sp_attrs.update(line_spacing_attrs(p["line_spacing"]))
     if "spacing_before_dxa" in p:
         sp_attrs["before"] = str(int(p["spacing_before_dxa"]))
     if "spacing_after_dxa" in p:
         sp_attrs["after"] = str(int(p["spacing_after_dxa"]))
     if sp_attrs:
-        _replace_child(ppr, "spacing", sp_attrs)
+        replace_child(ppr, "spacing", sp_attrs)
 
     # 缩进（首行缩进 / 悬挂缩进）
     ind_attrs: dict[str, str] = {}
@@ -176,59 +144,52 @@ def _apply_level_paragraph(lvl: ET.Element, p: dict[str, Any]) -> None:
             "firstLine": str(int(first_line)),
         })
     if ind_attrs:
-        _replace_child(ppr, "ind", ind_attrs)
+        replace_child(ppr, "ind", ind_attrs)
 
     # 对齐（覆盖 lvlJc）
     if "align" in p:
-        _replace_child(ppr, "jc", {"val": str(p["align"])})
+        replace_child(ppr, "jc", {"val": str(p["align"])})
 
 
 # ─────────────── lvl 字符属性（字体、字号） ───────────────
-def _ensure_rpr(lvl: ET.Element) -> ET.Element:
-    rpr = lvl.find("w:rPr", NS)
-    if rpr is None:
-        rpr = ET.Element(_q("rPr"))
-        lvl.append(rpr)
-    return rpr
-
 
 def _apply_level_run(lvl: ET.Element, r: dict[str, Any]) -> None:
     """在 lvl 的 rPr 中写入字体（rFonts）、字号（sz / szCs）。"""
-    rpr = _ensure_rpr(lvl)
+    rpr = ensure_rpr(lvl)
 
     # 字体
     if "latin_font" in r or "cjk_font" in r:
         rfonts = rpr.find("w:rFonts", NS)
         if rfonts is None:
-            rfonts = ET.SubElement(rpr, _q("rFonts"))
+            rfonts = ET.SubElement(rpr, q("rFonts"))
         if "latin_font" in r:
             font = r["latin_font"]
             if font and font != "inherit":
                 for attr in ("ascii", "hAnsi", "cs"):
-                    rfonts.set(_q(attr), str(font))
+                    rfonts.set(q(attr), str(font))
         if "cjk_font" in r:
             font = r["cjk_font"]
             if font and font != "inherit":
-                rfonts.set(_q("eastAsia"), str(font))
+                rfonts.set(q("eastAsia"), str(font))
 
     # 字号
     if "size_half_pt" in r or "size_cs_half_pt" in r:
         sz = r.get("size_half_pt")
         sz_cs = r.get("size_cs_half_pt", sz)
         if sz is not None:
-            _replace_child(rpr, "sz", {"val": int(sz)})
+            replace_child(rpr, "sz", {"val": int(sz)})
         if sz_cs is not None:
-            _replace_child(rpr, "szCs", {"val": int(sz_cs)})
+            replace_child(rpr, "szCs", {"val": int(sz_cs)})
 
     # 加粗（可选）
     if "bold" in r and r["bold"]:
         if rpr.find("w:b", NS) is None:
-            ET.SubElement(rpr, _q("b"))
+            ET.SubElement(rpr, q("b"))
 
 
 def _apply_lvl(lvl: ET.Element, spec_lvl: dict[str, Any]) -> None:
     ilvl = int(spec_lvl["ilvl"])
-    lvl.set(_q("ilvl"), str(ilvl))
+    lvl.set(q("ilvl"), str(ilvl))
 
     # start
     start = int(spec_lvl.get("start", 1))
@@ -256,7 +217,7 @@ def _apply_lvl(lvl: ET.Element, spec_lvl: dict[str, Any]) -> None:
     # isLgl（把上级中文/罗马/字母等强制按 1,2,3 显示，关键！）
     if spec_lvl.get("is_lgl"):
         if lvl.find("w:isLgl", NS) is None:
-            ET.SubElement(lvl, _q("isLgl"))
+            ET.SubElement(lvl, q("isLgl"))
     else:
         _remove_child(lvl, "isLgl")
 
@@ -283,7 +244,7 @@ def _patch_abstract_num(ab: ET.Element, spec_levels: list[dict[str, Any]]) -> No
     # 按 ilvl 排序写入；缺失则新建
     have: dict[int, ET.Element] = {}
     for l in ab.findall("w:lvl", NS):
-        v = l.get(_q("ilvl"))
+        v = l.get(q("ilvl"))
         if v is None:
             continue
         try:
@@ -303,11 +264,11 @@ def _ensure_num_pointing_to(root: ET.Element, num_id: int, abstract_id: str) -> 
     n = _find_num(root, num_id)
     if n is None:
         # 末尾追加
-        n = ET.SubElement(root, _q("num"), {_q("numId"): str(num_id)})
+        n = ET.SubElement(root, q("num"), {q("numId"): str(num_id)})
     # 清空 ind/lvlOverride 等
     for child in list(n):
         n.remove(child)
-    ET.SubElement(n, _q("abstractNumId"), {_q("val"): abstract_id})
+    ET.SubElement(n, q("abstractNumId"), {q("val"): abstract_id})
     return n
 
 
@@ -326,18 +287,18 @@ def apply_to_numbering(numbering_xml: bytes, spec: dict[str, Any]) -> bytes:
     num = _find_num(root, num_id)
     if num is not None:
         abs_el = num.find("w:abstractNumId", NS)
-        abstract_id = abs_el.get(_q("val")) if abs_el is not None else None
+        abstract_id = abs_el.get(q("val")) if abs_el is not None else None
         ab = _find_abstract_num(root, abstract_id) if abstract_id else None
     else:
         ab = None
 
     if ab is None:
-        new_id = str(_max_abstract_id(root) + 1)
-        ab = ET.Element(_q("abstractNum"), {_q("abstractNumId"): new_id})
+        new_id = str(max_abstract_id(root) + 1)
+        ab = ET.Element(q("abstractNum"), {q("abstractNumId"): new_id})
         # abstractNum 必须出现在 num 之前
         insert_pos = 0
         for i, child in enumerate(list(root)):
-            if child.tag == _q("num"):
+            if child.tag == q("num"):
                 insert_pos = i
                 break
             insert_pos = i + 1
@@ -367,21 +328,21 @@ def apply_to_styles(styles_xml: bytes, spec: dict[str, Any]) -> bytes:
             style_to_ilvl[str(hs)] = int(lvl_spec["ilvl"])
 
     for s in root.findall("w:style", NS):
-        sid = s.get(_q("styleId"), "")
+        sid = s.get(q("styleId"), "")
         if sid not in style_to_ilvl:
             continue
         ilvl = style_to_ilvl[sid]
         ppr = s.find("w:pPr", NS)
         if ppr is None:
-            ppr = ET.Element(_q("pPr"))
+            ppr = ET.Element(q("pPr"))
             s.insert(0, ppr)
         # 重写 numPr
         old = ppr.find("w:numPr", NS)
         if old is not None:
             ppr.remove(old)
-        np = ET.SubElement(ppr, _q("numPr"))
-        ET.SubElement(np, _q("ilvl"), {_q("val"): str(ilvl)})
-        ET.SubElement(np, _q("numId"), {_q("val"): str(num_id)})
+        np = ET.SubElement(ppr, q("numPr"))
+        ET.SubElement(np, q("ilvl"), {q("val"): str(ilvl)})
+        ET.SubElement(np, q("numId"), {q("val"): str(num_id)})
 
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
@@ -401,22 +362,22 @@ def apply_to_document(doc_xml: bytes, spec: dict[str, Any]) -> tuple[bytes, int]
         body = root
 
     patched = 0
-    for p in body.iter(_q("p")):
+    for p in body.iter(q("p")):
         ppr = p.find("w:pPr", NS)
         if ppr is None:
             continue
         pstyle = ppr.find("w:pStyle", NS)
         if pstyle is None:
             continue
-        sid = pstyle.get(_q("val"), "")
+        sid = pstyle.get(q("val"), "")
         if sid not in style_to_ilvl:
             continue
         if ppr.find("w:numPr", NS) is not None:
             continue  # 已经有了，不动
         ilvl = style_to_ilvl[sid]
-        np = ET.SubElement(ppr, _q("numPr"))
-        ET.SubElement(np, _q("ilvl"), {_q("val"): str(ilvl)})
-        ET.SubElement(np, _q("numId"), {_q("val"): str(num_id)})
+        np = ET.SubElement(ppr, q("numPr"))
+        ET.SubElement(np, q("ilvl"), {q("val"): str(ilvl)})
+        ET.SubElement(np, q("numId"), {q("val"): str(num_id)})
         patched += 1
 
     return ET.tostring(root, encoding="utf-8", xml_declaration=True), patched

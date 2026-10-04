@@ -108,7 +108,7 @@ export async function requireUser(authorization: string | undefined): Promise<Au
   return user;
 }
 
-/** 登录代理：前端密文原样转发 AuthCenter（AuthCenter 全生态口径 = bcrypt(密文)，不解密）。返回 AuthCenter 原始双层信封。 */
+/** 登录代理：前端密文原样转发 AuthCenter（AuthCenter 全生态统一口径 = tryDecrypt → bcrypt(明文)，存量明文/密文哈希自动兼容收敛）。返回 AuthCenter 原始双层信封。 */
 export async function proxyLogin(username: string, passwordCipher: string): Promise<{ status: number; body: unknown }> {
   const res = await authCenterFetch('auth-center/login', {
     method: 'POST',

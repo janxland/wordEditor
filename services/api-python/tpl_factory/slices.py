@@ -7,6 +7,7 @@ from pathlib import Path
 from lxml import etree
 
 from .ooxml import _RID_ATTR_B, _open_tag_end, iter_body_top_level
+from ooxml_ns import W  # noqa: E402  命名空间 URI 唯一定义处
 
 def slice_block(src_docx: Path, start: int, end: int, prefix: str, out_dir: Path) -> dict:
     """从源 docx 的 document.xml **原样切字节** [start, end) 打包成块。
@@ -30,7 +31,7 @@ def slice_block(src_docx: Path, start: int, end: int, prefix: str, out_dir: Path
     root_tag = raw[raw.find(b"<w:document"):root_end + 1]
     ns_decls = b" ".join(re.findall(rb'xmlns:[A-Za-z0-9_.-]+="[^"]*"', root_tag))
     if b'xmlns:w="' not in ns_decls:
-        ns_decls = b'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' + ns_decls
+        ns_decls = f'xmlns:w="{W}" '.encode() + ns_decls
 
     frags, dropped_sect = [], 0
     for name, a, bpos in spans[start:end]:

@@ -30,6 +30,12 @@ from tool_paths import find_pandoc  # noqa: E402
 CONFIG_PATH = ROOT / "config" / "templates.json"
 DEFAULT_INPUT = ROOT / "input" / "carbon-neutral-renewable.md"
 DEFAULT_OUTPUT_DIR = ROOT / "output"
+# 默认模板的兜底值。真正的数据源是 config/templates.json 顶层的 "default_template"
+# （见下行 load 后的 `cfg.get("default_template")`）。
+# ⚠️ 与 direct.py 的 DEFAULT_TEMPLATE_ID 是**同一个事实的第二份**，不是冗余实现：
+# 本文件被 direct.py 以 **subprocess** 调用（sys.executable + build.py），进程边界没法
+# 共享 Python 常量，所以只能各留一份字面量。改默认模板请改 config/templates.json；
+# 若改了这里，必须同步 direct.py 的同名常量。
 DEFAULT_TEMPLATE_ID = "hutb-guanke"
 
 

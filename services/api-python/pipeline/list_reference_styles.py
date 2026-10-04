@@ -26,18 +26,10 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-NS = {"w": W}
-ET.register_namespace("w", W)
-
-
-def _q(t: str) -> str:
-    return f"{{{W}}}{t}"
-
+from ooxml_util import NS, W, q  # noqa: E402  必须排在 sys.path 之后
 
 def _val(el: ET.Element | None, default: str = "") -> str:
-    return el.get(_q("val"), default) if el is not None else default
-
+    return el.get(q("val"), default) if el is not None else default
 
 def _twips_to_pt(twips: str | None) -> float | None:
     if not twips:
@@ -47,17 +39,15 @@ def _twips_to_pt(twips: str | None) -> float | None:
     except ValueError:
         return None
 
-
 def _parse_rfonts(rfonts: ET.Element | None) -> dict[str, str]:
     if rfonts is None:
         return {}
     out: dict[str, str] = {}
     for k in ("ascii", "hAnsi", "cs", "eastAsia"):
-        v = rfonts.get(_q(k))
+        v = rfonts.get(q(k))
         if v:
             out[k] = v
     return out
-
 
 def _parse_rpr(rpr: ET.Element | None) -> dict[str, Any]:
     if rpr is None:
@@ -67,10 +57,10 @@ def _parse_rpr(rpr: ET.Element | None) -> dict[str, Any]:
     if fonts:
         out["fonts"] = fonts
     sz = rpr.find("w:sz", NS)
-    if sz is not None and sz.get(_q("val")):
+    if sz is not None and sz.get(q("val")):
         try:
-            out["size_pt"] = round(int(sz.get(_q("val"), "0")) / 2.0, 2)
-            out["size_half_pt"] = int(sz.get(_q("val"), "0"))
+            out["size_pt"] = round(int(sz.get(q("val"), "0")) / 2.0, 2)
+            out["size_half_pt"] = int(sz.get(q("val"), "0"))
         except ValueError:
             pass
     if rpr.find("w:b", NS) is not None:
@@ -78,26 +68,25 @@ def _parse_rpr(rpr: ET.Element | None) -> dict[str, Any]:
     if rpr.find("w:i", NS) is not None:
         out["italic"] = True
     color = rpr.find("w:color", NS)
-    if color is not None and color.get(_q("val")):
-        out["color"] = color.get(_q("val"))
+    if color is not None and color.get(q("val")):
+        out["color"] = color.get(q("val"))
     u = rpr.find("w:u", NS)
-    if u is not None and u.get(_q("val")):
-        out["underline"] = u.get(_q("val"))
+    if u is not None and u.get(q("val")):
+        out["underline"] = u.get(q("val"))
     return out
-
 
 def _parse_ppr(ppr: ET.Element | None) -> dict[str, Any]:
     if ppr is None:
         return {}
     out: dict[str, Any] = {}
     jc = ppr.find("w:jc", NS)
-    if jc is not None and jc.get(_q("val")):
-        out["align"] = jc.get(_q("val"))
+    if jc is not None and jc.get(q("val")):
+        out["align"] = jc.get(q("val"))
     spacing = ppr.find("w:spacing", NS)
     if spacing is not None:
         sp: dict[str, Any] = {}
-        line = spacing.get(_q("line"))
-        rule = spacing.get(_q("lineRule"), "auto")
+        line = spacing.get(q("line"))
+        rule = spacing.get(q("lineRule"), "auto")
         if line:
             try:
                 ln = int(line)
@@ -109,8 +98,8 @@ def _parse_ppr(ppr: ET.Element | None) -> dict[str, Any]:
                 sp["line_rule"] = rule
             except ValueError:
                 pass
-        before = spacing.get(_q("before"))
-        after = spacing.get(_q("after"))
+        before = spacing.get(q("before"))
+        after = spacing.get(q("after"))
         if before:
             sp["before_pt"] = _twips_to_pt(before)
         if after:
@@ -121,7 +110,7 @@ def _parse_ppr(ppr: ET.Element | None) -> dict[str, Any]:
     if ind is not None:
         i: dict[str, Any] = {}
         for attr in ("firstLine", "firstLineChars", "hanging", "hangingChars", "left", "leftChars", "right"):
-            v = ind.get(_q(attr))
+            v = ind.get(q(attr))
             if v and v != "0":
                 if attr.endswith("Chars"):
                     try:
@@ -133,13 +122,12 @@ def _parse_ppr(ppr: ET.Element | None) -> dict[str, Any]:
         if i:
             out["indent"] = i
     outline = ppr.find("w:outlineLvl", NS)
-    if outline is not None and outline.get(_q("val")) is not None:
+    if outline is not None and outline.get(q("val")) is not None:
         try:
-            out["outline_level"] = int(outline.get(_q("val"), "0"))
+            out["outline_level"] = int(outline.get(q("val"), "0"))
         except ValueError:
             pass
     return out
-
 
 def _summarize_run(rpr: dict[str, Any]) -> str:
     bits: list[str] = []
@@ -159,14 +147,12 @@ def _summarize_run(rpr: dict[str, Any]) -> str:
         bits.append(f"#{rpr['color']}")
     return " ".join(bits)
 
-
 _CHINESE_SIZE: list[tuple[float, str]] = [
     (42, "初号"), (36, "小初"), (26, "一号"), (24, "小一"),
     (22, "二号"), (18, "小二"), (16, "三号"), (15, "小三"),
     (14, "四号"), (12, "小四"), (10.5, "五号"), (9, "小五"),
     (7.5, "六号"), (6.5, "小六"), (5.5, "七号"), (5, "八号"),
 ]
-
 
 def _chinese_size_name(pt: float | None) -> str | None:
     if pt is None:
@@ -175,7 +161,6 @@ def _chinese_size_name(pt: float | None) -> str | None:
         if abs(pt - v) < 0.26:
             return name
     return None
-
 
 def _summarize_paragraph(ppr: dict[str, Any]) -> str:
     bits: list[str] = []
@@ -196,7 +181,6 @@ def _summarize_paragraph(ppr: dict[str, Any]) -> str:
         bits.append(f"悬挂{ind['hangingChars']}字符")
     return " ".join(bits)
 
-
 def extract_styles(docx: Path) -> list[dict[str, Any]]:
     with zipfile.ZipFile(docx, "r") as z:
         with z.open("word/styles.xml") as f:
@@ -204,12 +188,12 @@ def extract_styles(docx: Path) -> list[dict[str, Any]]:
     root = ET.fromstring(xml_bytes)
     styles: list[dict[str, Any]] = []
     for s in root.findall("w:style", NS):
-        style_id = s.get(_q("styleId"), "")
+        style_id = s.get(q("styleId"), "")
         if not style_id:
             continue
-        stype = s.get(_q("type"), "")
-        is_default = s.get(_q("default"), "0") == "1"
-        is_custom = s.get(_q("customStyle"), "0") == "1"
+        stype = s.get(q("type"), "")
+        is_default = s.get(q("default"), "0") == "1"
+        is_custom = s.get(q("customStyle"), "0") == "1"
         name = _val(s.find("w:name", NS))
         based_on = _val(s.find("w:basedOn", NS))
         next_style = _val(s.find("w:next", NS))
@@ -243,7 +227,6 @@ def extract_styles(docx: Path) -> list[dict[str, Any]]:
     ))
     return styles
 
-
 def resolve_docx(args: argparse.Namespace) -> Path:
     if args.docx:
         p = Path(args.docx)
@@ -256,7 +239,6 @@ def resolve_docx(args: argparse.Namespace) -> Path:
     cfg = load_config()
     template = resolve_template(cfg, args.template)
     return ROOT / template["reference_doc"]
-
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="枚举 reference.docx 的样式")
@@ -296,7 +278,6 @@ def main() -> int:
         if s["runSummary"] or s["paragraphSummary"]:
             print(f"       {s['paragraphSummary']}  |  {s['runSummary']}".rstrip())
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

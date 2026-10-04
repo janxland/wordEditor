@@ -14,6 +14,7 @@ DSL 字段见 docs/styles-dsl.md。
 """
 from __future__ import annotations
 
+
 import argparse
 import re
 import shutil
@@ -28,14 +29,20 @@ try:
 except ImportError:  # pragma: no cover
     yaml = None  # 仅在 --styles 模式下需要
 
-W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-ET.register_namespace("w", W)
-NS = {"w": W}
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
-
-def _q(t: str) -> str:
-    return f"{{{W}}}{t}"
-
+from ooxml_util import (
+    set_wordwrap_zero,  # noqa: E402
+    NS,
+    W,
+    ensure_ppr,
+    ensure_rpr,
+    line_spacing_attrs,
+    q,
+    replace_child,
+)
 
 _HEADER_FOOTER_PART_RE = re.compile(r"^word/(header|footer)\d+\.xml$")
 _ML_SHAPE_NS = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
@@ -133,47 +140,23 @@ BODY_NAMES = {"normal", "\u6587\u7ae0\u7684\u6b63\u6587"}
 # 低阶 OOXML 操作
 # ============================================================
 def _style_id(s: ET.Element) -> str:
-    return s.get(_q("styleId"), "")
+    return s.get(q("styleId"), "")
 
 
 def _style_name(s: ET.Element) -> str:
     n = s.find("w:name", NS)
-    return n.get(_q("val"), "") if n is not None else ""
+    return n.get(q("val"), "") if n is not None else ""
 
 
-def _ensure_ppr(style: ET.Element) -> ET.Element:
-    ppr = style.find("w:pPr", NS)
-    if ppr is None:
-        ppr = ET.Element(_q("pPr"))
-        style.insert(0, ppr)
-    return ppr
-
-
-def _ensure_rpr(style: ET.Element) -> ET.Element:
-    rpr = style.find("w:rPr", NS)
-    if rpr is None:
-        rpr = ET.SubElement(style, _q("rPr"))
-    return rpr
 
 
 def _set_or_replace(parent: ET.Element, tag: str, attrs: dict[str, str]) -> None:
     el = parent.find(f"w:{tag}", NS)
     if el is None:
-        el = ET.SubElement(parent, _q(tag))
+        el = ET.SubElement(parent, q(tag))
     for k, v in attrs.items():
-        el.set(_q(k), v)
+        el.set(q(k), v)
 
-
-def _replace_child(parent: ET.Element, tag: str, attrs: dict[str, Any] | None = None) -> ET.Element:
-    """删除同名子元素并新建一个；attrs 中的值会被 str() 化后设为 w: 命名空间属性。"""
-    old = parent.find(f"w:{tag}", NS)
-    if old is not None:
-        parent.remove(old)
-    el = ET.SubElement(parent, _q(tag))
-    if attrs:
-        for k, v in attrs.items():
-            el.set(_q(k), str(v))
-    return el
 
 
 def _remove_children(parent: ET.Element, *tags: str) -> None:
@@ -183,12 +166,6 @@ def _remove_children(parent: ET.Element, *tags: str) -> None:
             parent.remove(el)
 
 
-def _set_wordwrap_zero(ppr: ET.Element) -> bool:
-    ww = ppr.find("w:wordWrap", NS)
-    if ww is not None and ww.get(_q("val")) == "0":
-        return False
-    _set_or_replace(ppr, "wordWrap", {"val": "0"})
-    return True
 
 
 def _clear_indent(ppr: ET.Element) -> bool:
@@ -202,62 +179,45 @@ def _clear_indent(ppr: ET.Element) -> bool:
 
 
 def _set_latin_font(style: ET.Element, font: str) -> bool:
-    rpr = _ensure_rpr(style)
+    rpr = ensure_rpr(style)
     rfonts = rpr.find("w:rFonts", NS)
     if rfonts is None:
-        rfonts = ET.SubElement(rpr, _q("rFonts"))
+        rfonts = ET.SubElement(rpr, q("rFonts"))
     changed = False
     for attr in ("ascii", "hAnsi", "cs"):
-        if rfonts.get(_q(attr)) != font:
-            rfonts.set(_q(attr), font)
+        if rfonts.get(q(attr)) != font:
+            rfonts.set(q(attr), font)
             changed = True
     return changed
 
 
 def _set_cjk_font(style: ET.Element, font: str) -> bool:
-    rpr = _ensure_rpr(style)
+    rpr = ensure_rpr(style)
     rfonts = rpr.find("w:rFonts", NS)
     if rfonts is None:
-        rfonts = ET.SubElement(rpr, _q("rFonts"))
-    if rfonts.get(_q("eastAsia")) == font:
+        rfonts = ET.SubElement(rpr, q("rFonts"))
+    if rfonts.get(q("eastAsia")) == font:
         return False
-    rfonts.set(_q("eastAsia"), font)
+    rfonts.set(q("eastAsia"), font)
     return True
 
 
-def _line_spacing_attrs(value: Any) -> dict[str, str]:
-    if value in (None, "single"):
-        return {"line": "240", "lineRule": "auto"}
-    if value in (1.5, "1.5"):
-        return {"line": "360", "lineRule": "auto"}
-    if value in (2, "double", "2"):
-        return {"line": "480", "lineRule": "auto"}
-    # 固定磅值，例如 "22pt" → line=440(twips), lineRule=exact
-    if isinstance(value, str):
-        m = re.match(r"^\s*([0-9]+(?:\.[0-9]+)?)\s*(pt|磅)\s*$", value, re.IGNORECASE)
-        if m:
-            twips = int(round(float(m.group(1)) * 20))
-            return {"line": str(twips), "lineRule": "exact"}
-    if isinstance(value, (int, float)):
-        return {"line": str(int(value)), "lineRule": "auto"}
-    raise ValueError(f"unknown line_spacing: {value!r}")
-
 
 def _apply_paragraph(style: ET.Element, p: dict[str, Any]) -> None:
-    ppr = _ensure_ppr(style)
+    ppr = ensure_ppr(style)
     if p.get("word_wrap_break_latin"):
-        _set_wordwrap_zero(ppr)
+        set_wordwrap_zero(ppr)
     if p.get("clear_indent") or p.get("indent_clear"):
         _clear_indent(ppr)
     sp_attrs: dict[str, str] = {}
     if "line_spacing" in p:
-        sp_attrs.update(_line_spacing_attrs(p["line_spacing"]))
+        sp_attrs.update(line_spacing_attrs(p["line_spacing"]))
     if "spacing_before_dxa" in p:
         sp_attrs["before"] = str(p["spacing_before_dxa"])
     if "spacing_after_dxa" in p:
         sp_attrs["after"] = str(p["spacing_after_dxa"])
     if sp_attrs:
-        _replace_child(ppr, "spacing", sp_attrs)
+        replace_child(ppr, "spacing", sp_attrs)
     ind_attrs: dict[str, str] = {}
     if "hanging_indent_chars" in p:
         chars = int(p["hanging_indent_chars"])
@@ -278,12 +238,12 @@ def _apply_paragraph(style: ET.Element, p: dict[str, Any]) -> None:
             "firstLine": str(int(first_line)),
         })
     if ind_attrs:
-        _replace_child(ppr, "ind", ind_attrs)
+        replace_child(ppr, "ind", ind_attrs)
     if "align" in p:
         _set_or_replace(ppr, "jc", {"val": str(p["align"])})
     if "page_break_before" in p:
         if p["page_break_before"]:
-            _replace_child(ppr, "pageBreakBefore", {})
+            replace_child(ppr, "pageBreakBefore", {})
         else:
             _set_or_replace(ppr, "pageBreakBefore", {"val": "0"})
 
@@ -302,22 +262,22 @@ def _apply_run(style: ET.Element, r: dict[str, Any], fonts: dict[str, Any]) -> N
         if font:
             _set_cjk_font(style, font)
     if "size_half_pt" in r or "size_cs_half_pt" in r:
-        rpr = _ensure_rpr(style)
+        rpr = ensure_rpr(style)
         sz = r.get("size_half_pt")
         sz_cs = r.get("size_cs_half_pt", sz)
         if sz is not None:
-            _replace_child(rpr, "sz", {"val": sz})
+            replace_child(rpr, "sz", {"val": sz})
         if sz_cs is not None:
-            _replace_child(rpr, "szCs", {"val": sz_cs})
+            replace_child(rpr, "szCs", {"val": sz_cs})
     if "bold" in r:
-        rpr = _ensure_rpr(style)
+        rpr = ensure_rpr(style)
         _remove_children(rpr, "b", "bCs")
         if r["bold"]:
-            ET.SubElement(rpr, _q("b"))
-            ET.SubElement(rpr, _q("bCs"))
+            ET.SubElement(rpr, q("b"))
+            ET.SubElement(rpr, q("bCs"))
     if "color" in r:
         # 形如 "000000" / "auto"；用于强制覆盖 reference.docx 主题色或 Pandoc 高亮残留
-        _replace_child(_ensure_rpr(style), "color", {"val": r["color"]})
+        replace_child(ensure_rpr(style), "color", {"val": r["color"]})
 
 
 # ============================================================
@@ -374,9 +334,9 @@ def apply_dsl(xml_bytes: bytes, dsl: dict[str, Any]) -> bytes:
             if not _match_style(style, m):
                 continue
             label = f"{_style_id(style)!r}/{_style_name(style)!r}"
-            if rule.get("word_wrap_break_latin") and _set_wordwrap_zero(_ensure_ppr(style)):
+            if rule.get("word_wrap_break_latin") and set_wordwrap_zero(ensure_ppr(style)):
                 print(f"  - wordWrap=0: {label}")
-            if rule.get("clear_indent") and _clear_indent(_ensure_ppr(style)):
+            if rule.get("clear_indent") and _clear_indent(ensure_ppr(style)):
                 print(f"  - 清缩进: {label}")
             if rule.get("latin_font"):
                 font = rule["latin_font"]
@@ -407,17 +367,17 @@ def apply_dsl(xml_bytes: bytes, dsl: dict[str, Any]) -> bytes:
         if existing is not None:
             _remove_children(existing, "pPr", "rPr")
             if existing.find("w:qFormat", NS) is None:
-                ET.SubElement(existing, _q("qFormat"))
+                ET.SubElement(existing, q("qFormat"))
             target = existing
             print(f"  ~ 覆盖样式: name={name!r} (styleId={_style_id(existing)!r})")
         else:
             target = ET.SubElement(
-                root, _q("style"),
-                {_q("type"): "paragraph", _q("customStyle"): "1", _q("styleId"): sid},
+                root, q("style"),
+                {q("type"): "paragraph", q("customStyle"): "1", q("styleId"): sid},
             )
-            ET.SubElement(target, _q("name"), {_q("val"): name})
-            ET.SubElement(target, _q("basedOn"), {_q("val"): based_on})
-            ET.SubElement(target, _q("qFormat"))
+            ET.SubElement(target, q("name"), {q("val"): name})
+            ET.SubElement(target, q("basedOn"), {q("val"): based_on})
+            ET.SubElement(target, q("qFormat"))
             print(f"  + 新增样式: styleId={sid!r} name={name!r}")
         if "paragraph" in c:
             _apply_paragraph(target, c["paragraph"])
@@ -460,7 +420,7 @@ _REF_RE = _re.compile(r"\[(?=[^\]]*\d)[\dA-Za-z]+\]")
 def _paragraph_text(p: ET.Element) -> str:
     """提取段落纯文本（忽略域代码）。"""
     parts: list[str] = []
-    for r in p.iter(_q("t")):
+    for r in p.iter(q("t")):
         if r.text:
             parts.append(r.text)
     return "".join(parts)
@@ -474,10 +434,10 @@ def _style_id_index(styles_xml: bytes) -> dict[str, str]:
         return {}
     idx: dict[str, str] = {}
     for st in root.findall("w:style", NS):
-        sid = st.get(_q("styleId"))
+        sid = st.get(q("styleId"))
         nm = st.find("w:name", NS)
-        if sid and nm is not None and nm.get(_q("val")):
-            idx.setdefault(nm.get(_q("val")), sid)
+        if sid and nm is not None and nm.get(q("val")):
+            idx.setdefault(nm.get(q("val")), sid)
     return idx
 
 
@@ -495,7 +455,7 @@ def _resolve_style_id(styles_xml: bytes, wanted: str,
         root = ET.fromstring(styles_xml)
     except ET.ParseError:
         return wanted
-    ids = {st.get(_q("styleId")) for st in root.findall("w:style", NS)}
+    ids = {st.get(q("styleId")) for st in root.findall("w:style", NS)}
     if wanted in ids:
         return wanted
     for cand in (alias_name, wanted):
@@ -512,12 +472,12 @@ def _set_paragraph_style_by_id(p: ET.Element, style_id: str) -> None:
     """给段落设置段落样式（pPr/pStyle）。"""
     ppr = p.find("w:pPr", NS)
     if ppr is None:
-        ppr = ET.Element(_q("pPr"))
+        ppr = ET.Element(q("pPr"))
         p.insert(0, ppr)
     ps = ppr.find("w:pStyle", NS)
     if ps is None:
-        ps = ET.SubElement(ppr, _q("pStyle"))
-    ps.set(_q("val"), style_id)
+        ps = ET.SubElement(ppr, q("pStyle"))
+    ps.set(q("val"), style_id)
 
 
 def _is_english_only(text: str) -> bool:
@@ -579,7 +539,7 @@ def apply_abstract_styles(
     changed = 0
 
     for child in list(body):
-        if child.tag != _q("p"):
+        if child.tag != q("p"):
             continue
         text = _paragraph_text(child).strip()
 
@@ -665,7 +625,7 @@ def apply_abstract_styles(
     return ET.tostring(root, encoding="utf-8", xml_declaration=True), changed
 
 
-def patch_docx(path: Path, dsl: dict[str, Any]) -> None:
+def patch_docx_styles(path: Path, dsl: dict[str, Any]) -> None:
     multilevel = dsl.get("multilevel_list") or {}
     has_ml = bool(multilevel.get("levels"))
     if has_ml:
@@ -835,7 +795,7 @@ def main(argv: list[str]) -> int:
     dsl = load_dsl(args.styles)
     print(f"[postprocess_styles] {args.docx}  <- DSL: {args.styles}")
 
-    patch_docx(args.docx, dsl)
+    patch_docx_styles(args.docx, dsl)
     print("[postprocess_styles] \u5b8c\u6210")
     return 0
 

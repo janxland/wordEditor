@@ -27,8 +27,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from template_factory import load_spec  # noqa: E402
-
-W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+from ooxml_ns import W  # noqa: E402  命名空间 URI 唯一定义处
 
 
 def q(t):

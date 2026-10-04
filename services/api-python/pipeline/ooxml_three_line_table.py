@@ -30,6 +30,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
+from ooxml_util import CODE_STYLE_IDS, NS, q  # noqa: E402
 from ooxml_schema_order import (  # noqa: E402
     PPR_ORDER,
     TBLPR_ORDER,
@@ -38,13 +39,8 @@ from ooxml_schema_order import (  # noqa: E402
     put_ordered,
 )
 
-W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-NS = {"w": W}
-ET.register_namespace("w", W)
 
 
-def q(t: str) -> str:
-    return f"{{{W}}}{t}"
 
 
 _LINE = {"val": "single", "sz": "6", "space": "0", "color": "auto"}       # 栏目线 0.75pt
@@ -52,7 +48,6 @@ _THICK = {"val": "single", "sz": "12", "space": "0", "color": "auto"}      # 顶
 _NIL = {"val": "nil"}
 
 # 单元格内的代码段落：不参与居中
-_CODE_STYLE_IDS = ("SourceCode", "VerbatimChar")
 
 
 def _set_border(parent: ET.Element, edge: str, attrs: dict[str, str]) -> None:
@@ -100,7 +95,7 @@ def _patch_table(tbl: ET.Element) -> None:
         for p in tc.findall("w:p", NS):
             ppr = p.find("w:pPr", NS)
             ps = ppr.find("w:pStyle", NS) if ppr is not None else None
-            if ps is not None and ps.get(q("val")) in _CODE_STYLE_IDS:
+            if ps is not None and ps.get(q("val")) in CODE_STYLE_IDS:
                 continue
             if ppr is None:
                 ppr = ET.Element(q("pPr"))
@@ -116,7 +111,7 @@ def _patch_table(tbl: ET.Element) -> None:
         _set_border(tc_borders, "bottom", _LINE)
 
 
-def patch_document(xml_bytes: bytes) -> tuple[bytes, int]:
+def patch_document_three_line(xml_bytes: bytes) -> tuple[bytes, int]:
     root = ET.fromstring(xml_bytes)
     n = 0
     for tbl in root.iter(q("tbl")):
@@ -125,7 +120,7 @@ def patch_document(xml_bytes: bytes) -> tuple[bytes, int]:
     return ET.tostring(root, encoding="utf-8", xml_declaration=True), n
 
 
-def patch_docx(path: Path) -> int:
+def patch_docx_three_line(path: Path) -> int:
     tmp = path.with_suffix(path.suffix + ".tmp")
     count = 0
     with zipfile.ZipFile(path, "r") as zin, zipfile.ZipFile(
@@ -134,7 +129,7 @@ def patch_docx(path: Path) -> int:
         for item in zin.infolist():
             data = zin.read(item.filename)
             if item.filename == "word/document.xml":
-                data, count = patch_document(data)
+                data, count = patch_document_three_line(data)
             zout.writestr(item, data)
     shutil.move(str(tmp), str(path))
     return count
@@ -147,7 +142,7 @@ def main(argv: list[str]) -> int:
     if not args.docx.is_file():
         print(f"找不到文件: {args.docx}", file=sys.stderr)
         return 1
-    n = patch_docx(args.docx)
+    n = patch_docx_three_line(args.docx)
     print(f"[three-line-table] 已改写 {n} 个表格 → 三线表")
     return 0
 

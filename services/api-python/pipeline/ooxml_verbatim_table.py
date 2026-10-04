@@ -33,6 +33,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
+from ooxml_util import CODE_STYLE_IDS, NS, XML, q  # noqa: E402
 from ooxml_schema_order import (  # noqa: E402
     PPR_ORDER,
     TBLPR_ORDER,
@@ -41,12 +42,7 @@ from ooxml_schema_order import (  # noqa: E402
     put_ordered,
 )
 
-W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-XML = "http://www.w3.org/XML/1998/namespace"
-NS = {"w": W}
-ET.register_namespace("w", W)
 
-CODE_STYLE_IDS = {"SourceCode", "VerbatimChar"}
 # 正文可用宽度：A4(21cm) − 左右各 3.17cm ≈ 14.66cm ≈ 8312 twips，留 12 twips 余量
 TABLE_W = "8300"
 _LINE = {"val": "single", "sz": "12", "space": "0", "color": "auto"}   # 1.5pt 顶/底线
@@ -59,8 +55,6 @@ PY_NAME = SCRIPT_NAME  # 兼容旧名
 DEFAULT_CAPTION = "附录代码"
 
 
-def q(t: str) -> str:
-    return f"{{{W}}}{t}"
 
 
 def is_verbatim(p: ET.Element) -> bool:
@@ -192,7 +186,7 @@ def _spacer() -> ET.Element:
     return p
 
 
-def patch_document(xml_bytes: bytes, override: str | None = None) -> tuple[bytes, int, list[str]]:
+def patch_document_verbatim(xml_bytes: bytes, override: str | None = None) -> tuple[bytes, int, list[str]]:
     root = ET.fromstring(xml_bytes)
     body = root.find("w:body", NS)
     if body is None:
@@ -225,7 +219,7 @@ def patch_document(xml_bytes: bytes, override: str | None = None) -> tuple[bytes
     return ET.tostring(root, encoding="utf-8", xml_declaration=True), n, captions
 
 
-def patch_docx(path: Path, override: str | None = None) -> tuple[int, list[str]]:
+def patch_docx_verbatim(path: Path, override: str | None = None) -> tuple[int, list[str]]:
     tmp = path.with_suffix(path.suffix + ".tmp")
     count = 0
     captions: list[str] = []
@@ -235,7 +229,7 @@ def patch_docx(path: Path, override: str | None = None) -> tuple[int, list[str]]
         for item in zin.infolist():
             data = zin.read(item.filename)
             if item.filename == "word/document.xml":
-                data, count, captions = patch_document(data, override)
+                data, count, captions = patch_document_verbatim(data, override)
             zout.writestr(item, data)
     shutil.move(str(tmp), str(path))
     return count, captions
@@ -249,7 +243,7 @@ def main(argv: list[str]) -> int:
     if not args.docx.is_file():
         print(f"找不到文件: {args.docx}", file=sys.stderr)
         return 1
-    n, captions = patch_docx(args.docx, args.caption)
+    n, captions = patch_docx_verbatim(args.docx, args.caption)
     if n:
         print(f"[verbatim-table] 已把 {n} 处代码块改为三线表，表头：{captions}")
     else:

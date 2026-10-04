@@ -6,13 +6,23 @@ import re
 import shutil
 import zipfile
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 from xml.etree import ElementTree as ET
 
-W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-XML = "http://www.w3.org/XML/1998/namespace"
+import sys
+# 命名空间常量在 api-python 根的 ooxml_ns.py（全仓唯一定义），本目录是 pipeline/，
+# 需要把上一级塞进 sys.path 才 import 得到。
+_API_DIR = str(Path(__file__).resolve().parents[1])
+if _API_DIR not in sys.path:
+    sys.path.insert(0, _API_DIR)
+
+from ooxml_ns import NS, W, XML  # noqa: E402
+
+# 「等宽代码段」段落样式集合：三线表对齐 / 代码块转表都靠它识别。
+# 全仓唯一定义，不要在调用侧再写一份。
+CODE_STYLE_IDS = frozenset({"SourceCode", "VerbatimChar"})
+
 ET.register_namespace("w", W)
-NS = {"w": W}
 
 
 def q(tag: str) -> str:
@@ -21,6 +31,73 @@ def q(tag: str) -> str:
 
 def local_tag(el: ET.Element) -> str:
     return el.tag.split("}", 1)[-1] if "}" in el.tag else el.tag
+
+
+# ─────────────── 属性容器辅助（styles.xml / numbering.xml 共用） ───────────────
+# 这一组是 styles DSL（postprocess_styles / ooxml_multilevel / ooxml_list_styles）
+# 的唯一实现。任何新需求改这里，不要在调用侧再写一份。
+
+
+def ensure_ppr(el: ET.Element) -> ET.Element:
+    """取 w:pPr；缺失则新建并插到最前（ECMA-376 要求 pPr 是 style/lvl 的首子元素）。"""
+    ppr = el.find("w:pPr", NS)
+    if ppr is None:
+        ppr = ET.Element(q("pPr"))
+        el.insert(0, ppr)
+    return ppr
+
+
+def ensure_rpr(el: ET.Element) -> ET.Element:
+    """取 w:rPr；缺失则新建并追加到末尾。"""
+    rpr = el.find("w:rPr", NS)
+    if rpr is None:
+        rpr = ET.SubElement(el, q("rPr"))
+    return rpr
+
+
+def replace_child(parent: ET.Element, tag: str, attrs: dict[str, Any] | None = None) -> ET.Element:
+    """删除同名子元素后新建一个；attrs 的值 str() 化后设为 w: 命名空间属性。"""
+    old = parent.find(f"w:{tag}", NS)
+    if old is not None:
+        parent.remove(old)
+    el = ET.SubElement(parent, q(tag))
+    for k, v in (attrs or {}).items():
+        el.set(q(k), str(v))
+    return el
+
+
+def line_spacing_attrs(value: Any) -> dict[str, str]:
+    """DSL 的 line_spacing（"single" / 1.5 / "double" / "22pt"）→ w:spacing 属性。"""
+    if value in (None, "single"):
+        return {"line": "240", "lineRule": "auto"}
+    if value in (1.5, "1.5"):
+        return {"line": "360", "lineRule": "auto"}
+    if value in (2, "double", "2"):
+        return {"line": "480", "lineRule": "auto"}
+    if isinstance(value, str):
+        m = re.match(r"^\s*([0-9]+(?:\.[0-9]+)?)\s*(pt|磅)\s*$", value, re.IGNORECASE)
+        if m:
+            return {"line": str(int(round(float(m.group(1)) * 20))), "lineRule": "exact"}
+    if isinstance(value, (int, float)):
+        return {"line": str(int(value)), "lineRule": "auto"}
+    raise ValueError(f"unknown line_spacing: {value!r}")
+
+
+def set_wordwrap_zero(ppr: ET.Element) -> bool:
+    """关掉「单词中间换行」+ 允许标点溢出（中文论文排版习惯）。
+
+    返回 True 表示本次真的改了。这是 ElementTree 栈的唯一实现；
+    tpl_factory/reference.py 另有一份 python-docx/lxml 栈的孪生
+    `_set_wordwrap_zero_docx`，两栈不可互换，别误删另一份。
+    """
+    ww = ppr.find("w:wordWrap", NS)
+    if ww is None:
+        replace_child(ppr, "wordWrap", {"val": "0"})
+        return True
+    if ww.get(q("val")) == "0":
+        return False
+    ww.set(q("val"), "0")  # 就地改，不重建：pPr 有 schema 顺序，换位置会让 Word 报错
+    return True
 
 
 def patch_docx_parts(path: Path, patches: dict[str, Callable[[bytes], bytes]]) -> None:

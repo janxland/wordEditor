@@ -2,9 +2,8 @@
 import re
 from pathlib import Path
 
+from clone_core import TAIL_MARKERS  # noqa: E402  尾部识别词唯一来源在底座模块
 from .ooxml import W, _body_children, _has_page_break, _local, _para_text
-
-TAIL_MARKERS = ("评审", "评分", "成绩", "评阅", "评定", "评语", "打分", "打分表", "教师签名")
 
 _COVER_LABELS = ("题目", "学院", "专业", "班级", "学号", "学生姓名", "姓名", "指导教师",
                  "教师", "职称", "课程名称", "完成时间", "单位", "日期")

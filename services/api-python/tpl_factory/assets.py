@@ -1,6 +1,7 @@
 """Web 结构化资产（fields.json / rubric.json）与 templates.json 注册。"""
 import json
 from pathlib import Path
+import sys
 
 _ROOT = Path(__file__).resolve().parents[3]  # tpl_factory/assets.py → 仓库根
 CONFIG = _ROOT / "config" / "templates.json"
@@ -50,7 +51,8 @@ def register(spec: dict, config_path: Path = CONFIG) -> bool:
     cfg = json.loads(config_path.read_text(encoding="utf-8"))
     tpl_dir = Path(f"templates/{spec['id']}")
     if any(t["id"] == spec["id"] for t in cfg["templates"]):
-        print(f"· 已存在模板 {spec['id']}，跳过注册（如需覆盖请手动改 config/templates.json）")
+        print(f"· 已存在模板 {spec['id']}，跳过注册（如需覆盖请手动改 config/templates.json）",
+              file=sys.stderr)
         return False
     entry = {
         "id": spec["id"],

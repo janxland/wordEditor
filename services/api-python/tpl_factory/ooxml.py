@@ -2,30 +2,19 @@
 import re
 from pathlib import Path
 
-from clone_core import _load_parts  # noqa: E402  与本包同目录的兄弟模块
+from clone_core import (  # noqa: E402  底座模块：正文/样式名读取只有一份实现
+    _load_parts,
+    _para_text,
+    _style_names,
+)
 
-W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+from ooxml_ns import W  # noqa: E402  命名空间 URI 唯一定义处（clone_core 已把 api-python 根塞进 sys.path）
 
 def _local(el) -> str:
     return el.tag.split("}")[-1]
 
-def _para_text(el) -> str:
-    return "".join(t.text or "" for t in el.iter(f"{{{W}}}t")).strip()
-
 def _has_page_break(el) -> bool:
     return any(b.get(f"{{{W}}}type") == "page" for b in el.iter(f"{{{W}}}br"))
-
-def _style_names(styles) -> dict[str, str]:
-    """styleId -> 样式显示名（小写）。"""
-    out = {}
-    if styles is None:
-        return out
-    for s in styles.findall(f"{{{W}}}style"):
-        sid = s.get(f"{{{W}}}styleId")
-        nm = s.find(f"{{{W}}}name")
-        if sid and nm is not None:
-            out[sid] = (nm.get(f"{{{W}}}val") or "").lower()
-    return out
 
 def _body_children(src_docx: Path):
     """body 顶层元素（排除结尾 sectPr），作为切片索引空间。"""

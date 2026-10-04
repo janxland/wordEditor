@@ -1,27 +1,75 @@
 #!/Users/Admin1/.workbuddy/binaries/python/envs/default/bin/python
-"""wordEditor CLI —— Markdown → docx 直连导出（不走 web / API）。
+"""wordEditor 单一入口 —— Markdown ↔ docx 排版 / 学校模板接入。
 
 用法:
-  we build <md文件|工作区目录> [-t 模板id] [-o 输出docx路径]
-  we templates
+  we build <md文件|工作区目录> [-t 模板id] [-o 输出docx路径]   md → docx
+                  [--password-env VAR] [--author A] [--remark R] [--doc-title T]
+                  [--header-text S] [--footer-text S] [--header-align left|center|right] …
+  we templates                                                列出可用模板
+  we analyze <docx> [--marker 摘要] [--text]                  只读解剖（不写文件）
+  we clone <docx> <模板id> --name "显示名" [--marker 摘要] [--force]
+                                                             反向复刻成模板（0 FAIL 才算成功）
+  we verify <spec.yaml> <产物.docx>                           机械验收：0 退出码 = 全通过
+  we extract <docx> [-o out.md]                                docx → md（含图片），反向闭环
+  we ref-styles [-t 模板id | --docx 路径] [--json]             列出 reference.docx 样式清单
+
+同一内核也以 MCP 暴露（services/api-python/mcp_server.py），三条入口等价：
+  CI 脚本 → we；Agent → MCP（workbuddy / zcode / claude 等）；网页 → HTTP /api。
+「接入一所新学校」的标准流程永远是 analyze → clone → build。
+
+约定：stdout 只放**结果**（可被jq / json.load 消费），进度与提示一律走 stderr。
+
+接单区 vs 代码区（别搞混）:
+  客户稿件  → 仓库根 jobs/（inbox 来稿 / work 在建 / done 已交付），整目录被 .gitignore 忽略，
+              接单流程：cp 来稿到 jobs/inbox/ → 复制到 jobs/work/<单号>/ → we build 该目录 → 归档到 jobs/done/
+  代码样例  → input/，**要入库**。input/暑假社会调查报告-样例.md 是产物等价回归（E6）的基线输入，
+              删了/改了回归就跑不了。客户稿件不要放 input/，也不要把 jobs/ 的东西 commit 进去。
 
 示例:
   we build ~/Downloads/某调查                 # 目录即工作区, 产物 docx 回写该目录
-  we build 报告.md -t hutb-gongke            # 换工科模板
-  we templates                               # 列出全部模板
+  we build jobs/work/2026-10-04-某论文         # 接单区在建工作区（产物回写同目录）
+  we build 报告.md -t hutb-gongke              # 换工科模板
+  WPW=xxx we build 报告.md --password-env WPW  # 设修改密码（明文不进命令行）
+  we templates                                 # 列出全部模板
+  we analyze "某大学论文格式规范.docx"          # 先看事实
+  we clone "某大学论文格式规范.docx" my-univ --name "某大学 · 学位论文" --marker 摘要
+  we verify templates/my-univ/spec.yaml output/my-univ-sample.docx
+  we extract 某论文.docx                        # 反向提回 Markdown
 """
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+from pathlib import Path
 
-sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[1] / "services" / "api-python"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services" / "api-python"))
 
-from direct import build_to_workspace, list_templates, resolve_md  # noqa: E402
+from direct import build_to_workspace, list_templates  # noqa: E402
 
 
 def cmd_build(args: argparse.Namespace) -> None:
-    build_to_workspace(args.input, template_id=args.template, output_path=args.output)
+    build_to_workspace(args.input, template_id=args.template, output_path=args.output,
+                       extra_args=build_passthrough(args))
+
+
+def build_passthrough(args: argparse.Namespace) -> list[str]:
+    """把 we build 的进阶开关透传给 pipeline/build.py（不重复维护参数表）。"""
+    out: list[str] = []
+    for flag in ("no_postprocess", "no_html_pipe"):
+        if getattr(args, flag):
+            out.append("--" + flag.replace("_", "-"))
+    for opt, val in (("password_env", "password-env"), ("password", "password"),
+                     ("author", "author"), ("remark", "remark"), ("doc_title", "doc-title"),
+                     ("header_text", "header-text"), ("footer_text", "footer-text")):
+        v = getattr(args, opt, None)
+        if v:
+            out += [f"--{val}", v]
+    for opt, val in (("header_align", "header-align"), ("footer_align", "footer-align")):
+        v = getattr(args, opt, None)
+        if v:
+            out += [f"--{val}", v]
+    return out
 
 
 def cmd_templates(_args: argparse.Namespace) -> None:
@@ -32,8 +80,74 @@ def cmd_templates(_args: argparse.Namespace) -> None:
             print(f"{'':<20} {t['note']}")
 
 
+def cmd_analyze(args: argparse.Namespace) -> None:
+    from mcp_server import analyze_docx
+    print(analyze_docx(str(Path(args.docx).expanduser().resolve()),
+                       marker=args.marker or "", with_text=args.text))
+
+
+def cmd_clone(args: argparse.Namespace) -> None:
+    import mcp_server
+    out = mcp_server.clone_template(
+        docx_path=str(Path(args.docx).expanduser().resolve()),
+        new_id=args.id, name=args.name, marker=args.marker or "", force=args.force)
+    print(out)
+    # 退出码语义化：CI 可直接卡口（未通过 = 非 0），别让「看着像成功」混过去
+    try:
+        ok = json.loads(out).get("ok", False)
+    except json.JSONDecodeError:
+        ok = False
+    if ok or args.allow_unverified:
+        return
+    sys.exit(2)
+
+
+def cmd_verify(args: argparse.Namespace) -> None:
+    import template_verify
+    sys.argv = ["template_verify", args.spec, args.docx]
+    template_verify.main()
+
+
+def _run_pipeline_script(name: str, argv: list[str]) -> int:
+    """转发到 pipeline/ 下的脚本（复用其参数解析，不复述参数表）。"""
+    import subprocess
+    root = Path(__file__).resolve().parents[1]
+    script = root / "services" / "api-python" / "pipeline" / name
+    if not script.is_file():
+        print(f"找不到管线脚本: {script}", file=sys.stderr)
+        return 1
+    return subprocess.call([sys.executable, str(script), *argv], cwd=str(root))
+
+
+def cmd_extract(args: argparse.Namespace) -> None:
+    src = Path(args.docx).expanduser().resolve()
+    out = Path(args.output).expanduser().resolve() if args.output else src.with_suffix(".md")
+    argv = ["-i", str(src), "-o", str(out)]
+    if args.image_rel:
+        argv += ["--image-rel", args.image_rel]
+    sys.exit(_run_pipeline_script("extract_docx_to_md.py", argv))
+
+
+def cmd_ref_styles(args: argparse.Namespace) -> None:
+    if not args.template and not args.docx:
+        print("需要 -t <模板id> 或 --docx <路径> 之一", file=sys.stderr)
+        sys.exit(2)
+    argv: list[str] = []
+    if args.template:
+        argv += ["-t", args.template]
+    if args.docx:
+        argv += ["--docx", str(Path(args.docx).expanduser().resolve())]
+    if args.json:
+        argv.append("--json")
+    sys.exit(_run_pipeline_script("list_reference_styles.py", argv))
+
+
 def main() -> None:
-    ap = argparse.ArgumentParser(prog="we", description="wordEditor 直连导出 CLI")
+    ap = argparse.ArgumentParser(
+        prog="we", description="wordEditor 单一入口（md→docx 排版 + 学校模板接入）\n\n"
+        "接单区 vs 代码区：客户稿件放仓库根 jobs/（inbox/work/done，整目录被 .gitignore 忽略）；\n"
+        "input/ 是代码自带样例，要入库 —— 尤其 input/暑假社会调查报告-样例.md 是产物等价回归的基线输入。\n"
+        "接单流程：cp 来稿到 jobs/inbox/ → 复制到 jobs/work/<单号>/ → we build 该目录 → 归档到 jobs/done/")
     sub = ap.add_subparsers(dest="command", required=True)
 
     b = sub.add_parser("build", help="md/目录 → docx（默认回写工作区）")
@@ -41,10 +155,54 @@ def main() -> None:
     b.add_argument("-t", "--template", default="hutb-guanke",
                    help="模板 id，默认 hutb-guanke（湖南工商大学·管科）")
     b.add_argument("-o", "--output", default=None, help="输出 docx 路径，默认工作区内同名 docx")
+    b.add_argument("--no-postprocess", action="store_true", help="跳过后处理（调试用）")
+    b.add_argument("--no-html-pipe", action="store_true", help="不用 html 管道（更快，HTML 支持弱）")
+    b.add_argument("--password-env", default=None, help="从环境变量读「修改密码」（避免明文进命令行）")
+    b.add_argument("--password", default=None, help="设置「修改密码」（明文，优先用 --password-env）")
+    b.add_argument("--author", default=None, help="文档作者（写入 docProps）")
+    b.add_argument("--remark", default=None, help="文档备注（dc:description）")
+    b.add_argument("--doc-title", default=None, help="文档标题属性（dc:title）")
+    b.add_argument("--header-text", default=None, help="页眉文字")
+    b.add_argument("--footer-text", default=None, help="页脚文字")
+    b.add_argument("--header-align", choices=["left", "center", "right"], default=None)
+    b.add_argument("--footer-align", choices=["left", "center", "right"], default=None)
     b.set_defaults(func=cmd_build)
 
     tp = sub.add_parser("templates", help="列出可用模板")
     tp.set_defaults(func=cmd_templates)
+
+    an = sub.add_parser("analyze", help="只读解剖 docx：页面/正文逐段实测/封面尾表边界")
+    an.add_argument("docx")
+    an.add_argument("--marker", default="", help="正文起点标记文本，如 摘要")
+    an.add_argument("--text", action="store_true", help="附带 body 全文（摘格式要求用）")
+    an.set_defaults(func=cmd_analyze)
+
+    cl = sub.add_parser("clone", help="反向复刻 docx 为模板（工厂全链路 + 0 FAIL 验收）")
+    cl.add_argument("docx")
+    cl.add_argument("id", help="模板 id，英文数字连字符，如 csu-law-graduate")
+    cl.add_argument("--name", required=True, help="显示名，如 中南大学 · 法学硕士论文")
+    cl.add_argument("--marker", default="", help="正文起点标记文本，如 摘要")
+    cl.add_argument("--force", action="store_true", help="已存在同名目录时覆盖（会重写 spec）")
+    cl.add_argument("--allow-unverified", action="store_true",
+                    help="即使验收未通过也返回 0（默认未通过即非 0）")
+    cl.set_defaults(func=cmd_clone)
+
+    vf = sub.add_parser("verify", help="机械验收：spec 期望值 vs 产物 docx，0 退出码 = 全通过")
+    vf.add_argument("spec")
+    vf.add_argument("docx")
+    vf.set_defaults(func=cmd_verify)
+
+    ex = sub.add_parser("extract", help="docx → Markdown（含图片导出），反向闭环")
+    ex.add_argument("docx")
+    ex.add_argument("-o", "--output", default=None, help="输出 .md，默认与源同目录同名")
+    ex.add_argument("--image-rel", default=None, help="md 里图片相对路径前缀，默认 images/<slug>")
+    ex.set_defaults(func=cmd_extract)
+
+    rs = sub.add_parser("ref-styles", help="列出 reference.docx 的样式清单")
+    rs.add_argument("-t", "--template", default=None, help="模板 id")
+    rs.add_argument("--docx", default=None, help="直接指定 docx（与 -t 二选一）")
+    rs.add_argument("--json", action="store_true", help="输出 JSON")
+    rs.set_defaults(func=cmd_ref_styles)
 
     args = ap.parse_args()
     args.func(args)

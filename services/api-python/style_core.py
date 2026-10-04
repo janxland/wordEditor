@@ -28,15 +28,14 @@ import sys
 import tempfile
 from pathlib import Path
 
-import os
-
-WORDEDITOR_ROOT = Path(os.environ.get(
-    "WORDEDITOR_ROOT", "/Users/Admin1/Desktop/project/janxland/wordEditor"))
-API_DIR = WORDEDITOR_ROOT / "services" / "api-python"
+API_DIR = Path(__file__).resolve().parent
 PIPE_DIR = API_DIR / "pipeline"
 for p in (str(API_DIR), str(PIPE_DIR)):
     if p not in sys.path:
         sys.path.insert(0, p)
+
+# 仓库根的唯一来源在 clone_core（env WORDEDITOR_ROOT 优先，回退按文件位置推导）。
+from clone_core import WORDEDITOR_ROOT  # noqa: E402
 
 import direct  # noqa: E402  (工作区构建核心)
 from postprocess_pipeline import run_styles_postprocess  # noqa: E402

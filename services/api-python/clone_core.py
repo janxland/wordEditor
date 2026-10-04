@@ -2,16 +2,18 @@
 # -*- coding: utf-8 -*-
 """docx → 模板反向复刻核心（不碰默认模板）。
 
-三种用法:
+两种用法:
   1. 分析:      analyze_docx(path)                  → 格式/封面结构报告，只读
   2. 复刻注册:  clone_template(src, new_id, ...)    → 新模板（含封面块），全通道可用
-  3. 单次套用:  build_with_cover(md, src, ...)      → 不注册，一次性产出带封面 docx
 
 原理:
   - pandoc --reference-doc 复用源 docx 的 styles.xml + sectPr + 页眉页脚（格式层）
   - 源 docx 中正文起点（第一个 Title/Heading 或摘要标记）之前的内容 → 封面块
     （封面、评分表等），构建后原样注入到产物开头
   - 注册进 config/templates.json 的条目 source="derived"，可用 remove_template 撤销
+
+注意：新增模板**优先走 tpl_factory**（spec.yaml 是唯一数据源，自带 detect/analyze/build/verify
+全链路）；本模块是它的能力底座与旧路径，MCP / CLI 的 clone_template 走工厂。
 
 命令行:
   python clone_core.py analyze  <docx>
@@ -20,6 +22,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import sys
@@ -28,7 +31,9 @@ from pathlib import Path
 
 from lxml import etree
 
-WORDEDITOR_ROOT = Path(__file__).resolve().parents[2]
+# 仓库根的唯一来源：环境变量 WORDEDITOR_ROOT 优先，回退按本文件位置推导（不硬编码绝对路径）。
+# style_core / tpl_factory 一律从这里 import，不要再各算一份。
+WORDEDITOR_ROOT = Path(os.environ.get("WORDEDITOR_ROOT", Path(__file__).resolve().parents[2]))
 CONFIG = WORDEDITOR_ROOT / "config" / "templates.json"
 _API_DIR = Path(__file__).resolve().parent
 _PIPE_DIR = _API_DIR / "pipeline"
@@ -36,9 +41,8 @@ for _p in (str(_API_DIR), str(_PIPE_DIR)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-NS = {"w": W, "r": R}
+from ooxml_ns import NS, R, W  # noqa: E402  命名空间 URI 唯一定义处（见 pipeline 侧的同样 import）
+
 RID_ATTRS = {f"{{{R}}}{k}" for k in ("embed", "link", "id", "pict", "dm", "lo", "qs", "cs")}
 RID_RE = re.compile(r"^rId\d+$")
 
@@ -55,14 +59,15 @@ def _load_parts(docx: Path):
 
 
 def _style_names(styles) -> dict:
-    """styleId → 样式名（w:name val）。"""
+    """styleId → 样式名（w:name val，小写）。缺 styleId 的样式跳过。"""
     out = {}
     if styles is None:
         return out
     for st in styles.findall(f"{{{W}}}style"):
+        sid = st.get(f"{{{W}}}styleId")
         nm = st.find(f"{{{W}}}name")
-        if nm is not None:
-            out[st.get(f"{{{W}}}styleId")] = (nm.get(f"{{{W}}}val") or "").lower()
+        if sid and nm is not None:
+            out[sid] = (nm.get(f"{{{W}}}val") or "").lower()
     return out
 
 
@@ -213,7 +218,9 @@ def extract_cover(path: Path, marker: str | None, out_dir: Path) -> dict:
 
 # ---------------------------------------------------------------- 尾部块抽取
 
-TAIL_MARKERS = ("评审表", "评分表", "成绩", "评阅")
+# 尾页评分表的识别词。全仓唯一一份（tpl_factory/detect.py 从此处 import）。
+# 取两家历史取值的并集：工厂探测用的宽集合覆盖了旧路径的窄集合。
+TAIL_MARKERS = ("评审", "评分", "成绩", "评阅", "评定", "评语", "打分", "打分表", "教师签名")
 
 def extract_tail(path: Path, out_dir: Path) -> dict | None:
     """抽取文档末尾的评分/评审表块（标题段 + 末表 + 表后内容）。
@@ -497,21 +504,6 @@ def clone_template(source_docx: str | Path, new_id: str, marker: str | None = "�
         CONFIG.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return {"template_id": new_id, "styles_yaml": str(tdir / "styles.yaml"),
             "cover": cover, "tail": tail, "registered": register}
-
-
-def build_with_cover(md_path: str | Path, source_docx: str | Path,
-                     output_path: str | Path | None = None,
-                     marker: str | None = "摘要", numbering: str = "gongke") -> Path:
-    """单次套用（不注册模板）：按源 docx 格式构建 + 注入封面，产出即弃。"""
-    import direct  # noqa: E402
-    tmp_id = f"_oneshot_{uuid_hex()}" if False else "_oneshot_clone"
-    res = clone_template(source_docx, tmp_id, marker=marker, numbering=numbering,
-                         display_name="一次性复刻", register=True)
-    try:
-        out = direct.build_to_workspace(md_path, template_id=tmp_id, output_path=output_path)
-    finally:
-        remove_clone(tmp_id)
-    return out
 
 
 def remove_clone(new_id: str) -> bool:

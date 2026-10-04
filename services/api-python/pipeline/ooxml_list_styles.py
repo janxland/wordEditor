@@ -16,17 +16,28 @@
 """
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from ooxml_util import (  # noqa: E402
+    NS,
+    W,
+    ensure_ppr,
+    ensure_rpr,
+    line_spacing_attrs,
+    q,
+    replace_child,
+)
+from ooxml_numbering import max_abstract_id  # noqa: E402
+
 import copy
 from typing import Any
 from xml.etree import ElementTree as ET
 
-W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-NS = {"w": W}
-ET.register_namespace("w", W)
 
-
-def _q(tag: str) -> str:
-    return f"{{{W}}}{tag}"
 
 
 # ─────────────────────────────── 库样式扁平化 ───────────────────────────────
@@ -101,21 +112,12 @@ def resolve_use_list(
 
 # ─────────────────────────────── numbering.xml ───────────────────────────────
 
-def _max_abstract_id(root: ET.Element) -> int:
-    m = -1
-    for ab in root.findall("w:abstractNum", NS):
-        try:
-            m = max(m, int(ab.get(_q("abstractNumId"), "-1")))
-        except ValueError:
-            pass
-    return m
-
 
 def _used_num_ids(root: ET.Element) -> set[int]:
     out: set[int] = set()
     for n in root.findall("w:num", NS):
         try:
-            out.add(int(n.get(_q("numId"), "-1")))
+            out.add(int(n.get(q("numId"), "-1")))
         except ValueError:
             pass
     return out
@@ -133,27 +135,27 @@ def _ensure_numbering_root(numbering_xml: bytes) -> ET.Element:
 
 def _make_abstract_num(abstract_id: int, style: dict[str, Any]) -> ET.Element:
     """从扁平 style 生成单级 abstractNum。"""
-    ab = ET.Element(_q("abstractNum"), {_q("abstractNumId"): str(abstract_id)})
-    ET.SubElement(ab, _q("multiLevelType"), {_q("val"): "hybridMultilevel"})
+    ab = ET.Element(q("abstractNum"), {q("abstractNumId"): str(abstract_id)})
+    ET.SubElement(ab, q("multiLevelType"), {q("val"): "hybridMultilevel"})
 
     lst = style.get("list") or {}
-    lvl = ET.SubElement(ab, _q("lvl"), {_q("ilvl"): "0"})
-    ET.SubElement(lvl, _q("start"), {_q("val"): str(int(lst.get("start", 1)))})
-    ET.SubElement(lvl, _q("numFmt"), {_q("val"): str(lst.get("num_fmt", "decimal"))})
+    lvl = ET.SubElement(ab, q("lvl"), {q("ilvl"): "0"})
+    ET.SubElement(lvl, q("start"), {q("val"): str(int(lst.get("start", 1)))})
+    ET.SubElement(lvl, q("numFmt"), {q("val"): str(lst.get("num_fmt", "decimal"))})
     suff = lst.get("suff")
     if suff:
-        ET.SubElement(lvl, _q("suff"), {_q("val"): str(suff)})
-    ET.SubElement(lvl, _q("lvlText"), {_q("val"): str(lst.get("lvl_text", "%1."))})
-    ET.SubElement(lvl, _q("lvlJc"), {_q("val"): str(lst.get("align", "left"))})
+        ET.SubElement(lvl, q("suff"), {q("val"): str(suff)})
+    ET.SubElement(lvl, q("lvlText"), {q("val"): str(lst.get("lvl_text", "%1."))})
+    ET.SubElement(lvl, q("lvlJc"), {q("val"): str(lst.get("align", "left"))})
     # pStyle 绑定到本列表样式 id，方便 Word 在更改样式时自动套
-    ET.SubElement(lvl, _q("pStyle"), {_q("val"): style["id"]})
+    ET.SubElement(lvl, q("pStyle"), {q("val"): style["id"]})
     return ab
 
 
 def _insert_before_num(root: ET.Element, node: ET.Element) -> None:
     """abstractNum 必须出现在 num 之前。"""
     for i, child in enumerate(list(root)):
-        if child.tag == _q("num"):
+        if child.tag == q("num"):
             root.insert(i, node)
             return
     root.append(node)
@@ -163,7 +165,7 @@ def _insert_before_num(root: ET.Element, node: ET.Element) -> None:
 
 def _find_style(root: ET.Element, sid: str) -> ET.Element | None:
     for s in root.findall("w:style", NS):
-        if s.get(_q("styleId")) == sid:
+        if s.get(q("styleId")) == sid:
             return s
     return None
 
@@ -179,28 +181,28 @@ def _ensure_style(root: ET.Element, sid: str, name: str, based_on: str) -> ET.El
         return s
     s = ET.SubElement(
         root,
-        _q("style"),
-        {_q("type"): "paragraph", _q("customStyle"): "1", _q("styleId"): sid},
+        q("style"),
+        {q("type"): "paragraph", q("customStyle"): "1", q("styleId"): sid},
     )
-    ET.SubElement(s, _q("name"), {_q("val"): name})
-    ET.SubElement(s, _q("basedOn"), {_q("val"): based_on or "a"})
-    ET.SubElement(s, _q("qFormat"))
+    ET.SubElement(s, q("name"), {q("val"): name})
+    ET.SubElement(s, q("basedOn"), {q("val"): based_on or "a"})
+    ET.SubElement(s, q("qFormat"))
     return s
 
 
 def _attach_num_pr(style: ET.Element, num_id: int, ilvl: int = 0) -> None:
     ppr = style.find("w:pPr", NS)
     if ppr is None:
-        ppr = ET.SubElement(style, _q("pPr"))
+        ppr = ET.SubElement(style, q("pPr"))
         # 让 pPr 在 rPr 之前（OOXML 推荐顺序）
         # 不强制重排：现代 Word/WPS 都能容忍。
     # 重写 numPr
     old = ppr.find("w:numPr", NS)
     if old is not None:
         ppr.remove(old)
-    np = ET.SubElement(ppr, _q("numPr"))
-    ET.SubElement(np, _q("ilvl"), {_q("val"): str(ilvl)})
-    ET.SubElement(np, _q("numId"), {_q("val"): str(num_id)})
+    np = ET.SubElement(ppr, q("numPr"))
+    ET.SubElement(np, q("ilvl"), {q("val"): str(ilvl)})
+    ET.SubElement(np, q("numId"), {q("val"): str(num_id)})
 
 
 # ─────────────────────────────── 主入口 ───────────────────────────────
@@ -231,7 +233,7 @@ def apply_list_styles(
     # 2) numbering.xml: 为每个启用样式创建 abstractNum + num
     num_root = _ensure_numbering_root(numbering_xml)
     used = _used_num_ids(num_root)
-    next_abs_id = _max_abstract_id(num_root) + 1
+    next_abs_id = max_abstract_id(num_root) + 1
 
     new_nums: list[tuple[int, int]] = []  # (num_id, abstract_id)
     used_ids: dict[str, int] = {}
@@ -251,8 +253,8 @@ def apply_list_styles(
         used_ids[style["id"]] = num_id
 
     for num_id, abs_id in new_nums:
-        n = ET.SubElement(num_root, _q("num"), {_q("numId"): str(num_id)})
-        ET.SubElement(n, _q("abstractNumId"), {_q("val"): str(abs_id)})
+        n = ET.SubElement(num_root, q("num"), {q("numId"): str(num_id)})
+        ET.SubElement(n, q("abstractNumId"), {q("val"): str(abs_id)})
 
     new_numbering = ET.tostring(num_root, encoding="utf-8", xml_declaration=True)
 
@@ -280,10 +282,10 @@ def apply_list_styles(
 def _abstract_id_of(num_root: ET.Element, num_id: int) -> int | None:
     target = str(num_id)
     for n in num_root.findall("w:num", NS):
-        if n.get(_q("numId")) == target:
+        if n.get(q("numId")) == target:
             ab = n.find("w:abstractNumId", NS)
             try:
-                return int(ab.get(_q("val"), "-1")) if ab is not None else None
+                return int(ab.get(q("val"), "-1")) if ab is not None else None
             except ValueError:
                 return None
     return None
@@ -331,7 +333,7 @@ def redirect_list_num_ids(
         return mapping[orig]
 
     count = 0
-    for p in doc_root.iter(_q("p")):
+    for p in doc_root.iter(q("p")):
         ppr = p.find("w:pPr", NS)
         if ppr is None:
             continue
@@ -342,31 +344,31 @@ def redirect_list_num_ids(
         if nid_el is None:
             continue
         try:
-            cur = int(nid_el.get(_q("val"), "-1"))
+            cur = int(nid_el.get(q("val"), "-1"))
         except ValueError:
             continue
         if cur <= 0 or cur in preserved_num_ids:
             continue
-        nid_el.set(_q("val"), str(remap(cur)))
+        nid_el.set(q("val"), str(remap(cur)))
         if numpr.find("w:ilvl", NS) is None:
-            numpr.insert(0, ET.Element(_q("ilvl"), {_q("val"): str(default_ilvl)}))
+            numpr.insert(0, ET.Element(q("ilvl"), {q("val"): str(default_ilvl)}))
         if default_style_id:
             ps = ppr.find("w:pStyle", NS)
             if ps is None:
-                ppr.insert(0, ET.Element(_q("pStyle"), {_q("val"): default_style_id}))
+                ppr.insert(0, ET.Element(q("pStyle"), {q("val"): default_style_id}))
             else:
-                ps.set(_q("val"), default_style_id)
+                ps.set(q("val"), default_style_id)
         count += 1
 
     if count == 0:
         return document_xml, numbering_xml, 0
 
     for new_id in mapping.values():  # 仅当 target_abs 存在时 mapping 才非空
-        n = ET.SubElement(num_root, _q("num"), {_q("numId"): str(new_id)})
-        ET.SubElement(n, _q("abstractNumId"), {_q("val"): str(target_abs)})
+        n = ET.SubElement(num_root, q("num"), {q("numId"): str(new_id)})
+        ET.SubElement(n, q("abstractNumId"), {q("val"): str(target_abs)})
         for ilvl in range(9):
-            lo = ET.SubElement(n, _q("lvlOverride"), {_q("ilvl"): str(ilvl)})
-            ET.SubElement(lo, _q("startOverride"), {_q("val"): "1"})
+            lo = ET.SubElement(n, q("lvlOverride"), {q("ilvl"): str(ilvl)})
+            ET.SubElement(lo, q("startOverride"), {q("val"): "1"})
 
     return (
         ET.tostring(doc_root, encoding="utf-8", xml_declaration=True),

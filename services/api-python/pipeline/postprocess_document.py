@@ -18,7 +18,8 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from ooxml_numbering import HUTB_HEADING_NUM_ID  # noqa: E402
-from ooxml_util import (  # noqa: E402
+from ooxml_util import (
+    CODE_STYLE_IDS,  # noqa: E402
     NS,
     append_ref_field,
     append_text_run,
@@ -38,7 +39,6 @@ from ooxml_util import (  # noqa: E402
 REF_IN_TEXT = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
 TABLE_CAPTION_FALLBACK = re.compile(r"^\s*表(?:格)?\s*\d+[\s．.：:、　]*\S")
 TABLE_CAPTION_STYLE_ID = "表注"  # 与 hutb-base.yaml custom_styles.id / Pandoc custom-style 一致
-CODE_STYLE_IDS = {"SourceCode", "VerbatimChar"}
 
 
 def _is_verbatim_paragraph(p: ET.Element) -> bool:
@@ -218,7 +218,7 @@ def apply_table_caption_fallback(document_xml: bytes) -> tuple[bytes, int]:
     return ET.tostring(root, encoding="utf-8", xml_declaration=True), changed
 
 
-def patch_docx(
+def patch_docx_document(
     path: Path,
     *,
     skip_headings: bool = False,
@@ -274,7 +274,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"找不到: {args.docx}", file=sys.stderr)
         return 1
 
-    stats = patch_docx(
+    stats = patch_docx_document(
         args.docx,
         skip_headings=args.skip_headings,
         skip_refs=args.skip_refs,

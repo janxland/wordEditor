@@ -22,10 +22,16 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+# W / R 的 URI 唯一定义在 api-python 根的 ooxml_ns.py，这里以 *_NS 别名引入
+# （本文件的 W/R 是带花括号的 `{uri}` 形态，不能与 URI 同名）。
+_API_DIR = str(Path(__file__).resolve().parents[1])
+if _API_DIR not in sys.path:
+    sys.path.insert(0, _API_DIR)
+
+from ooxml_ns import R as R_NS, W as W_NS  # noqa: E402
+
 A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
 M_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math"
-R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 WP_NS = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
 PIC_NS = "http://schemas.openxmlformats.org/drawingml/2006/picture"
 
