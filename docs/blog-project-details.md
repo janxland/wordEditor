@@ -46,7 +46,7 @@ flowchart LR
 
 - 前端开发代理与本地编排：[apps/wordEditor-frontend/server/dev-api.ts](../apps/wordEditor-frontend/server/dev-api.ts)
 - Python API 入口：[services/api-python/app.py](../services/api-python/app.py)
-- Python CLI 统一入口：[services/api-python/run.py](../services/api-python/run.py)
+- CLI 统一入口：[bin/we](../bin/we)
 - Node API 启动入口：[services/api-node/src/main.ts](../services/api-node/src/main.ts)
 - 核心构建脚本：[services/api-python/pipeline/build.py](../services/api-python/pipeline/build.py)
 
@@ -147,7 +147,7 @@ Python 依赖见 [requirements.txt](../requirements.txt)。
 ### 一键导出（CLI）
 
 ```powershell
-py services/api-python/run.py build -i input/碳中和风光储优化.md -t hutb-guanke
+./bin/we build input/碳中和风光储优化.md -t hutb-guanke
 ```
 
 ### 前后端联调

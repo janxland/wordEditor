@@ -2,6 +2,17 @@
 node_modules/
 .pnpm-store/
 
+# 密钥 / 凭据 / 本机环境（绝不入库；本仓库为私有仓库，仍按此口径防御）
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+**/*-service-account*.json
+
 # 前端构建 / 缓存
 dist/
 .cache/
@@ -16,8 +27,9 @@ __pycache__/
 .venv/
 venv/
 
-# 用户自定义模板（含学校官方 docx，勿提交敏感内容时可取消忽略）
-# templates/hutb-shared/reference.docx
+# 桌面端本地运行数据（可能含用户文档与任务产物）
+services/api-node/.data/
+services/api-node/*.log
 
 # IDE / OS
 .idea/
@@ -39,3 +51,21 @@ apps/wordeditor-desktop/resources/
 
 # 临时校验脚本
 apps/wordEditor-frontend/tmp-check.mjs
+
+# ── 接单区 ──────────────────────────────────────────────────────────────────
+# jobs/ 是**接单业务区**，不是代码区：客户来稿、在建工作区、交付物、图片素材。
+# 一律不入库 —— 客户稿件进 git 会：① 让工作区永远脏（干扰去冗余扫描与 code review）
+# ② 有隐私/版权风险 ③ 仓库体积失控（曾有两单 41M 直接堆在 input/）。
+# 只保留骨架目录与规约文档，方便 clone 下来就知道往哪放。
+# 规约见 jobs/README.md；代码自带的样例输入在 input/（那个是要入库的）。
+jobs/**
+!jobs/README.md
+# 先把三个子目录本身放行（目录被排除的话 git 根本不会进去看里面的 .gitkeep），
+# 再单独放行骨架占位文件 —— 这样 clone 下来目录结构就在，但里面的客户文件一个都不进库。
+!jobs/inbox/
+!jobs/work/
+!jobs/done/
+!jobs/*/.gitkeep
+
+# 去冗余轮次里删掉的代码的本地备份（只留磁盘当回滚材料，不入库）
+docs/refactor/rounds/*/backup/
